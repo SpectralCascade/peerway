@@ -1,4 +1,4 @@
-import { StyleSheet, View, Image } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
@@ -6,7 +6,7 @@ import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import AppVersion from '../AppVersion';
 
-function SetupScreen(props) {
+function SetupScreen({ navigation }) {
     return (
         <SafeAreaView style={StyleMain.background}>
             <View style={StyleMain.mainContent}>
@@ -16,9 +16,9 @@ function SetupScreen(props) {
                     <Text>Your data are belong to... you!</Text>
                 </View>
 
-                <View style={StyleMain.button}>
+                <TouchableOpacity style={StyleMain.button} onPress={() => navigation.navigate("EditProfile")}>
                     <ButtonText>Create Account</ButtonText>
-                </View>
+                </TouchableOpacity>
 
                 <View style={[StyleMain.button, styles.aboutButton]}>
                     <ButtonText>About</ButtonText>
