@@ -21,7 +21,7 @@ export default function App() {
             <Stack.Screen
               name="EditProfile"
               component={ProfileEditScreen}
-              options={{animation: 'slide_from_right'}}
+              options={{title: "Edit Profile", animation: 'slide_from_right', headerShown: true,}}
             />
           </Stack.Navigator>
         </NavigationContainer>

@@ -9,13 +9,14 @@ import AppVersion from '../AppVersion';
 function SetupScreen({ navigation }) {
     return (
         <SafeAreaView style={StyleMain.background}>
-            <View style={StyleMain.mainContent}>
-                <View style={StyleMain.logoContainer}>
-                    <Image style={StyleMain.logo} source={require("../../assets/adaptive-icon.png")}>
-                    </Image>
-                    <Text>Your data are belong to... you!</Text>
-                </View>
-
+            
+            <View style={StyleMain.logoContainer}>
+                <Image style={StyleMain.logo} source={require("../../assets/adaptive-icon.png")}>
+                </Image>
+                <Text>Your data are belong to... you!</Text>
+            </View>
+            
+            <View style={StyleMain.bottomContent}>
                 <TouchableOpacity style={StyleMain.button} onPress={() => navigation.navigate("EditProfile")}>
                     <ButtonText>Create Account</ButtonText>
                 </TouchableOpacity>
