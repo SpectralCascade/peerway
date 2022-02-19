@@ -6,6 +6,7 @@ import AvatarIcon from "../../assets/icons/account.svg";
 import DatePicker from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
+import ImagePicker from 'react-native-image-crop-picker';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -43,10 +44,19 @@ export default class ProfileEditScreen extends React.Component {
                 <View style={[StyleMain.mainContent]}>
                     <ScrollView>
                         <View style={StyleMain.center}>
-                            <View style={[StyleMain.avatar, styles.avatar, {marginTop: 10}]}>
+                            <TouchableOpacity
+                                style={[StyleMain.avatar, styles.avatar, {marginTop: 10}]}
+                                onPress={() => {
+                                    ImagePicker.openPicker({
+                                        cropping: true
+                                    }).then(image => {
+                                        console.log(image);
+                                    });
+                                }}
+                            >
                                 <Image source={require("../../assets/favicon.png")} style={styles.avatar} />
                                 <AvatarIcon width={avatarSize} height={avatarSize} style={{position: "absolute"}} />
-                            </View>
+                            </TouchableOpacity>
                         </View>
                         <Text style={styles.text}>Name:</Text>
                         <TextInput
