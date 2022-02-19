@@ -8,7 +8,7 @@ import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
 
 const dimensions = Dimensions.get('window');
-const avatarSize = dimensions.width * 0.5;
+const avatarSize = dimensions.width * 0.3;
 
 export default class ProfileEditScreen extends React.Component {
     constructor(props) {
@@ -16,6 +16,7 @@ export default class ProfileEditScreen extends React.Component {
         this.datePickerModalRef = React.createRef();
         this.state = {
             selectedDate: "",
+            name: ""
         };
     }
 
@@ -39,20 +40,21 @@ export default class ProfileEditScreen extends React.Component {
                     }} />
                 </Modal>
 
-                <View style={[StyleMain.center, StyleMain.topContent]}>
+                <View style={[StyleMain.mainContent]}>
                     <ScrollView>
+                        <View style={StyleMain.center}>
                             <View style={[StyleMain.avatar, styles.avatar, {marginTop: 10}]}>
                                 <Image source={require("../../assets/favicon.png")} style={styles.avatar} />
                                 <AvatarIcon width={avatarSize} height={avatarSize} style={{position: "absolute"}} />
                             </View>
-                    </ScrollView>
-                </View>
-
-                <View style={[StyleMain.mainContent]}>
-                    <ScrollView>
-                        
+                        </View>
                         <Text style={styles.text}>Name:</Text>
-                        <TextInput style={StyleMain.textInput}></TextInput>
+                        <TextInput
+                            onChangeText={(text) => this.setState({name: text}) } 
+                            style={StyleMain.textInput}
+                            value={this.state.name}
+                            placeholder="Required field..."
+                        />
 
                         <Text style={styles.text}>Date of birth:</Text>
                         <TouchableOpacity style={StyleMain.textInput} onPress={() => {
@@ -79,11 +81,14 @@ export default class ProfileEditScreen extends React.Component {
                             numberOfLines={3}
                             style={[StyleMain.textInputMultiline, {height: 80}]}
                         />
-
                     </ScrollView>
                     
-                    <TouchableOpacity style={[StyleMain.button, {height: 40, marginTop: 12}]} onPress={() => console.log("Saving profile...")}>
-                        <ButtonText>Save Profile</ButtonText>
+                    <TouchableOpacity
+                        disabled={this.state.name == ""}
+                        style={[StyleMain.button, {backgroundColor: (this.state.name != "" ? "#fc5c65" : "#ec4c55"), height: 40, marginTop: 12}]}
+                        onPress={() => console.log("Saving profile...")}
+                    >
+                        <ButtonText style={{color: (this.state.name != "" ? "#fff" : "#bbb")}}>Save Profile</ButtonText>
                     </TouchableOpacity>
 
                 </View>

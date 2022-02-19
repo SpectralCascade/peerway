@@ -49,8 +49,6 @@ const StyleMain = StyleSheet.create({
         flex: 1,
         padding: 12,
     },
-    topContent: {
-    },
     text: {
         color: "#000",
     },
