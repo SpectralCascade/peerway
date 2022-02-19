@@ -43,16 +43,13 @@ const StyleMain = StyleSheet.create({
     },
     logoContainer: {
         flex: 1,
-        justifyContent: "flex-start",
         alignItems: "center"
     },
     mainContent: {
         flex: 1,
-        justifyContent: "flex-start",
         padding: 12,
     },
     topContent: {
-        justifyContent: "flex-start",
     },
     text: {
         color: "#000",
