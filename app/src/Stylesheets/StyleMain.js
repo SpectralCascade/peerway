@@ -56,9 +56,17 @@ const StyleMain = StyleSheet.create({
     },
     textInput: {
         backgroundColor: "#fff",
-        height: 40,
+        minHeight: 40,
         borderWidth: 1,
-        padding: 10,
+        justifyContent: "center",
+        paddingHorizontal: 12
+    },
+    textInputMultiline: {
+        textAlignVertical: "top",
+        backgroundColor: "#fff",
+        minHeight: 40,
+        borderWidth: 1,
+        padding: 12,
     }
 });
 

@@ -5,9 +5,10 @@ import StyleMain from '../Stylesheets/StyleMain';
 import AvatarIcon from "../../assets/icons/account.svg";
 import DatePicker from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
+import ButtonText from '../Components/ButtonText';
 
 const dimensions = Dimensions.get('window');
-const avatarSize = dimensions.width * 0.6;
+const avatarSize = dimensions.width * 0.5;
 
 export default class ProfileEditScreen extends React.Component {
     constructor(props) {
@@ -15,7 +16,6 @@ export default class ProfileEditScreen extends React.Component {
         this.datePickerModalRef = React.createRef();
         this.state = {
             selectedDate: "",
-            isOpen: false,
         };
     }
 
@@ -52,7 +52,7 @@ export default class ProfileEditScreen extends React.Component {
                     <ScrollView>
                         
                         <Text style={styles.text}>Name:</Text>
-                        <TextInput onPressOut={Keyboard.dismiss} style={StyleMain.textInput}></TextInput>
+                        <TextInput style={StyleMain.textInput}></TextInput>
 
                         <Text style={styles.text}>Date of birth:</Text>
                         <TouchableOpacity style={StyleMain.textInput} onPress={() => {
@@ -67,7 +67,25 @@ export default class ProfileEditScreen extends React.Component {
                             })()}</Text>
                         </TouchableOpacity>
 
+                        <Text style={styles.text}>Location:</Text>
+                        <TextInput style={StyleMain.textInput} />
+
+                        <Text style={styles.text}>Website:</Text>
+                        <TextInput style={StyleMain.textInput} />
+
+                        <Text style={styles.text}>About you:</Text>
+                        <TextInput
+                            multiline={true}
+                            numberOfLines={3}
+                            style={[StyleMain.textInputMultiline, {height: 80}]}
+                        />
+
                     </ScrollView>
+                    
+                    <TouchableOpacity style={[StyleMain.button, {height: 40, marginTop: 12}]} onPress={() => console.log("Saving profile...")}>
+                        <ButtonText>Save Profile</ButtonText>
+                    </TouchableOpacity>
+
                 </View>
 
             </View>
