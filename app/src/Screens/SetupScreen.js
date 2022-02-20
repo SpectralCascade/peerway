@@ -5,19 +5,27 @@ import StyleMain from '../Stylesheets/StyleMain';
 import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import AppVersion from '../AppVersion';
+import Database from '../Database';
 
-function SetupScreen({ navigation }) {
+export default function SetupScreen(props) {
+    React.useEffect(() => {
+        return props.navigation.addListener('focus', () => {
+            console.log("OPENED SETUP SCREEN");
+            Database.SwitchActiveEntity(null);
+        });
+    });
+
     return (
         <SafeAreaView style={StyleMain.background}>
-            
+
             <View style={StyleMain.logoContainer}>
                 <Image style={StyleMain.logo} source={require("../../assets/adaptive-icon.png")}>
                 </Image>
-                <Text>Your data are belong to... you!</Text>
+                <Text>All your data are belong to... you.</Text>
             </View>
             
             <View style={StyleMain.bottomContent}>
-                <TouchableOpacity style={StyleMain.button} onPress={() => navigation.navigate("EditProfile")}>
+                <TouchableOpacity style={StyleMain.button} onPress={() => props.navigation.navigate("EditProfile")}>
                     <ButtonText>Create Account</ButtonText>
                 </TouchableOpacity>
 
@@ -40,5 +48,3 @@ const styles = StyleSheet.create({
         backgroundColor: "#55f",
     }
 })
-
-export default SetupScreen;

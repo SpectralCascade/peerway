@@ -1,27 +1,28 @@
 import { Dimensions, StyleSheet } from 'react-native';
+import Colors from './Colors'
 
 const dimensions = Dimensions.get('window');
 
 const StyleMain = StyleSheet.create({
     avatar: {
-        backgroundColor: "#55C",
+        backgroundColor: Colors.avatarBackground,
         width: "100%",
         height: "100%"
     },
     background: {
         flex: 1,
-        backgroundColor: '#CCF',
+        backgroundColor: Colors.background,
     },
     button: {
         width: "100%",
         height: 70,
-        backgroundColor: "#fc5c65",
+        backgroundColor: Colors.button,
         justifyContent: "center",
         alignItems: "center",
         marginTop: 40,
     },
     buttonText: {
-        color: "#fff",
+        color: Colors.buttonText,
         fontFamily: "monospace",
     },
     bottomContent: {
@@ -50,10 +51,10 @@ const StyleMain = StyleSheet.create({
         padding: 12,
     },
     text: {
-        color: "#000",
+        color: Colors.text,
     },
     textInput: {
-        backgroundColor: "#fff",
+        backgroundColor: Colors.textInput,
         minHeight: 40,
         borderWidth: 1,
         justifyContent: "center",
@@ -61,7 +62,7 @@ const StyleMain = StyleSheet.create({
     },
     textInputMultiline: {
         textAlignVertical: "top",
-        backgroundColor: "#fff",
+        backgroundColor: Colors.textInput,
         minHeight: 40,
         borderWidth: 1,
         padding: 12,

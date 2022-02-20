@@ -7,6 +7,8 @@ import DatePicker from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
 import ImagePicker from 'react-native-image-crop-picker';
+import Database from '../Database';
+import Colors from '../Stylesheets/Colors';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -21,10 +23,26 @@ export default class ProfileEditScreen extends React.Component {
         };
     }
 
+    componentDidMount() {
+        this.onOpen();
+    }
+
+    onOpen() {
+        if (typeof this.state !== 'undefined')
+        {
+            console.log("Opened profile edit screen");
+            // Load active entity data
+            if (Database.active != null) {
+                this.setState({ name: Database.active.getString("profile.name") });
+            } else {
+                this.setState({ name: "" });
+            }
+        }
+    }
+
     render() {
         return (
             <View style={StyleMain.background}>
-
                 <Modal style={[styles.modal]} position={"center"} ref={this.datePickerModalRef}>
                     <DatePicker
                         onSelectedChange={date => {
@@ -95,10 +113,15 @@ export default class ProfileEditScreen extends React.Component {
                     
                     <TouchableOpacity
                         disabled={this.state.name == ""}
-                        style={[StyleMain.button, {backgroundColor: (this.state.name != "" ? "#fc5c65" : "#ec4c55"), height: 40, marginTop: 12}]}
-                        onPress={() => console.log("Saving profile...")}
+                        style={[StyleMain.button, {backgroundColor: (this.state.name != "" ? Colors.button : Colors.buttonDisabled), height: 40, marginTop: 12}]}
+                        onPress={() => {
+                            if (Database.active == null) {
+                                Database.SwitchActiveEntity(Database.CreateEntity());
+                            }
+                            Database.active.set("profile.name", this.state.name);
+                        }}
                     >
-                        <ButtonText style={{color: (this.state.name != "" ? "#fff" : "#bbb")}}>Save Profile</ButtonText>
+                        <ButtonText style={{color: (this.state.name != "" ? Colors.buttonText : Colors.buttonTextDisabled)}}>Save Profile</ButtonText>
                     </TouchableOpacity>
 
                 </View>
