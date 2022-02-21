@@ -3,7 +3,7 @@ import { Button, Dimensions, Image, Keyboard, StyleSheet, TextInput, TouchableOp
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
 import AvatarIcon from "../../assets/icons/account.svg";
-import DatePicker from 'react-native-modern-datepicker';
+import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
 import ImagePicker from 'react-native-image-crop-picker';
@@ -19,7 +19,11 @@ export default class ProfileEditScreen extends React.Component {
         this.datePickerModalRef = React.createRef();
         this.state = {
             selectedDate: "",
-            name: ""
+            rawDate: "",
+            name: "",
+            location: "",
+            website: "",
+            bio: ""
         };
     }
 
@@ -31,11 +35,20 @@ export default class ProfileEditScreen extends React.Component {
         if (typeof this.state !== 'undefined')
         {
             console.log("Opened profile edit screen");
-            // Load active entity data
             if (Database.active != null) {
+                // Load active entity data
                 this.setState({ name: Database.active.getString("profile.name") });
+                this.setState({ selectedDate: getFormatedDate(new Date(Database.active.getString("profile.dob"))) });
+                this.setState({ location: Database.active.getString("profile.location") });
+                this.setState({ website: Database.active.getString("profile.website") });
+                this.setState({ bio: Database.active.getString("profile.bio") });
             } else {
+                // No entity is loaded, must be part of entity creation flow.
                 this.setState({ name: "" });
+                this.setState({ selectedDate: "" });
+                this.setState({ location: "" });
+                this.setState({ website: "" });
+                this.setState({ bio: "" });
             }
         }
     }
@@ -93,21 +106,31 @@ export default class ProfileEditScreen extends React.Component {
                                 if (this.state.selectedDate == "") {
                                     return "Select date...";
                                 }
-                                return new Date(Date.parse(this.state.selectedDate)).toLocaleDateString()
+                                return new Date(Date.parse(this.state.selectedDate)).toLocaleDateString();
                             })()}</Text>
                         </TouchableOpacity>
 
                         <Text style={styles.text}>Location:</Text>
-                        <TextInput style={StyleMain.textInput} />
+                        <TextInput
+                            onChangeText={(text) => this.setState({location: text}) }
+                            style={StyleMain.textInput}
+                            value={this.state.location}
+                        />
 
                         <Text style={styles.text}>Website:</Text>
-                        <TextInput style={StyleMain.textInput} />
+                        <TextInput
+                            onChangeText={(text) => this.setState({website: text})}
+                            style={StyleMain.textInput}
+                            value={this.state.website}
+                        />
 
                         <Text style={styles.text}>About you:</Text>
                         <TextInput
+                            onChangeText={(text) => this.setState({bio: text})}
                             multiline={true}
                             numberOfLines={3}
                             style={[StyleMain.textInputMultiline, {height: 80}]}
+                            value={this.state.bio}
                         />
                     </ScrollView>
                     
@@ -119,6 +142,12 @@ export default class ProfileEditScreen extends React.Component {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
                             Database.active.set("profile.name", this.state.name);
+                            Database.active.set("profile.dob",
+                                this.state.selectedDate != "" ? 
+                                    (new Date(Date.parse(this.state.selectedDate))).toJSON() : (new Date()).toJSON());
+                            Database.active.set("profile.location", this.state.location);
+                            Database.active.set("profile.website", this.state.website);
+                            Database.active.set("profile.bio", this.state.bio);
                         }}
                     >
                         <ButtonText style={{color: (this.state.name != "" ? Colors.buttonText : Colors.buttonTextDisabled)}}>Save Profile</ButtonText>
