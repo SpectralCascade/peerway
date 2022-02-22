@@ -3,6 +3,7 @@ import { Button, Dimensions, Image, Keyboard, StyleSheet, TextInput, TouchableOp
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
 import AvatarIcon from "../../assets/icons/account.svg";
+import EditImageIcon from "../../assets/icons/edit-image.svg";
 import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
@@ -101,15 +102,17 @@ export default class ProfileEditScreen extends React.Component {
                                 // Load avatar from database if available
                                 (() => {
                                     if (this.state.avatar != "") {
+                                        var avatar = JSON.parse(this.state.avatar);
                                         return (
                                         <Image
-                                            source={{uri: "data:" + JSON.parse(this.state.avatar).mime + ";base64," + JSON.parse(this.state.avatar).data}}
+                                            source={{uri: "data:" + avatar.mime + ";base64," + avatar.data}}
                                             style={styles.avatar}
                                         />);
                                     }
                                     return <AvatarIcon width={avatarSize} height={avatarSize} style={{position: "absolute"}} />
                                 })()
                                 }
+                                <EditImageIcon width={avatarSize / 3} height={avatarSize / 3} style={{position: "absolute", bottom: 0, right: 0}} />
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.text}>Name:</Text>
@@ -172,6 +175,7 @@ export default class ProfileEditScreen extends React.Component {
                             Database.active.set("profile.website", this.state.website);
                             Database.active.set("profile.bio", this.state.bio);
                             Database.active.set("profile.avatar", this.state.avatar);
+                            this.props.navigation.navigate("Chat");
                         }}
                     >
                         <ButtonText style={{color: (this.state.name != "" ? Colors.buttonText : Colors.buttonTextDisabled)}}>Save Profile</ButtonText>
