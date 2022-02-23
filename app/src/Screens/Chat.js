@@ -1,15 +1,25 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { KeyboardAvoidingView, StyleSheet, View } from 'react-native';
-import { GiftedChat, InputToolbar } from 'react-native-gifted-chat'
+import { Actions, GiftedChat, InputToolbar } from 'react-native-gifted-chat'
 import StyleMain from '../Stylesheets/StyleMain';
 
-export default function ChatScreen(props) {
+export default function Chat(props) {
     const [messages, setMessages] = useState([]);
 
     useEffect(() => {
         setMessages([{
             _id: 1,
-            text: 'Hello, world!',
+            text: 'Hello, world!\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nwow what a long message this is\n\n\n\n\ncrazy',
+            createdAt: new Date(),
+            user: {
+                _id: 2,
+                name: 'React Native',
+                avatar: 'https://placeimg.com/140/140/any',
+            }
+        },
+        {
+            _id: 2,
+            text: 'woah\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nwoah',
             createdAt: new Date(),
             user: {
                 _id: 2,
@@ -30,6 +40,13 @@ export default function ChatScreen(props) {
         />);
     };
 
+    const renderActions = props => {
+        return (<Actions
+            {...props}
+            containerStyle={styles.actions}
+        />);
+    };
+
     return (
         <View style={StyleMain.background}>
             <GiftedChat
@@ -39,6 +56,9 @@ export default function ChatScreen(props) {
                 user={{
                     _id: 1,
                 }}
+                alwaysShowSend
+                scrollToBottom
+                renderActions={renderActions}
             />
         </View>
     );
@@ -46,5 +66,7 @@ export default function ChatScreen(props) {
 
 const styles = StyleSheet.create({
     inputToolbar: {
+    },
+    actions: {
     }
 });

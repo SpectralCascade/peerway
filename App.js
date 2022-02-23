@@ -2,8 +2,9 @@ import React from 'react';
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SetupScreen from './app/src/Screens/SetupScreen';
-import ProfileEditScreen from './app/src/Screens/ProfileEditScreen';
-import ChatScreen from './app/src/Screens/ChatScreen';
+import ProfileEdit from './app/src/Screens/ProfileEdit';
+import Chat from './app/src/Screens/Chat';
+import MessagingOverview from './app/src/Screens/MessagingOverview';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,12 +22,16 @@ export default function App() {
             />
             <Stack.Screen
               name="EditProfile"
-              component={ProfileEditScreen}
+              component={ProfileEdit}
               options={{title: "Edit Profile", animation: 'slide_from_right', headerShown: true,}}
             />
             <Stack.Screen
+              name="MessagingOverview"
+              component={MessagingOverview}
+            />
+            <Stack.Screen
               name="Chat"
-              component={ChatScreen}
+              component={Chat}
               options={{title: "Chat", animation: 'slide_from_right', headerShown: true,}}
             />
           </Stack.Navigator>

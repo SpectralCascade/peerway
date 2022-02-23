@@ -1,8 +1,8 @@
 import React from 'react';
-import { Button, Dimensions, Image, Keyboard, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
+import { Button, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
-import AvatarIcon from "../../assets/icons/account.svg";
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import EditImageIcon from "../../assets/icons/edit-image.svg";
 import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
@@ -10,11 +10,12 @@ import ButtonText from '../Components/ButtonText';
 import ImagePicker from 'react-native-image-crop-picker';
 import Database from '../Database';
 import Colors from '../Stylesheets/Colors';
+import { CommonActions } from '@react-navigation/native';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
 
-export default class ProfileEditScreen extends React.Component {
+export default class ProfileEdit extends React.Component {
     constructor(props) {
         super(props);
         this.datePickerModalRef = React.createRef();
@@ -109,7 +110,12 @@ export default class ProfileEditScreen extends React.Component {
                                             style={styles.avatar}
                                         />);
                                     }
-                                    return <AvatarIcon width={avatarSize} height={avatarSize} style={{position: "absolute"}} />
+                                    return (<MaterialCommunityIcons
+                                        name="account"
+                                        size={avatarSize}
+                                        color="black"
+                                        style={{position: "absolute"}}
+                                    />);
                                 })()
                                 }
                                 <EditImageIcon width={avatarSize / 3} height={avatarSize / 3} style={{position: "absolute", bottom: 0, right: 0}} />
@@ -175,7 +181,12 @@ export default class ProfileEditScreen extends React.Component {
                             Database.active.set("profile.website", this.state.website);
                             Database.active.set("profile.bio", this.state.bio);
                             Database.active.set("profile.avatar", this.state.avatar);
-                            this.props.navigation.navigate("Chat");
+                            this.props.navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 1,
+                                    routes: [{ name: 'MessagingOverview' }]
+                                })
+                            );
                         }}
                     >
                         <ButtonText style={{color: (this.state.name != "" ? Colors.buttonText : Colors.buttonTextDisabled)}}>Save Profile</ButtonText>
