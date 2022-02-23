@@ -3,7 +3,6 @@ import { Button, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, Vie
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import EditImageIcon from "../../assets/icons/edit-image.svg";
 import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
@@ -113,12 +112,17 @@ export default class ProfileEdit extends React.Component {
                                     return (<MaterialCommunityIcons
                                         name="account"
                                         size={avatarSize}
-                                        color="black"
+                                        color="white"
                                         style={{position: "absolute"}}
                                     />);
                                 })()
                                 }
-                                <EditImageIcon width={avatarSize / 3} height={avatarSize / 3} style={{position: "absolute", bottom: 0, right: 0}} />
+                                <MaterialCommunityIcons
+                                    name="image-plus"
+                                    size={avatarSize / 3}
+                                    color="black"
+                                    style={{position: "absolute", bottom: 0, right: 0}}
+                                />
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.text}>Name:</Text>
