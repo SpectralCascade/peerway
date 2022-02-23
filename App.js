@@ -32,7 +32,7 @@ export default function App() {
             <Stack.Screen
               name="Chat"
               component={Chat}
-              options={{title: "Chat", animation: 'slide_from_right', headerShown: true,}}
+              options={{title: "Chat", headerShown: true,}}
             />
           </Stack.Navigator>
         </NavigationContainer>
