@@ -16,10 +16,12 @@ export default function MessagingOverview(props) {
     React.useEffect(() => {
         return props.navigation.addListener('focus', () => {
             console.log("OPENED MESSAGING OVERVIEW");
+            // TODO refresh screen
         });
     });
 
-    const [chats, setChats] = useState([
+    // Initial chats data loaded into the list
+    const allChats = [
         {
             id: '1',
             name: "L. Farquad",
@@ -40,10 +42,29 @@ export default function MessagingOverview(props) {
             icon: "",
             read: true
         }
-    ]);
+    ];
+
+    for (var i = 3; i <= 20; i++) {
+        allChats.push({
+            id: i.toString(),
+            name: "Dummy Name",
+            message: {
+                content: "Dummy message content",
+                timestamp: (new Date()).toLocaleDateString("en-GB")
+            },
+            icon: "",
+            read: true
+        })
+    }
+
+    const [chats, setChats] = useState(allChats);
 
     const onOpenChat = (chat) => {
-        props.navigation.navigate("Chat");
+        chat = allChats.find((item) => item.id === chat.id);
+        if (chat != null) {
+            chat.read = true;
+            props.navigation.navigate("Chat");
+        }
     };
 
     return (
@@ -65,15 +86,19 @@ export default function MessagingOverview(props) {
                     <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
                         <View style={styles.chatIcon}></View>
                         <View style={styles.chatContent}>
-                            <Text style={styles.chatContentHeader}>{item.name}</Text>
-                            <Text style={styles.chatContentMessage}>{item.message.content}</Text>
+                            <Text style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>{item.name}</Text>
+                            <Text style={[styles.chatContentMessage, {color: item.read ? "#999" : "#000", fontWeight: item.read ? "normal" : "bold"}]}>{item.message.content}</Text>
                         </View>
-                        <View style={styles.chatTimestamp}></View>
+                        <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
                     </TouchableOpacity>
                     <View style={[styles.edge, {backgroundColor: "#ccc"}]}></View>
                     </View>
                 )}
             />
+
+            <TouchableOpacity onPress={() => onOpenChat()} style={styles.newChatButton}>
+                <MaterialIcons name="chat" size={iconSize * 0.8} color="white" />
+            </TouchableOpacity>
 
         </SafeAreaView>
     );
@@ -105,7 +130,9 @@ const styles = StyleSheet.create({
         borderRadius: 10000
     },
     chatTimestamp: {
-
+        position: "absolute",
+        right: paddingAmount,
+        top: paddingAmount
     },
     edge: {
         height: 1,
@@ -114,6 +141,17 @@ const styles = StyleSheet.create({
     menuButton: {
         position: "absolute",
         left: 0
+    },
+    newChatButton: {
+        position: "absolute",
+        right: paddingAmount * 5,
+        bottom: paddingAmount * 7,
+        width: iconSize * 1.2,
+        height: iconSize * 1.2,
+        borderRadius: 10000,
+        backgroundColor: Colors.button,
+        justifyContent: "center",
+        alignItems: "center"
     },
     settingsButton: {
         position: "absolute",
