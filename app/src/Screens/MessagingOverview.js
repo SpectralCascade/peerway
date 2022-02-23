@@ -1,4 +1,4 @@
-import { StyleSheet, View, Image, TouchableOpacity, ScrollView, FlatList } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, ScrollView, FlatList, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
@@ -36,7 +36,7 @@ export default function MessagingOverview(props) {
             id: '2',
             name: "Walter's donut party",
             message: {
-                content: "Kleiner: The administrator is not interes...",
+                content: "Kleiner: The administrator wants to get a conclusive analysis of today's sample. I gather they went to some lengths to get it.",
                 timestamp: (new Date()).toLocaleDateString("en-GB")
             },
             icon: "",
@@ -83,11 +83,21 @@ export default function MessagingOverview(props) {
                 data={chats}
                 renderItem={({ item }) => (
                     <View>
+                        
                     <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
                         <View style={styles.chatIcon}></View>
                         <View style={styles.chatContent}>
-                            <Text style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>{item.name}</Text>
-                            <Text style={[styles.chatContentMessage, {color: item.read ? "#999" : "#000", fontWeight: item.read ? "normal" : "bold"}]}>{item.message.content}</Text>
+                            <Text
+                                numberOfLines={1}
+                                style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>
+                                {item.name}
+                            </Text>
+                            <Text
+                                numberOfLines={1}
+                                style={[styles.chatContentMessage, {color: item.read ? "#999" : "#000", fontWeight: item.read ? "normal" : "bold"}]}
+                            >
+                                {item.message.content}
+                            </Text>
                         </View>
                         <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
                     </TouchableOpacity>
@@ -104,6 +114,8 @@ export default function MessagingOverview(props) {
     );
 }
 
+const dimensions = Dimensions.get("window");
+
 const styles = StyleSheet.create({
     chatContainer: {
         height: 70,
@@ -112,14 +124,18 @@ const styles = StyleSheet.create({
     },
     chatContent: {
         position: "absolute",
-        left: paddingAmount + paddingAmount + iconSize
+        left: paddingAmount + paddingAmount + iconSize,
+        width: dimensions.width - (paddingAmount * 4 + iconSize * 2),
+        flexWrap: "nowrap",
     },
     chatContentHeader: {
         fontSize: 16,
-        color: "#000"
+        color: "#000",
+        flex: 1
     },
     chatContentMessage: {
-        color: "#999"
+        color: "#999",
+        flex: 1,
     },
     chatIcon: {
         position: "absolute",
