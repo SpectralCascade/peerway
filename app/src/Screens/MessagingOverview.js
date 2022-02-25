@@ -1,6 +1,6 @@
 import { StyleSheet, View, Image, TouchableOpacity, ScrollView, FlatList, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { Component, useState } from 'react';
+import React, { Component } from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
 import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
@@ -18,7 +18,8 @@ export default class MessagingOverview extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            chats: [    
+            chats: []
+            /*[
                 {
                     id: '1',
                     name: "L. Farquad",
@@ -39,10 +40,10 @@ export default class MessagingOverview extends Component {
                     icon: "",
                     read: true
                 }
-            ]
+            ]*/
         }
 
-        for (var i = 3; i <= 20; i++) {
+        /*for (var i = 3; i <= 20; i++) {
             this.state.chats.push({
                 id: i.toString(),
                 name: "Dummy Name",
@@ -53,23 +54,23 @@ export default class MessagingOverview extends Component {
                 icon: "",
                 read: true
             })
-        }
+        }*/
 
     }
 
     loadChats() {
-        
     }
 
     render() {
         const onCreateChat = () => {
-            console.log("TODO setup chat creation");
+            this.props.navigation.navigate("RequestChat");
         };
 
         const onOpenChat = (chat) => {
             chat = chat != null ? this.state.chats.find((item) => item.id === chat.id) : null;
             if (chat != null) {
                 chat.read = true;
+                this.forceUpdate();
                 this.props.navigation.navigate("Chat");
             }
         };
@@ -78,6 +79,7 @@ export default class MessagingOverview extends Component {
             <SafeAreaView style={StyleMain.background}>
                 
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => {
+                    this.loadChats();
                     this.forceUpdate();
                     console.log("OPENED MESSAGING OVERVIEW");
                 }}/>

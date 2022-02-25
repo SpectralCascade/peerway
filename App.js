@@ -5,6 +5,7 @@ import SetupScreen from './app/src/Screens/SetupScreen';
 import ProfileEdit from './app/src/Screens/ProfileEdit';
 import Chat from './app/src/Screens/Chat';
 import MessagingOverview from './app/src/Screens/MessagingOverview';
+import RequestChat from './app/src/Screens/RequestChat';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,6 +34,11 @@ export default function App() {
               name="Chat"
               component={Chat}
               options={{title: "Chat", headerShown: true,}}
+            />
+            <Stack.Screen
+              name="RequestChat"
+              component={RequestChat}
+              options={{title: "Chat Invitations", animation: 'slide_from_right', headerShown: true,}}
             />
           </Stack.Navigator>
         </NavigationContainer>

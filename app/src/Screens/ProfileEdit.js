@@ -20,7 +20,6 @@ export default class ProfileEdit extends React.Component {
         this.datePickerModalRef = React.createRef();
         this.state = {
             selectedDate: "",
-            rawDate: "",
             name: "",
             location: "",
             website: "",
@@ -40,20 +39,25 @@ export default class ProfileEdit extends React.Component {
             console.log("Opened profile edit screen");
             if (Database.active != null) {
                 // Load active entity data
-                this.setState({ name: Database.active.getString("profile.name") });
-                this.setState({ selectedDate: getFormatedDate(new Date(Database.active.getString("profile.dob"))) });
-                this.setState({ location: Database.active.getString("profile.location") });
-                this.setState({ website: Database.active.getString("profile.website") });
-                this.setState({ bio: Database.active.getString("profile.bio") });
-                this.setState({ avatar: Database.active.getString("profile.avatar") });
+                profile = JSON.parse(Database.active.getString("profile"));
+                this.setState({
+                    name: profile.name,
+                    selectedDate: getFormatedDate(new Date(profile.dob)),
+                    location: profile.location,
+                    website: profile.website,
+                    bio: profile.bio,
+                    avatar: profile.avatar
+                });
             } else {
                 // No entity is loaded, must be part of entity creation flow.
-                this.setState({ name: "" });
-                this.setState({ selectedDate: "" });
-                this.setState({ location: "" });
-                this.setState({ website: "" });
-                this.setState({ bio: "" });
-                this.setState({ avatar: "" });
+                this.setState({
+                    name: "",
+                    selectedDate: "",
+                    location: "",
+                    website: "",
+                    bio: "",
+                    avatar: ""
+                });
             }
         }
     }
@@ -177,14 +181,20 @@ export default class ProfileEdit extends React.Component {
                             if (Database.active == null) {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
-                            Database.active.set("profile.name", this.state.name);
-                            Database.active.set("profile.dob",
-                                this.state.selectedDate != "" ? 
-                                    (new Date(Date.parse(this.state.selectedDate))).toJSON() : (new Date()).toJSON());
-                            Database.active.set("profile.location", this.state.location);
-                            Database.active.set("profile.website", this.state.website);
-                            Database.active.set("profile.bio", this.state.bio);
-                            Database.active.set("profile.avatar", this.state.avatar);
+                            // Extract state
+                            profile = {
+                                name: this.state.name,
+                                dob: (this.state.selectedDate != "" ? 
+                                    (new Date(Date.parse(this.state.selectedDate))).toJSON() :
+                                    (new Date()).toJSON()),
+                                location: this.state.location,
+                                website: this.state.website,
+                                bio: this.state.bio,
+                                avatar: this.state.avatar
+                            };
+                            // Save profile in database
+                            Database.active.set("profile", JSON.stringify(profile));
+
                             this.props.navigation.dispatch(
                                 CommonActions.reset({
                                     index: 1,
