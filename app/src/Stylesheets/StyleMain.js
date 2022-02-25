@@ -6,8 +6,7 @@ const dimensions = Dimensions.get('window');
 const StyleMain = StyleSheet.create({
     avatar: {
         backgroundColor: Colors.avatarBackground,
-        width: "100%",
-        height: "100%"
+        borderRadius: 10000,
     },
     background: {
         flex: 1,

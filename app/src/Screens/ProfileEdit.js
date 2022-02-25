@@ -10,6 +10,7 @@ import ImagePicker from 'react-native-image-crop-picker';
 import Database from '../Database';
 import Colors from '../Stylesheets/Colors';
 import { CommonActions } from '@react-navigation/native';
+import Avatar from '../Components/Avatar';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -85,7 +86,7 @@ export default class ProfileEdit extends React.Component {
                     <ScrollView>
                         <View style={StyleMain.center}>
                             <TouchableOpacity
-                                style={[StyleMain.avatar, styles.avatar, {marginTop: 10}]}
+                                style={[StyleMain.avatar, { width: avatarSize, height: avatarSize, marginTop: 10 }]}
                                 onPress={() => {
                                     ImagePicker.openPicker({
                                         width: 400,
@@ -102,25 +103,7 @@ export default class ProfileEdit extends React.Component {
                                     });
                                 }}
                             >
-                                {
-                                // Load avatar from database if available
-                                (() => {
-                                    if (this.state.avatar != "") {
-                                        var avatar = JSON.parse(this.state.avatar);
-                                        return (
-                                        <Image
-                                            source={{uri: "data:" + avatar.mime + ";base64," + avatar.data}}
-                                            style={styles.avatar}
-                                        />);
-                                    }
-                                    return (<MaterialCommunityIcons
-                                        name="account"
-                                        size={avatarSize}
-                                        color="white"
-                                        style={{position: "absolute"}}
-                                    />);
-                                })()
-                                }
+                                <Avatar avatar={this.state.avatar} size={avatarSize} />
                                 <MaterialCommunityIcons
                                     name="image-plus"
                                     size={avatarSize / 3}
@@ -182,7 +165,7 @@ export default class ProfileEdit extends React.Component {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
                             // Extract state
-                            profile = {
+                            var profile = {
                                 name: this.state.name,
                                 dob: (this.state.selectedDate != "" ? 
                                     (new Date(Date.parse(this.state.selectedDate))).toJSON() :
@@ -214,11 +197,6 @@ export default class ProfileEdit extends React.Component {
 }
 
 const styles = StyleSheet.create({
-    avatar: {
-        width: avatarSize,
-        height: avatarSize,
-        borderRadius: 10000
-    },
     modal: {
         justifyContent: 'center',
         alignItems: 'center',
