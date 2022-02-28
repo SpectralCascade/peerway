@@ -1,6 +1,6 @@
 import React from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from 'react-native-vector-icons';
 import { Image } from 'react-native';
 
 // Takes an object and size, then displays the avatar
@@ -16,7 +16,7 @@ export default function Avatar(props) {
         );
     }
     return (
-        <MaterialCommunityIcons
+        <Icon
             name="account"
             size={props.size}
             color="white"

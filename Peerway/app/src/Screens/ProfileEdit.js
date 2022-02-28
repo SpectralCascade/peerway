@@ -2,7 +2,7 @@ import React from 'react';
 import { Button, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from 'react-native-vector-icons';
 import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';
@@ -104,7 +104,7 @@ export default class ProfileEdit extends React.Component {
                                 }}
                             >
                                 <Avatar avatar={this.state.avatar} size={avatarSize} />
-                                <MaterialCommunityIcons
+                                <Icon
                                     name="image-plus"
                                     size={avatarSize / 3}
                                     color="black"

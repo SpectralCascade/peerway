@@ -5,7 +5,7 @@ import StyleMain from '../Stylesheets/StyleMain';
 import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import Database from '../Database';
-import { MaterialIcons } from '@expo/vector-icons'; 
+import { Icon } from 'react-native-vector-icons'; 
 import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
 
@@ -85,10 +85,10 @@ export default class MessagingOverview extends Component {
 
                 <View style={styles.topbar}>
                     <TouchableOpacity style={[styles.menuButton]}>
-                        <MaterialIcons name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
+                        <Icon name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.settingsButton]}>
-                        <MaterialIcons name="settings" size={topbarHeight * 0.9} color="black" style={[]} />
+                        <Icon name="settings" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.edge}></View>
@@ -121,7 +121,7 @@ export default class MessagingOverview extends Component {
                 />
 
                 <TouchableOpacity onPress={() => onCreateChat()} style={styles.newChatButton}>
-                    <MaterialIcons name="chat" size={iconSize * 0.8} color="white" />
+                    <Icon name="chat" size={iconSize * 0.8} color="white" />
                 </TouchableOpacity>
 
             </SafeAreaView>
