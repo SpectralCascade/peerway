@@ -4,6 +4,7 @@
     "slug": "peerway",
     "version": "1.0.0",
     "orientation": "portrait",
+    "plugins": ["@config-plugins/react-native-webrtc"],
     "icon": "./app/assets/icon.png",
     "splash": {
       "image": "./app/assets/splash.png",

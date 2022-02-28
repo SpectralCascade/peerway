@@ -9,7 +9,9 @@
     "eject": "expo eject"
   },
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^2.0.1",
     "@dietime/react-native-date-picker": "^1.2.0",
+    "@expo/ngrok": "^2.5.0",
     "@react-native-community/masked-view": "^0.1.11",
     "@react-navigation/native": "^6.0.8",
     "@react-navigation/native-stack": "^6.5.0",
@@ -35,6 +37,8 @@
     "react-native-safe-area-context": "3.3.2",
     "react-native-screens": "~3.10.1",
     "react-native-web": "0.17.1",
+    "react-native-webrtc": "^1.94.2",
+    "socket.io-client": "^4.4.1",
     "uuid": "^8.3.2"
   },
   "devDependencies": {

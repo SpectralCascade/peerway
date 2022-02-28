@@ -18,8 +18,7 @@ export default class MessagingOverview extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            chats: []
-            /*[
+            chats: [
                 {
                     id: '1',
                     name: "L. Farquad",
@@ -40,10 +39,10 @@ export default class MessagingOverview extends Component {
                     icon: "",
                     read: true
                 }
-            ]*/
+            ]
         }
 
-        /*for (var i = 3; i <= 20; i++) {
+        for (var i = 3; i <= 20; i++) {
             this.state.chats.push({
                 id: i.toString(),
                 name: "Dummy Name",
@@ -53,8 +52,8 @@ export default class MessagingOverview extends Component {
                 },
                 icon: "",
                 read: true
-            })
-        }*/
+            });
+        }
 
     }
 
