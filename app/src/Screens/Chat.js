@@ -209,15 +209,11 @@ export default class Chat extends React.Component {
     }
 
     sendMessage(previousMessages) {
+        // Send the last message
         this.sendChannel.current.send(this.state.messages[0].text);
-        this.onSend();
-    }
-
-    // Callback when a message is sent by the user.
-    onSend(previousMessages) {
         this.state.messages = GiftedChat.append(previousMessages, this.state.messages);
         this.forceUpdate();
-    };
+    }
 
     // Callback to render the input toolbar
     renderInputToolbar(props) {
