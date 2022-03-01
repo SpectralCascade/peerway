@@ -2,7 +2,7 @@ import React from 'react';
 import { Button, Dimensions, Image, StyleSheet, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
 import Text from '../Components/Text';
 import StyleMain from '../Stylesheets/StyleMain';
-import { Icon } from 'react-native-vector-icons';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DatePicker, { getFormatedDate } from 'react-native-modern-datepicker';
 import Modal from 'react-native-modalbox';
 import ButtonText from '../Components/ButtonText';

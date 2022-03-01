@@ -54,6 +54,7 @@ const StyleMain = StyleSheet.create({
     },
     textInput: {
         backgroundColor: Colors.textInput,
+        color: Colors.text,
         minHeight: 40,
         borderWidth: 1,
         justifyContent: "center",

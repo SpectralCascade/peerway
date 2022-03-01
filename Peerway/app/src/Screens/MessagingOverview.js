@@ -5,7 +5,7 @@ import StyleMain from '../Stylesheets/StyleMain';
 import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import Database from '../Database';
-import { Icon } from 'react-native-vector-icons'; 
+import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
-import { Icon } from 'react-native-vector-icons';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Image } from 'react-native';
 
 // Takes an object and size, then displays the avatar
