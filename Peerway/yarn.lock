@@ -5666,7 +5666,7 @@
   "resolved" "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-3.3.2.tgz"
   "version" "3.3.2"
 
-"react-native-screens@>= 3.0.0":
+"react-native-screens@^3.13.0", "react-native-screens@>= 3.0.0":
   "integrity" "sha512-cAreMaFPW+qikOc0YFFvfue0tJ9CQaHwzRNg0IPd8/VILbqM7U8TJrCK+K0OUY6o+9B0KYbFfDrkj1wmqidHpw=="
   "resolved" "https://registry.npmjs.org/react-native-screens/-/react-native-screens-3.13.0.tgz"
   "version" "3.13.0"
