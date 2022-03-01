@@ -5,6 +5,7 @@ import StyleMain from '../Stylesheets/StyleMain';
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc'
 import { io } from "socket.io-client";
 import HandleEffect from '../Components/HandleEffect';
+import Database from '../Database';
 
 const server_ip = "192.168.0.59";
 const port = 20222;
@@ -41,7 +42,7 @@ export default class Chat extends React.Component {
         this.other = React.createRef();
         this.sendChannel = React.createRef();
         // Get the chat ID
-        this.chatID = props.route.params.chatID;
+        this.chatID = "debug_chat";//props.route.params.chatID;
     }
 
     // Called when the screen is opened.
@@ -58,35 +59,38 @@ export default class Chat extends React.Component {
 
         // Await other user(s) to join the chat
         this.socket.current.on("other user", id => {
+            console.log("Setting up other user...");
             this.callUser(id);
             this.other.current = id;
         });
 
         // Ditto
         this.socket.current.on("user joined", id => {
+            console.log("user joined");
             this.other.current = id;
         });
 
-        this.socket.current.on("offer", this.handleOffer);
+        this.socket.current.on("offer", (socket) => { this.handleOffer(socket); });
 
-        this.socket.current.on("answer", this.handleAnswer);
+        this.socket.current.on("answer", (socket) => { this.handleAnswer(socket); });
 
-        this.socket.current.on("ice-candidate", this.handleNewICECandidateMsg);
+        this.socket.current.on("ice-candidate", (socket) => { this.handleNewICECandidateMsg(socket); });
 
         this.forceUpdate();
     }
 
     callUser(id) {
         // This will initiate the call for the receiving peer
-        console.log("[INFO] Initiated a call")
-        this.peer.current = Peer(id);
+        console.log("[INFO] Initiated a call");
+        this.peer.current = this.CreatePeer(id);
         this.sendChannel.current = this.peer.current.createDataChannel("sendChannel");
         
         // listen to incoming messages from other peer
-        this.sendChannel.current.onmessage = handleReceiveMessage;
+        this.sendChannel.current.onmessage = (e) => this.handleReceiveMessage(e);
     }
 
-    Peer(userID) {
+    CreatePeer(userID) {
+        console.log("Creating peer with id " + userID);
         /* 
         Here we are using Turn and Stun server
         (ref: https://blog.ivrpowers.com/post/technologies/what-is-stun-turn-server/)
@@ -104,8 +108,8 @@ export default class Chat extends React.Component {
                 },
             ]
         });
-        peer.onicecandidate = handleICECandidateEvent;
-        peer.onnegotiationneeded = () => handleNegotiationNeededEvent(userID);
+        peer.onicecandidate = (e) => this.handleICECandidateEvent(e);
+        peer.onnegotiationneeded = () => this.handleNegotiationNeededEvent(userID);
         return peer;
     }
 
@@ -129,10 +133,10 @@ export default class Chat extends React.Component {
         between the peers to establish communication
         */
         console.log("[INFO] Handling Offer")
-        this.peer.current = Peer();
+        this.peer.current = this.CreatePeer(Database.active.getString(id));
         this.peer.current.ondatachannel = (event) => {
             this.sendChannel.current = event.channel;
-            this.sendChannel.current.onmessage = handleReceiveMessage;
+            this.sendChannel.current.onmessage = (e) => this.handleReceiveMessage(e);
             console.log('[SUCCESS] Connection established')
         }
 
@@ -172,17 +176,15 @@ export default class Chat extends React.Component {
     handleReceiveMessage(e){
         // Listener for receiving messages from the peer
         console.log("[INFO] Message received from peer", e.data);
-        const msg = [
-            {
-                _id: Math.random(1000).toString(), // TODO: use proper IDs...
-                text: e.data,
-                createdAt: new Date(),
-                user: {
-                    _id: 2,
-                },
-            }
-        ];
-        setMessages(previousMessages => GiftedChat.append(previousMessages, msg))
+        this.state.messages = GiftedChat.append(this.state.messages, [{
+            _id: Math.random(1000).toString(), // TODO: use proper IDs...
+            text: e.data,
+            createdAt: new Date(),
+            user: {
+                _id: 2,
+            },
+        }]);
+        this.forceUpdate();
     };
 
     handleICECandidateEvent(e) {
@@ -195,7 +197,7 @@ export default class Chat extends React.Component {
         */
         if (e.candidate) {
             const payload = {
-                target: otherUser.current,
+                target: this.other.current,
                 candidate: e.candidate,
             }
             this.socket.current.emit("ice-candidate", payload);
@@ -208,10 +210,11 @@ export default class Chat extends React.Component {
         this.peer.current.addIceCandidate(candidate).catch(e => console.log(e));
     }
 
-    sendMessage(previousMessages) {
+    sendMessage(messages) {
         // Send the last message
+        this.state.messages = GiftedChat.append(this.state.messages, messages);
+        console.log("Messages: " + JSON.stringify(this.state.messages));
         this.sendChannel.current.send(this.state.messages[0].text);
-        this.state.messages = GiftedChat.append(previousMessages, this.state.messages);
         this.forceUpdate();
     }
 
@@ -242,7 +245,7 @@ export default class Chat extends React.Component {
                 <GiftedChat
                     messages={this.state.messages}
                     renderInputToolbar={(props) => this.renderInputToolbar(props)}
-                    onSend={(currentMessages) => this.sendMessage(currentMessages)}
+                    onSend={(messages) => this.sendMessage(messages)}
                     user={{
                         _id: 1,
                     }}

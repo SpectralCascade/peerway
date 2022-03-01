@@ -16,7 +16,7 @@ io.on('connection', socket => {
     // Callback to handle a peer joining a chat
     socket.on('join room', roomID => {
 
-        console.log("Received join request");
+        console.log("Received join request for chat room " + roomID + " from socket " + socket.id);
 
         if (rooms[roomID]) {
             // Receiving peer joins the room
@@ -32,7 +32,7 @@ io.on('connection', socket => {
             For initiating peer it would be receiving peer and vice versa.
         */
         const otherUser = rooms[roomID].find(id => id !== socket.id);
-        if(otherUser){
+        if (otherUser) {
             socket.emit("other user", otherUser);
             socket.to(otherUser).emit("user joined", socket.id);
         }
@@ -42,7 +42,7 @@ io.on('connection', socket => {
         The initiating peer offers a connection
     */
     socket.on('offer', payload => {
-        console.log("Received offer");
+        console.log("Received offer from payload " + payload.target);
         io.to(payload.target).emit('offer', payload);
     });
 
@@ -50,11 +50,12 @@ io.on('connection', socket => {
         The receiving peer answers (accepts) the offer
     */
     socket.on('answer', payload => {
-        console.log("Answered offer");
+        console.log("Answered offer from payload " + payload.target);
         io.to(payload.target).emit('answer', payload);
     });
 
     socket.on('ice-candidate', incoming => {
+        console.log("Setting up ice candidate " + JSON.stringify(incoming.candidate));
         io.to(incoming.target).emit('ice-candidate', incoming.candidate);
     })
 });
