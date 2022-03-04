@@ -8,6 +8,8 @@ import Database from '../Database';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
+import { io } from 'socket.io-client';
+import Constants from '../Constants';
 
 const topbarHeight = 56;
 const iconSize = 56;
@@ -55,6 +57,23 @@ export default class MessagingOverview extends Component {
             });
         }
 
+        this.socket = React.createRef();
+        this.connectToSignalServer();
+    }
+
+    // TODO: Move this connection setup code somewhere else
+    connectToSignalServer() {
+        this.socket.current = io.connect("http://" + Constants.server_ip + ":" + Constants.port);
+
+        // Setup the entity on the server so others can see it listed
+        let profile = JSON.parse(Database.active.getString("profile"));
+        let entity = {
+            id: Database.active.getString("id"),
+            name: profile.name,
+            avatar: profile.avatar
+        };
+        console.log("id = " + entity.id);
+        this.socket.current.emit("SetupEntity", entity);
     }
 
     loadChats() {
@@ -62,7 +81,7 @@ export default class MessagingOverview extends Component {
 
     render() {
         const onCreateChat = () => {
-            this.props.navigation.navigate("RequestChat");
+            this.props.navigation.navigate("RequestChat", { socket: this.socket });
         };
 
         const onOpenChat = (chat) => {

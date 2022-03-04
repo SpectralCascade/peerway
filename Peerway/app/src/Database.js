@@ -111,6 +111,7 @@ export default class Database {
             id: id,
             encryptionKey: key
         });
+        this.entities[id].set("id", id);
 
         // Add entity to userdata.
         userdata.set(id, key);

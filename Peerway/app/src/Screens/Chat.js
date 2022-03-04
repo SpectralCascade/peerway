@@ -6,9 +6,7 @@ import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react
 import { io } from "socket.io-client";
 import HandleEffect from '../Components/HandleEffect';
 import Database from '../Database';
-
-const server_ip = "192.168.0.59";
-const port = 20222;
+import Constants from '../Constants';
 
 export default class Chat extends React.Component {
     constructor(props) {
@@ -51,7 +49,7 @@ export default class Chat extends React.Component {
 
         // Setup connection to the signal server
         // TODO handle connection failure
-        this.socket.current = io.connect("http://" + server_ip + ":" + port.toString());
+        this.socket.current = io.connect("http://" + Constants.server_ip + ":" + Constants.port.toString());
 
         console.log("setup connection to server");
         // Join the chat
@@ -133,7 +131,7 @@ export default class Chat extends React.Component {
         between the peers to establish communication
         */
         console.log("[INFO] Handling Offer")
-        this.peer.current = this.CreatePeer(Database.active.getString(id));
+        this.peer.current = this.CreatePeer(Database.active.getString("id"));
         this.peer.current.ondatachannel = (event) => {
             this.sendChannel.current = event.channel;
             this.sendChannel.current.onmessage = (e) => this.handleReceiveMessage(e);

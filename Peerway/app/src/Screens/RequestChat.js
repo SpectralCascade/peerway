@@ -22,6 +22,8 @@ export default class RequestChat extends Component {
             selected: [],
             chatID: "",
         }
+
+        this.socket = props.socket;
     }
 
     // Callback when this screen is opened.
@@ -29,6 +31,15 @@ export default class RequestChat extends Component {
         // TODO: Load up first X peers found on the network
         // TODO: In future, only list friends unless search terms are entered.
         console.log("OPENED REQUEST CHAT");
+
+        // Handle retrieval of entities list
+        // TODO: Check if slice() copy is needed or not
+        this.socket.current.on("ListEntitiesResponse", listing => {
+            this.setState({ profiles: listing.slice()});
+        });
+
+        // TODO: More data should be requested as user scrolls
+        this.socket.current.emit("ListEntities", {});
         //this.forceUpdate();
     }
 
