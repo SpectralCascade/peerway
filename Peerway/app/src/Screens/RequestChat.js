@@ -7,6 +7,7 @@ import Colors from '../Stylesheets/Colors';
 import StyleMain from '../Stylesheets/StyleMain';
 import {v1 as uuidv1} from 'uuid';
 import Database from '../Database';
+import Globals from '../Globals';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -22,8 +23,12 @@ export default class RequestChat extends Component {
             selected: [],
             chatID: "",
         }
+    }
 
-        this.socket = props.socket;
+    // Callback handler for listing entities
+    onListEntitiesResponse(listing) {
+        this.state.profiles = listing.slice();
+        this.forceUpdate();
     }
 
     // Callback when this screen is opened.
@@ -31,15 +36,12 @@ export default class RequestChat extends Component {
         // TODO: Load up first X peers found on the network
         // TODO: In future, only list friends unless search terms are entered.
         console.log("OPENED REQUEST CHAT");
-
         // Handle retrieval of entities list
         // TODO: Check if slice() copy is needed or not
-        this.socket.current.on("ListEntitiesResponse", listing => {
-            this.setState({ profiles: listing.slice()});
-        });
+        Globals.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
-        this.socket.current.emit("ListEntities", {});
+        Globals.connection.current.emit("ListEntities");
         //this.forceUpdate();
     }
 
@@ -56,7 +58,7 @@ export default class RequestChat extends Component {
         return (
             <View style={StyleMain.background}>
                 {/* Handles screen opening callback */}
-                <HandleEffect navigation={this.props.navigation} effect="focus" callback={this.onOpen}/>
+                <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => this.onOpen()}/>
 
                 {/* List of entities that the user can invite to chat */}
                 <FlatList

@@ -44,11 +44,12 @@ var sortedClientsAlphanumeric = [];
 function sortClients(mode) {
     switch (mode) {
         case "alphanumeric":
-            sortedClientsAlphanumeric.sort((a, b) => {
-                return (entities[clients[a].entityId])[a].name.localeCompare(
-                    (entities[clients[b].entityId])[b].name
+            // TODO
+            /*sortedClientsAlphanumeric.sort((a, b) => {
+                return ((entities[clients[a].entityId])[a]).name.localeCompare(
+                    ((entities[clients[b].entityId])[b]).name
                 );
-            });
+            });*/
             needSortAlphanumeric = false;
             break;
     }
@@ -139,6 +140,10 @@ io.on('connection', socket => {
     socket.on("ListEntities", options => {
         const perPage = 50;
 
+        if (options === undefined) {
+            options = {};
+        }
+
         let page = "page" in options ? Math.min(Math.floor(sortedClientsAlphanumeric.length / perPage), Math.max(0, options.page - 1)) : 0;
         // TODO: Handle sorting option
         let sort = "sort" in options ? options.sort : "alphanumeric";
@@ -164,6 +169,8 @@ io.on('connection', socket => {
                 avatar: entity.avatar,
             });
         }
+
+        console.log("Info: Responding to ListEntities request from socket " + socket.id);
 
         // Send list back to the client
         socket.emit("ListEntitiesResponse", listing);
