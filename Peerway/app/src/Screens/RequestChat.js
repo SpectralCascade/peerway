@@ -42,6 +42,8 @@ export default class RequestChat extends Component {
         Globals.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
+        // TODO: Only list entities that the user knows of, i.e. mutuals and
+        // other entities that they share a chat with.
         Globals.connection.current.emit("ListEntities", {
             page: 1,
             sort: "alphanumeric"
@@ -62,7 +64,7 @@ export default class RequestChat extends Component {
     // Callback when the invitations are confirmed.
     // For now this always creates a new chat
     onConfirm() {
-        var id = uuidv1();
+        let id = Database.CreateChat();
         console.log("Creating chat with id " + id);
         this.setState({chatID: id});
         this.props.navigation.navigate('Chat', { chatID: id });
@@ -80,6 +82,7 @@ export default class RequestChat extends Component {
                     data={this.state.profiles}
                     keyExtractor={item => item.clientId}
                     renderItem={({ item }) => {
+                        // Don't list the active entity...
                         return item.id === Database.active.getString("id") ? (<></>) : 
                         (
                         <View>

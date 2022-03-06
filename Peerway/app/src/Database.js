@@ -47,20 +47,6 @@ const ExampleEntity = {
                     }
                 }
             ],
-            // Locks that can only be opened by a corresponding permission key.
-            // Note that only administrators are allowed to generate new shared locks,
-            // but every verified member has the shared locks. Shared locks can only be given
-            // by a verified administrator.
-            locks: {
-                // Lock for verifying this identity, NEVER shared with another entity.
-                id: "<generated-lock>",
-                // Lock for reading messages.
-                rx: "<shared-lock>",
-                // Lock for sending messages.
-                tx: "<shared-lock>",
-                // Lock for verifying an administrator.
-                admin: "<shared-lock>"
-            },
             // When was the last message received from this chat?
             received: "<serialised-date>",
             // When was the last update to this chat (considers last message received time)?
@@ -136,6 +122,50 @@ export default class Database {
             userdata.delete(id);
         }
         return success;
+    }
+
+    // Create a new chat for the currently active entity with other entities.
+    // Takes a list of members (NOT including the active entity) and optional meta to copy.
+    static CreateChat(members, meta={}) {
+        let isGroup = members.length > 1;
+
+        if (meta == undefined) {
+            meta = {};
+        }
+
+        if (!("id" in meta)) {
+            // Generated ID for this chat, based on timestamp & MAC address.
+            meta.id = uuidv1();
+        }
+        
+        // Generate chat metadata
+        let chatData = {
+            name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[0].name,
+            members: "members" in meta ? meta.members : [],
+            received: "received" in meta ? meta.received : (new Date()).getUTCMilliseconds(),
+            updated: "updated" in meta ? meta.updated : (new Date()).getUTCMilliseconds(),
+            read: "read" in meta ? meta.read : false,
+            muted: "muted" in meta ? meta.muted : false,
+            blocked: "blocked" in meta ? meta.blocked : false,
+            icon: "icon" in meta ? meta.icon : (isGroup ? "" : members[0].avatar),
+        };
+        
+        // Generate member entries if necessary
+        if (chatData.members.length == 0) {
+            for (let member in members) {
+                chatData.members.push({
+                    id: member.id,
+                    keys: {
+                        // TODO digital signature and encryption keys
+                    }
+                });
+            }
+        }
+
+        // Create a chat entry
+        this.active.set("chat.meta." + meta.id, JSON.stringify(chatData));
+
+        return meta.id;
     }
 
 }
