@@ -134,7 +134,7 @@ export default class MessagingOverview extends Component {
                             </View>
                             <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
                         </TouchableOpacity>
-                        <View style={[styles.edge, {backgroundColor: "#ccc"}]}></View>
+                        <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
                         </View>
                     )}
                 />
@@ -182,10 +182,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         right: paddingAmount,
         top: paddingAmount
-    },
-    edge: {
-        height: 1,
-        backgroundColor: "#000"
     },
     menuButton: {
         position: "absolute",

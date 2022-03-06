@@ -11,7 +11,7 @@ export default function Avatar(props) {
         return (
             <Image
                 source={{uri: "data:" + avatar.mime + ";base64," + avatar.data}}
-                style={[StyleMain.avatar, {width: props.size, height: props.size}]}
+                style={[StyleMain.avatar, {width: props.size, height: props.size}, props.style]}
             />
         );
     }
@@ -20,7 +20,7 @@ export default function Avatar(props) {
             name="account"
             size={props.size}
             color="white"
-            style={{position: "absolute"}}
+            style={[{position: "absolute"}, props.style]}
         />
     );
 }

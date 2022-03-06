@@ -37,6 +37,10 @@ const StyleMain = StyleSheet.create({
     datePickerDropdown: {
         height: 40,
     },
+    edge: {
+        height: 1,
+        backgroundColor: "#000"
+    },
     logo: {
         width: dimensions.width,
         height: dimensions.height / 2

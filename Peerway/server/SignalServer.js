@@ -165,6 +165,7 @@ io.on('connection', socket => {
             let entity = entities[id].find(v => v.socketId === socketId);
             listing.push({
                 id: id,
+                clientId: socketId,
                 name: entity.name,
                 avatar: entity.avatar,
             });
@@ -205,7 +206,7 @@ io.on('connection', socket => {
         The initiating peer offers a connection
     */
     socket.on('offer', payload => {
-        console.log("Received offer from payload " + payload.target);
+        console.log("Received offer from client " + payload.target);
         io.to(payload.target).emit('offer', payload);
     });
 
@@ -213,12 +214,12 @@ io.on('connection', socket => {
         The receiving peer answers (accepts) the offer
     */
     socket.on('answer', payload => {
-        console.log("Answered offer from payload " + payload.target);
+        console.log("Answered offer from client " + payload.target);
         io.to(payload.target).emit('answer', payload);
     });
 
     socket.on('ice-candidate', incoming => {
-        console.log("Setting up ice candidate " + JSON.stringify(incoming.candidate));
+        console.log("Setting up ice candidate...");
         io.to(incoming.target).emit('ice-candidate', incoming.candidate);
     })
 });

@@ -11,6 +11,7 @@ import Globals from '../Globals';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
+const paddingAmount = 8;
 
 // TODO: Reuse this screen for editing members of an existing chat
 export default class RequestChat extends Component {
@@ -20,7 +21,7 @@ export default class RequestChat extends Component {
 
         this.state = {
             profiles: [],
-            selected: [],
+            selected: {},
             chatID: "",
         }
     }
@@ -41,8 +42,21 @@ export default class RequestChat extends Component {
         Globals.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
-        Globals.connection.current.emit("ListEntities");
-        //this.forceUpdate();
+        Globals.connection.current.emit("ListEntities", {
+            page: 1,
+            sort: "alphanumeric"
+        });
+    }
+
+    // Callback when an entity is selected
+    onSelect(item) {
+        console.log("Selecting item " + item.clientId);
+        if (item.clientId in this.state.selected) {
+            delete this.state.selected[item.clientId];
+        } else {
+            this.state.selected[item.clientId] = item.id;
+        }
+        this.forceUpdate();
     }
 
     // Callback when the invitations are confirmed.
@@ -53,8 +67,9 @@ export default class RequestChat extends Component {
         this.setState({chatID: id});
         this.props.navigation.navigate('Chat', { chatID: id });
     }
-//disabled={this.state.selected.length == 0}
+
     render() {
+        let didSelect = Object.keys(this.state.selected).length != 0;
         return (
             <View style={StyleMain.background}>
                 {/* Handles screen opening callback */}
@@ -63,24 +78,41 @@ export default class RequestChat extends Component {
                 {/* List of entities that the user can invite to chat */}
                 <FlatList
                     data={this.state.profiles}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity>
-                            <Avatar avatar={item.avatar} size={avatarSize}></Avatar>
+                    keyExtractor={item => item.clientId}
+                    renderItem={({ item }) => {
+                        return item.id === Database.active.getString("id") ? (<></>) : 
+                        (
+                        <View>
+                        <TouchableOpacity onPress={() => this.onSelect(item)} style={styles.selectable}>
+                            <Avatar avatar={item.avatar} size={avatarSize} style={styles.avatar}></Avatar>
+                            <Text
+                                numberOfLines={1}
+                                style={styles.nameText}>
+                                {item.name}
+                            </Text>
+                            <View style={[
+                                styles.checkbox,
+                                item.clientId in this.state.selected ? styles.checked : styles.unchecked
+                            ]}>
+                            </View>
                         </TouchableOpacity>
-                    )}
+                        <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+                        </View>
+                        );
+                    }}
                 />
 
                 {/* Confirmation button invites or removes users from the chat */}
                 <View style={styles.confirmButtonContainer}>
                     <TouchableOpacity
+                        disabled={!didSelect}
                         onPress={() => this.onConfirm()}
                         style={[StyleMain.button, styles.confirmButton]}
                     >
                         <Text style={[
                             StyleMain.buttonText,
-                            { color: (this.state.selected.length == 0 ?
-                                Colors.buttonTextDisabled : Colors.buttonText)}
+                            { color: (didSelect ?
+                                Colors.buttonText : Colors.buttonTextDisabled)}
                             ]}>Confirm</Text>
                     </TouchableOpacity>
                 </View>
@@ -90,6 +122,32 @@ export default class RequestChat extends Component {
 }
 
 const styles = StyleSheet.create({
+    avatar: {
+        position: "absolute",
+        left: paddingAmount,
+        top: paddingAmount
+    },
+    checkbox: {
+        position: "absolute",
+        right: paddingAmount,
+        width: avatarSize * 0.5,
+        height: avatarSize * 0.5
+    },
+    checked: {
+        backgroundColor: "#afa"
+    },
+    unchecked: {
+        backgroundColor: "#777"
+    },
+    selectable: {
+        padding: paddingAmount,
+        justifyContent: "center",
+        height: paddingAmount * 2 + avatarSize
+    },
+    nameText: {
+        left: paddingAmount + paddingAmount + avatarSize,
+        width: dimensions.width - (paddingAmount * 4 + avatarSize * 2),
+    },
     confirmButton: {
     },
     confirmButtonContainer: {
@@ -98,10 +156,5 @@ const styles = StyleSheet.create({
         width: "100%",
         bottom: 0,
         paddingVertical: 30
-    },
-    avatar: {
-        width: avatarSize,
-        height: avatarSize,
-        borderRadius: 10000
     },
 });
