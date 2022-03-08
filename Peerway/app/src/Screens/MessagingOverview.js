@@ -2,7 +2,6 @@ import { StyleSheet, View, Image, TouchableOpacity, ScrollView, FlatList, Dimens
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { Component } from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
-import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import Database from '../Database';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
@@ -10,7 +9,7 @@ import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
 import { io } from 'socket.io-client';
 import Constants from '../Constants';
-import Globals from '../Globals';
+import AppState from '../AppState';
 
 const topbarHeight = 56;
 const iconSize = 56;
@@ -58,13 +57,13 @@ export default class MessagingOverview extends Component {
             });
         }
 
-        Globals.connection = React.createRef();
+        AppState.connection = React.createRef();
         this.connectToSignalServer();
     }
 
     // TODO: Move this connection setup code somewhere else
     connectToSignalServer() {
-        Globals.connection.current = io.connect("http://" + Constants.server_ip + ":" + Constants.port);
+        AppState.connection.current = io.connect("http://" + Constants.server_ip + ":" + Constants.port);
 
         // Setup the entity on the server so others can see it listed
         let profile = JSON.parse(Database.active.getString("profile"));
@@ -73,7 +72,7 @@ export default class MessagingOverview extends Component {
             name: profile.name,
             avatar: profile.avatar
         };
-        Globals.connection.current.emit("SetupEntity", entity);
+        AppState.connection.current.emit("SetupEntity", entity);
     }
 
     loadChats() {

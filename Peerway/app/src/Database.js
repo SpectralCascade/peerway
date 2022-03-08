@@ -3,9 +3,6 @@ import { MMKV } from 'react-native-mmkv';
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import AppKeys from './AppKeys';
 
-// Local user data, tracking entities and general app settings.
-const userdata = new MMKV({ id: "userdata", encryptionKey: AppKeys.userdata });
-
 // This entity example shows what the different key-value fields are used for.
 // Note that the actual storage stores non-primitive objects as JSON strings.
 // Also note that content data is not stored in the entity storage object itself.
@@ -71,11 +68,25 @@ export default class Database {
     static entities = {};
     static active = null;
 
+    // Local user data, tracking entities and general app settings.
+    static userdata = new MMKV({ id: "userdata", encryptionKey: AppKeys.userdata });
+
     // Changes the current active entity storage slot.
     static SwitchActiveEntity(id) {
         if (id == null || id == "") {
+            this.userdata.set("active", "");
             this.active = null;
         } else {
+            this.userdata.set("active", id);
+            // Load the MMKV instance if not already loaded
+            let key = this.userdata.getString(id);
+            if (!(id in this.entities)) {
+                console.log("Loading active entity " + id + "...");
+                this.entities[id] = new MMKV({
+                    id: id,
+                    encryptionKey: key
+                });
+            }
             this.active = this.entities[id];
         }
         return this.active;
@@ -84,12 +95,12 @@ export default class Database {
     // Creates a new entity storage slot and automatically sets the active slot.
     static CreateEntity() {
         // Generated ID for this entity, based on timestamp & MAC address.
-        id = uuidv1();
+        let id = uuidv1();
         
         // Randomly generated encryption key for the entity data.
         // This way, if another user gets access to the entity data, they need the key to access it.
         // In future, this could be a user password or pin instead of RNG UUID.
-        key = uuidv4();
+        let key = uuidv4();
 
         //console.log("Created id " + id + " and key: " + key);
         // Create new entity storage slot
@@ -100,7 +111,7 @@ export default class Database {
         this.entities[id].set("id", id);
 
         // Add entity to userdata.
-        userdata.set(id, key);
+        this.userdata.set(id, key);
 
         return id;
     }
@@ -118,8 +129,8 @@ export default class Database {
             delete this.entities[id];
         }
         // Then delete the entity entry from userdata
-        if (userdata.contains(id)) {
-            userdata.delete(id);
+        if (this.userdata.contains(id)) {
+            this.userdata.delete(id);
         }
         return success;
     }

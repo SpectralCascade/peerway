@@ -177,7 +177,6 @@ export default class ProfileEdit extends React.Component {
                             };
                             // Save profile in database
                             Database.active.set("profile", JSON.stringify(profile));
-
                             this.props.navigation.dispatch(
                                 CommonActions.reset({
                                     index: 1,

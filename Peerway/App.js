@@ -6,6 +6,7 @@ import ProfileEdit from './app/src/Screens/ProfileEdit';
 import Chat from './app/src/Screens/Chat';
 import MessagingOverview from './app/src/Screens/MessagingOverview';
 import RequestChat from './app/src/Screens/RequestChat';
+import SplashScreen from './app/src/Screens/SplashScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -13,10 +14,14 @@ export default function App() {
     return (
         <NavigationContainer>
           <Stack.Navigator
-            initialRouteName='Setup'
+            initialRouteName='Splash'
             screenOptions={{
               headerShown: false,
             }}>
+            <Stack.Screen
+              name="Splash"
+              component={SplashScreen}
+            />
             <Stack.Screen
               name="Setup"
               component={SetupScreen}

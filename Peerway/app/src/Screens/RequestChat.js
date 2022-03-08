@@ -7,7 +7,7 @@ import Colors from '../Stylesheets/Colors';
 import StyleMain from '../Stylesheets/StyleMain';
 import {v1 as uuidv1} from 'uuid';
 import Database from '../Database';
-import Globals from '../Globals';
+import AppState from '../AppState';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -39,12 +39,12 @@ export default class RequestChat extends Component {
         console.log("OPENED REQUEST CHAT");
         // Handle retrieval of entities list
         // TODO: Check if slice() copy is needed or not
-        Globals.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
+        AppState.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
         // TODO: Only list entities that the user knows of, i.e. mutuals and
         // other entities that they share a chat with.
-        Globals.connection.current.emit("ListEntities", {
+        AppState.connection.current.emit("ListEntities", {
             page: 1,
             sort: "alphanumeric"
         });
