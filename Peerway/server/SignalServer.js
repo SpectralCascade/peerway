@@ -74,8 +74,8 @@ io.on('connection', socket => {
 
         // Remove from clients and entity listings
         if (socket.id in clients) {
-            let entityId = clients[socket.id];
-            console.log("Client " + socket.id + " disconnected, removing entity " + entityId);
+            let entityId = clients[socket.id].entityId;
+            console.log("Info: Client " + socket.id + " disconnected, removing entity " + entityId);
 
             // Remove from sorted client list(s)
             let clientIndex = sortedClientsAlphanumeric.indexOf(socket.id);

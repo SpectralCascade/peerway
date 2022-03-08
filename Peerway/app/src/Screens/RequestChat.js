@@ -10,7 +10,7 @@ import Database from '../Database';
 import AppState from '../AppState';
 
 const dimensions = Dimensions.get('window');
-const avatarSize = dimensions.width * 0.3;
+const avatarSize = dimensions.width * 0.2;
 const paddingAmount = 8;
 
 // TODO: Reuse this screen for editing members of an existing chat
@@ -39,6 +39,7 @@ export default class RequestChat extends Component {
         console.log("OPENED REQUEST CHAT");
         // Handle retrieval of entities list
         // TODO: Check if slice() copy is needed or not
+        AppState.connection.current.off("ListEntitiesResponse");
         AppState.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
@@ -52,7 +53,6 @@ export default class RequestChat extends Component {
 
     // Callback when an entity is selected
     onSelect(item) {
-        console.log("Selecting item " + item.clientId);
         if (item.clientId in this.state.selected) {
             delete this.state.selected[item.clientId];
         } else {
@@ -64,7 +64,8 @@ export default class RequestChat extends Component {
     // Callback when the invitations are confirmed.
     // For now this always creates a new chat
     onConfirm() {
-        let id = Database.CreateChat();
+        let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
+        let id = Database.CreateChat(selected);
         console.log("Creating chat with id " + id);
         this.setState({chatID: id});
         this.props.navigation.navigate('Chat', { chatID: id });
@@ -85,7 +86,7 @@ export default class RequestChat extends Component {
                         // Don't list the active entity...
                         return item.id === Database.active.getString("id") ? (<></>) : 
                         (
-                        <View>
+                        <View style={styles.item}>
                         <TouchableOpacity onPress={() => this.onSelect(item)} style={styles.selectable}>
                             <Avatar avatar={item.avatar} size={avatarSize} style={styles.avatar}></Avatar>
                             <Text
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
     avatar: {
         position: "absolute",
         left: paddingAmount,
-        top: paddingAmount
+        top: paddingAmount,
     },
     checkbox: {
         position: "absolute",
@@ -160,4 +161,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         paddingVertical: 30
     },
+    item: {
+        backgroundColor: "#fff"
+    }
 });
