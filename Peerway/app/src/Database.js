@@ -43,6 +43,8 @@ const ExampleEntity = {
         // A public verification key for checking digital signatures from this peer.
         verifier: "<public-signature-key>"
     },
+    // Array of all chats this entity is part of, ordered by most recent interaction.
+    chats: [],
     // Metadata for direct messaging with other entities.
     // Example chat with unique id
     "chat.<uuid-generated-id>": {
@@ -196,7 +198,8 @@ export default class Database {
         }
 
         // Create a chat entry
-        this.active.set("chat.meta." + meta.id, JSON.stringify(chatData));
+        
+        Database.active.set("chat." + meta.id, JSON.stringify(chatData));
 
         return meta.id;
     }

@@ -28,49 +28,17 @@ export default class MessagingOverview extends Component {
         this.state = {
             // The id of the current active entity
             id: "",
-            chats: [
-                {
-                    id: '1',
-                    name: "L. Farquad",
-                    message: {
-                        content: "The muffin man on Drury Lane?",
-                        timestamp: (new Date()).toLocaleDateString("en-GB")
-                    },
-                    icon: "",
-                    read: false
-                },
-                {
-                    id: '2',
-                    name: "Walter's donut party",
-                    message: {
-                        content: "Kleiner: The administrator wants to get a conclusive analysis of today's sample. I gather they went to some lengths to get it.",
-                        timestamp: (new Date()).toLocaleDateString("en-GB")
-                    },
-                    icon: "",
-                    read: true
-                }
-            ]
-        }
-
-        for (var i = 3; i <= 20; i++) {
-            this.state.chats.push({
-                id: i.toString(),
-                name: "Dummy Name",
-                message: {
-                    content: "Dummy message content",
-                    timestamp: (new Date()).toLocaleDateString("en-GB")
-                },
-                icon: "",
-                read: true
-            });
+            chats: []
         }
 
         // As the constructor will be called before 
-        if (this.state.id == undefined || this.state.id.length == 0) {
+        if (this.state.id.length == 0) {
             this.state.id = Database.active.getString("id");
         }
 
         AppState.connection = React.createRef();
+
+        //Database.active.delete("chats");
 
         // CONSIDER: Move this elsewhere?
         this.connectToSignalServer();
@@ -79,8 +47,38 @@ export default class MessagingOverview extends Component {
     // Callback on navigating to this screen.
     OnOpen() {
         this.state.id = Database.active.getString("id");
+        // Load up cached chats
+        let chatIds = [];
+        if (Database.active.contains("chats")) {
+            chatIds = JSON.parse(Database.active.getString("chats"));
+            console.log("Chats = " + JSON.stringify(chatIds));
+        }
+        this.state.chats = [];
+        for (let i in chatIds) {
+            let id = chatIds[i];
+            if (Database.active.contains("chat." + id)) {
+                let meta = JSON.parse(Database.active.getString("chat." + id));
+
+                // Create a chat entry for the UI
+                this.state.chats.push({
+                    id: id,
+                    name: meta.name,
+                    message: {
+                        content: "...", // TODO: insert last message text
+                        timestamp: (new Date(meta.received)).toLocaleDateString("en-GB")
+                    },
+                    icon: meta.icon,
+                    read: meta.read
+                });
+            } else {
+                console.log("Error: Chat " + id + " does not exist, but is listed!");
+            }
+        }
+
+        // Connect to peers to update chats
         this.SetupCallbacks();
         this.SyncPeers();
+
         this.forceUpdate();
         console.log("OPENED MESSAGING OVERVIEW");
     }
@@ -98,8 +96,8 @@ export default class MessagingOverview extends Component {
             this.handleNewICECandidateMsg(incoming);
         });
 
-        AppState.connection.off("EntityMeta");
-        AppState.connection.on("EntityMeta", (meta) => { this.OnEntityMetaReceived(meta); });
+        AppState.connection.current.off("EntityMeta");
+        AppState.connection.current.on("EntityMeta", (meta) => { this.OnEntityMetaReceived(meta); });
     }
 
     // Send a request to connect to a specified entity.
@@ -262,7 +260,7 @@ export default class MessagingOverview extends Component {
 
     // Synchronise messages and content with known peers, in order of peers last interacted with.
     SyncPeers() {
-        this.peers = JSON.parse(Database.active.getString("peers"));
+        this.peers = Database.active.contains("peers") ? JSON.parse(Database.active.getString("peers")) : [];
         for (let id in this.peersToConnect) {
             // Get local peer metadata
             let meta = JSON.parse(Database.active.getString("peer." + id));
@@ -276,6 +274,10 @@ export default class MessagingOverview extends Component {
 
     // TODO: Move this connection setup code somewhere else
     connectToSignalServer() {
+        if (AppState.connection.current && AppState.connection.current.connected) {
+            return;
+        }
+
         AppState.connection.current = io.connect("http://" + Constants.server_ip + ":" + Constants.port);
 
         // Setup the entity on the server so others can see it listed

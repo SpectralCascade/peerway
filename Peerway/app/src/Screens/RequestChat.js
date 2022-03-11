@@ -8,6 +8,7 @@ import StyleMain from '../Stylesheets/StyleMain';
 import {v1 as uuidv1} from 'uuid';
 import Database from '../Database';
 import AppState from '../AppState';
+import { CommonActions } from '@react-navigation/native';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.2;
@@ -66,9 +67,21 @@ export default class RequestChat extends Component {
     onConfirm() {
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
         let id = Database.CreateChat(selected);
-        console.log("Creating chat with id " + id);
+        console.log("CONTAINS CHATS = " + Database.active.contains("chats"));
+        let chats = Database.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
+        chats.push(id);
+        Database.active.set("chats", JSON.stringify(chats));
+        console.log("Creating chat with id " + id + " to go with chats:\n" + JSON.stringify(chats));
+        console.log("CONTAINS CHATS = " + Database.active.contains("chats"));
         this.setState({chatID: id});
-        this.props.navigation.navigate('Chat', { chatID: id });
+        // TODO: Open chat instead of messaging overview
+        this.props.navigation.dispatch(
+            CommonActions.reset({
+                index: 1,
+                routes: [{ name: 'MessagingOverview' }]
+            })
+        );
+        //this.props.navigation.navigate("Chat", { chatID: id });
     }
 
     render() {
@@ -110,7 +123,7 @@ export default class RequestChat extends Component {
                 <View style={styles.confirmButtonContainer}>
                     <TouchableOpacity
                         disabled={!didSelect}
-                        onPress={() => this.onConfirm()}
+                        onPress={() => { this.onConfirm(); }}
                         style={[StyleMain.button, styles.confirmButton]}
                     >
                         <Text style={[
