@@ -127,8 +127,8 @@ export default class Chat extends React.Component {
 
     handleOffer(incoming) {
         /*
-        Here we are exchanging config information
-        between the peers to establish communication
+            Here we are exchanging config information
+            between the peers to establish communication
         */
         console.log("[INFO] Handling Offer")
         this.peer.current = this.CreatePeer(Database.active.getString("id"));

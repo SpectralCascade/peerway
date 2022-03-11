@@ -19,44 +19,66 @@ const ExampleEntity = {
         website: "https://example.com",
         bio: "I enjoy reading and writing code."
     },
+    // A digital signature, used to verify that messages etc. are genuinely from this entity.
+    signature: {
+        public: "<public-signature-key>",
+        private: "<private-signature-key>",
+        expires: "<serialised-date-timestamp>"
+    },
+    // Array of all peer entity IDs this entity has interactions with, ordered by most recent interaction.
+    peers: [],
+    // Metadata regarding other peers this entity has interacted with historically.
+    // Example peer with unique id
+    "peer.<peer-entity-id>": {
+        // Name of the peer
+        name: "Bob",
+        // Path to the peer avatar image file
+        avatar: "<path-to-avatar-image>",
+        // Is this peer a mutual?
+        mutual: "<boolean>",
+        // Is this peer blocked?
+        blocked: "<boolean>",
+        // The time at which this peer was last synced with
+        sync: "<serialised-date-timestamp>",
+        // A public verification key for checking digital signatures from this peer.
+        verifier: "<public-signature-key>"
+    },
     // Metadata for direct messaging with other entities.
-    chats: {
-        // Example chat with unique id
-        "<uuid-generated-id>": {
-            // Name of the chat.
-            name: "John Smith",
-            // Which entities are part of the chat along with permission keys.
-            members: [
-                {
-                    // ID of the listed entity.
-                    id: "<entity-id>",
-                    // Key chat permissions.
-                    keys: {
-                        // Key for verifying identity, only shared with this member.
-                        id: "<generated-key>",
-                        // Key for reading messages in the chat.
-                        rx: "<generated-key>",
-                        // Key for sending messages in the chat.
-                        tx: "<generated-key>",
-                        // This key indicates whether the listed entity has administrator privileges.
-                        // Only a select few entities have this key.
-                        admin: "<generated-key>"
-                    }
+    // Example chat with unique id
+    "chat.<uuid-generated-id>": {
+        // Name of the chat.
+        name: "John Smith",
+        // Which entities are part of the chat along with permission keys.
+        members: [
+            {
+                // ID of the listed entity.
+                id: "<entity-id>",
+                // Key chat permissions.
+                keys: {
+                    // Key for verifying identity, only shared with this member.
+                    id: "<generated-key>",
+                    // Key for reading messages in the chat.
+                    rx: "<generated-key>",
+                    // Key for sending messages in the chat.
+                    tx: "<generated-key>",
+                    // This key indicates whether the listed entity has administrator privileges.
+                    // Only a select few entities have this key.
+                    admin: "<generated-key>"
                 }
-            ],
-            // When was the last message received from this chat?
-            received: "<serialised-date>",
-            // When was the last update to this chat (considers last message received time)?
-            updated: "<serialised-date>",
-            // Is this chat flagged as read?
-            read: false,
-            // Is this chat muted?
-            muted: false,
-            // Is this chat blocked?
-            blocked: false,
-            // The image used as the chat icon.
-            icon: "<icon-image-base64-string>"
-        }
+            }
+        ],
+        // When was the last message received from this chat?
+        received: "<serialised-date>",
+        // When was the last update to this chat (considers last message received time)?
+        updated: "<serialised-date>",
+        // Is this chat flagged as read?
+        read: false,
+        // Is this chat muted?
+        muted: false,
+        // Is this chat blocked?
+        blocked: false,
+        // The image used as the chat icon.
+        icon: "<icon-image-base64-string>"
     }
 };
 

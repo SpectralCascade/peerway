@@ -130,6 +130,7 @@ io.on('connection', socket => {
     // NOTE: It's possible for the same entity to appear more than once.
     // This is because it's possible for the same entity to have multiple connections.
     // CONSIDER: Change event name to better reflect the note above.
+    // TODO: Optionally omit fields such as avatar, name etc.
     // Options:
     /*
     {
@@ -177,7 +178,34 @@ io.on('connection', socket => {
         socket.emit("ListEntitiesResponse", listing);
     });
 
+    // Handle request to get some meta data on an entity connected to this server.
+    // Meta input data requires an entity id at least.
+    // Always returns "id" and "available" fields. Also includes clientId if available.
+    // Only returns other fields when specified.
+    // TODO validate input
+    // Example meta request (for getting all entity metadata fields):
+    /*
+    {
+        name: true,
+        avatar: true
+    }
+    */
+    socket.on("GetEntityMeta", (request) => {
+        let available = request.id in entities;
+        let meta = {
+            id: request.id,
+            available: available,
+            clientId: available ? entities[request.id].clientId : undefined,
+            name: available && request["name"] ? entities[request.id].name : undefined,
+            avatar: available && request["avatar"] ? entities[request.id].avatar : undefined
+        }
+
+        // Send back metadata as requested
+        socket.emit("EntityMeta", meta);
+    });
+
     // Callback to handle a peer joining a chat
+    // TODO: burn this
     socket.on('join room', roomID => {
 
         console.log("Received join request for chat room " + roomID + " from socket " + socket.id);
@@ -202,22 +230,19 @@ io.on('connection', socket => {
         }
     });
 
-    /*
-        The initiating peer offers a connection
-    */
-    socket.on('offer', payload => {
+    // A peer wishes to connect to another peer.
+    socket.on("SendPeerRequest", payload => {
         console.log("Received offer from client " + payload.target);
-        io.to(payload.target).emit('offer', payload);
+        io.to(payload.target).emit("PeerConnectionRequest", payload);
     });
 
-    /*
-        The receiving peer answers (accepts) the offer
-    */
-    socket.on('answer', payload => {
+    // A peer accepts a request to connect to a peer.
+    socket.on("AcceptPeerRequest", payload => {
         console.log("Answered offer from client " + payload.target);
-        io.to(payload.target).emit('answer', payload);
+        io.to(payload.target).emit("PeerConnectionAccepted", payload);
     });
 
+    // This is part of the ICE process for connecting peers once a request is accepted.
     socket.on('ice-candidate', incoming => {
         console.log("Setting up ice candidate...");
         io.to(incoming.target).emit('ice-candidate', incoming.candidate);
