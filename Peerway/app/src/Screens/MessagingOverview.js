@@ -260,7 +260,12 @@ export default class MessagingOverview extends Component {
 
     // Synchronise messages and content with known peers, in order of peers last interacted with.
     SyncPeers() {
-        this.peers = Database.active.contains("peers") ? JSON.parse(Database.active.getString("peers")) : [];
+        this.peers = [];
+        Database.active.delete("peers");
+        if (Database.active.contains("peers")) {
+            console.log("Data: " + Database.active.getString("peers"));
+            peers = JSON.parse(Database.active.getString("peers"));
+        }
         for (let id in this.peersToConnect) {
             // Get local peer metadata
             let meta = JSON.parse(Database.active.getString("peer." + id));
@@ -333,7 +338,7 @@ export default class MessagingOverview extends Component {
                     data={this.state.chats}
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => (
-                        <View>                        
+                        <View>
                         <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
                             <View style={styles.chatIcon}></View>
                             <View style={styles.chatContent}>

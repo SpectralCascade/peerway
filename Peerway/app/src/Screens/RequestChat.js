@@ -65,14 +65,31 @@ export default class RequestChat extends Component {
     // Callback when the invitations are confirmed.
     // For now this always creates a new chat
     onConfirm() {
+        // TODO REMOVE ME debug only
+        Database.active.delete("chats");
+
+        // Create a chat entry in the database
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
         let id = Database.CreateChat(selected);
-        console.log("CONTAINS CHATS = " + Database.active.contains("chats"));
         let chats = Database.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
-        chats.push(id);
+        // Add chat to top
+        chats = [id].concat(chats);
         Database.active.set("chats", JSON.stringify(chats));
-        console.log("Creating chat with id " + id + " to go with chats:\n" + JSON.stringify(chats));
-        console.log("CONTAINS CHATS = " + Database.active.contains("chats"));
+
+        // Add peer entries when necessary
+        let chat = JSON.parse(Database.active.getString("chat." + id));
+        for (i in chat.members) {
+            console.log("Adding peer " + chat.members[i].id);
+            Database.AddPeer(chat.members[i].id);
+            let peer = JSON.parse(Database.active.getString("peer." + chat.members[i].id));
+            // This will be the most up-to-date data, so overwrite.
+            peer.name = selected.name;
+            peer.avatar = selected.avatar;
+            Database.active.set("peer." + chat.members[i].id, JSON.stringify(peer));
+        }
+
+        console.log("Created chat with id " + id);
+
         this.setState({chatID: id});
         // TODO: Open chat instead of messaging overview
         this.props.navigation.dispatch(

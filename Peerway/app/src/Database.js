@@ -176,7 +176,7 @@ export default class Database {
         // Generate chat metadata
         let chatData = {
             name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[0].name,
-            members: "members" in meta ? meta.members : [],
+            members: members,
             received: "received" in meta ? meta.received : (new Date()).getUTCMilliseconds(),
             updated: "updated" in meta ? meta.updated : (new Date()).getUTCMilliseconds(),
             read: "read" in meta ? meta.read : false,
@@ -198,10 +198,54 @@ export default class Database {
         }
 
         // Create a chat entry
-        
         Database.active.set("chat." + meta.id, JSON.stringify(chatData));
 
         return meta.id;
+    }
+
+    static MarkPeerInteraction(id, peers=[], index=-1) {
+        if (peers.length == 0) {
+            peers = JSON.parse(Database.active.getString("peers"));
+        }
+
+        if (index < 0) {
+            index = peers.indexOf(id);
+        }
+
+        // Move to top of the list
+        // TODO: more efficient solution?
+        let bottom = peers.slice(index, index + 1);
+        let top = peers.slice(0, Math.max(0, index));
+        peers = [id].concat(top.concat(bottom));
+
+        Database.active.set("peers", JSON.stringify(peers));
+    }
+
+    // Add a peer entry to the database, if it isn't already there
+    static AddPeer(id, markInteraction=true) {
+        let peers = [];
+        if (Database.active.contains("peers")) {
+            peers = JSON.parse(Database.active.getString("peers"));
+        }
+
+        let index = peers.indexOf(id);
+        if (index >= 0) {
+            if (markInteraction) {
+                this.MarkPeerInteraction(id, peers, index);
+            }
+        } else {
+            // Add to the front of the list
+            Database.active.set("peers", JSON.stringify(([id].concat(peers))));
+            Database.active.set("peer." + id, JSON.stringify({
+                name: "",
+                avatar: "",
+                mutual: false,
+                blocked: false,
+                sync: "",
+                verifier: ""
+            }));
+        }
+        
     }
 
 }
