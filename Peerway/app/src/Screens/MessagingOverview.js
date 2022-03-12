@@ -124,7 +124,7 @@ export default class MessagingOverview extends Component {
         let meta = {};
         // TODO check in JSON object - might be faster than an array.
         if (peer.id in this.peersToConnect) {
-            meta = Database.active.getString("peer:" + peer.id);
+            meta = Database.active.getString("peer." + peer.id);
 
             // TODO: Check peer is genuine (verify signature)
         } else {
@@ -140,7 +140,7 @@ export default class MessagingOverview extends Component {
             };
             this.peersToConnect.push(peer.id);
             Database.active.set("peers", JSON.stringify(this.peersToConnect));
-            Database.active.set("peer:" + peer.id, JSON.stringify(meta));
+            Database.active.set("peer." + peer.id, JSON.stringify(meta));
         }
 
         let toRemove = this.peersToConnect.indexOf(peer.id);
@@ -262,7 +262,8 @@ export default class MessagingOverview extends Component {
     SyncPeers() {
         this.peers = [];
         if (Database.active.contains("peers")) {
-            peers = JSON.parse(Database.active.getString("peers"));
+            this.peers = JSON.parse(Database.active.getString("peers"));
+            console.log("Syncing " + this.peers.length + " peers... " + JSON.stringify(this.peers));
         }
         for (let id in this.peersToConnect) {
             // Get local peer metadata

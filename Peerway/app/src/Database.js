@@ -214,8 +214,8 @@ export default class Database {
 
         // Move to top of the list
         // TODO: more efficient solution?
-        let bottom = peers.slice(index, index + 1);
-        let top = peers.slice(0, Math.max(0, index));
+        let bottom = peers.length > 1 ? peers.slice(index, index + 1) : [];
+        let top = peers.length > 1 ? peers.slice(0, Math.max(0, index)) : [];
         peers = [id].concat(top.concat(bottom));
 
         Database.active.set("peers", JSON.stringify(peers));
@@ -225,16 +225,21 @@ export default class Database {
     static AddPeer(id, markInteraction=true) {
         let peers = [];
         if (Database.active.contains("peers")) {
+            console.log("database contains peers");
             peers = JSON.parse(Database.active.getString("peers"));
+        } else {
+            console.log("database DOES NOT contain peers");
         }
 
         let index = peers.indexOf(id);
         if (index >= 0) {
+            console.log("peer " + id + " already exists");
             if (markInteraction) {
                 this.MarkPeerInteraction(id, peers, index);
             }
         } else {
             // Add to the front of the list
+            console.log("Adding NEW peer to list");
             Database.active.set("peers", JSON.stringify(([id].concat(peers))));
             Database.active.set("peer." + id, JSON.stringify({
                 name: "",

@@ -77,15 +77,14 @@ export default class RequestChat extends Component {
         Database.active.set("chats", JSON.stringify(chats));
 
         // Add peer entries when necessary
-        let chat = JSON.parse(Database.active.getString("chat." + id));
-        for (i in chat.members) {
-            console.log("Adding peer " + chat.members[i].id);
-            Database.AddPeer(chat.members[i].id);
-            let peer = JSON.parse(Database.active.getString("peer." + chat.members[i].id));
+        for (i in selected) {
+            console.log("Adding peer " + selected[i].id);
+            Database.AddPeer(selected[i].id);
+            let peer = JSON.parse(Database.active.getString("peer." + selected[i].id));
             // This will be the most up-to-date data, so overwrite.
-            peer.name = selected.name;
-            peer.avatar = selected.avatar;
-            Database.active.set("peer." + chat.members[i].id, JSON.stringify(peer));
+            peer.name = selected[i].name;
+            peer.avatar = selected[i].avatar;
+            Database.active.set("peer." + selected[i].id, JSON.stringify(peer));
         }
 
         console.log("Created chat with id " + id);
