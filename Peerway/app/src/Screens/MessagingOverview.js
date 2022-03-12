@@ -261,9 +261,7 @@ export default class MessagingOverview extends Component {
     // Synchronise messages and content with known peers, in order of peers last interacted with.
     SyncPeers() {
         this.peers = [];
-        Database.active.delete("peers");
         if (Database.active.contains("peers")) {
-            console.log("Data: " + Database.active.getString("peers"));
             peers = JSON.parse(Database.active.getString("peers"));
         }
         for (let id in this.peersToConnect) {
