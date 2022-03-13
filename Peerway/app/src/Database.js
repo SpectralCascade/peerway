@@ -86,8 +86,6 @@ const ExampleEntity = {
 
 export default class Database {
 
-    // All chat content for the active entity, by chat ID.
-    static chats = {};
     // All entities, by entity ID.
     static entities = {};
     static active = null;
@@ -198,14 +196,14 @@ export default class Database {
         }
 
         // Create a chat entry
-        Database.active.set("chat." + meta.id, JSON.stringify(chatData));
+        this.active.set("chat." + meta.id, JSON.stringify(chatData));
 
         return meta.id;
     }
 
     static MarkPeerInteraction(id, peers=[], index=-1) {
         if (peers.length == 0) {
-            peers = JSON.parse(Database.active.getString("peers"));
+            peers = JSON.parse(this.active.getString("peers"));
         }
 
         if (index < 0) {
@@ -218,30 +216,30 @@ export default class Database {
         let top = peers.length > 1 ? peers.slice(0, Math.max(0, index)) : [];
         peers = [id].concat(top.concat(bottom));
 
-        Database.active.set("peers", JSON.stringify(peers));
+        this.active.set("peers", JSON.stringify(peers));
     }
 
     // Add a peer entry to the database, if it isn't already there
     static AddPeer(id, markInteraction=true) {
         let peers = [];
-        if (Database.active.contains("peers")) {
-            console.log("database contains peers");
-            peers = JSON.parse(Database.active.getString("peers"));
+        if (this.active.contains("peers")) {
+            console.log("Database contains peers array");
+            peers = JSON.parse(this.active.getString("peers"));
         } else {
-            console.log("database DOES NOT contain peers");
+            console.log("Database DOES NOT contain peers array");
         }
 
         let index = peers.indexOf(id);
         if (index >= 0) {
-            console.log("peer " + id + " already exists");
+            console.log("peer." + id + " already exists, no need to add new.");
             if (markInteraction) {
                 this.MarkPeerInteraction(id, peers, index);
             }
         } else {
             // Add to the front of the list
-            console.log("Adding NEW peer to list");
-            Database.active.set("peers", JSON.stringify(([id].concat(peers))));
-            Database.active.set("peer." + id, JSON.stringify({
+            console.log("Adding NEW peer to list: peer." + id);
+            this.active.set("peers", JSON.stringify(([id].concat(peers))));
+            this.active.set("peer." + id, JSON.stringify({
                 name: "",
                 avatar: "",
                 mutual: false,

@@ -67,6 +67,7 @@ export default class RequestChat extends Component {
     onConfirm() {
         // TODO REMOVE ME debug only
         Database.active.delete("chats");
+        Database.active.delete("peers");
 
         // Create a chat entry in the database
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
@@ -84,7 +85,7 @@ export default class RequestChat extends Component {
             // This will be the most up-to-date data, so overwrite.
             peer.name = selected[i].name;
             peer.avatar = selected[i].avatar;
-            Database.active.set("peer." + selected[i].id, JSON.stringify(peer));
+            //Database.active.set("peer." + selected[i].id, JSON.stringify(peer));
         }
 
         console.log("Created chat with id " + id);
