@@ -46,6 +46,8 @@ export default class MessagingOverview extends Component {
 
     // Callback on navigating to this screen.
     OnOpen() {
+        console.log("OPENED MESSAGING OVERVIEW");
+        
         this.state.id = Database.active.getString("id");
         // Load up cached chats
         let chatIds = [];
@@ -80,7 +82,6 @@ export default class MessagingOverview extends Component {
         this.SyncPeers();
 
         this.forceUpdate();
-        console.log("OPENED MESSAGING OVERVIEW");
     }
 
     // Configure callbacks for setting up a WebRTC connection
@@ -96,8 +97,8 @@ export default class MessagingOverview extends Component {
             this.handleNewICECandidateMsg(incoming);
         });
 
-        AppState.connection.current.off("EntityMeta");
-        AppState.connection.current.on("EntityMeta", (meta) => { this.OnEntityMetaReceived(meta); });
+        AppState.connection.current.off("EntityMetaResponse");
+        AppState.connection.current.on("EntityMetaResponse", (meta) => { this.OnEntityMetaResponse(meta); });
     }
 
     // Send a request to connect to a specified entity.
@@ -188,14 +189,17 @@ export default class MessagingOverview extends Component {
     }
 
     // Handle response to a request to get entity meta
-    OnEntityMetaReceived(meta) {
+    OnEntityMetaResponse(meta) {
+        console.log("Meta response: " + JSON.stringify(meta));
         if (meta.available) {
             // Check if the entity is supposed to be connected to.
             if (meta.id in this.peersToConnect) {
                 // Make a connection request
+                console.log("Info: Sending connection request to peer." + meta.id + " of client " + meta.clientId);
                 this.SendConnectionRequest(meta.id, meta.clientId);
             } else {
                 // Might have a use case, e.g. interacting with a new entity for the first time.
+                console.log("Peer not in expected peersToConnect array.");
             }
         }
     }
@@ -273,7 +277,9 @@ export default class MessagingOverview extends Component {
             // Don't sync with blocked peers.
             if (!meta.blocked) {
                 // Check with the server whether the peer is connected
-                AppState.connection.current.emit("GetEntityMeta", { id: id });
+                console.log("Info: Requesting entity meta for peer." + id);
+                let params = { id: id };
+                AppState.connection.current.emit("GetEntityMeta", params);
             }
         }
     }

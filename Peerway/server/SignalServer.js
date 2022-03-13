@@ -25,12 +25,19 @@ var clients = {
 // or in the rarest case (to the point it's almost impossible) there's a uuid collision.
 var entities = {
     /*
-    "<entity-id>": {
-        "<client-socket-id>": {
+    "<entity-id>": [
+        {
+            socketId: "<client-socket-id>",
             name: "<entity-name>",
             avatar: "<entity-avatar>"
         },
-    }
+        {
+            socketId: "<client-socket-id>",
+            name: "<entity-name>",
+            avatar: "<entity-avatar>"
+        },
+        etc...
+    ]
     */
 };
 
@@ -82,8 +89,10 @@ io.on('connection', socket => {
             sortedClientsAlphanumeric.splice(clientIndex, 1);
 
             // Remove from entities
-            let index = entities[entityId].indexOf(socket.id);
-            entities[entityId].splice(index, 1);
+            let index = entities[entityId].findIndex(entity => entity.socketId === socket.id);
+            if (index >= 0) {
+                entities[entityId].splice(index, 1);
+            }
 
             // Finally, remove the client entry
             delete clients[socket.id];
@@ -93,12 +102,13 @@ io.on('connection', socket => {
     // Handle initial setup of an entity.
     // Without this, it's not allowed for clients to connect with other peers.
     // NOTE: When switching active entity, the client should disconnect and reconnect before emitting this.
+    // TODO: Obtain and validate the digital signature of the entity before completing setup.
     socket.on("SetupEntity", (entity) => {
         // Only do this once while the entity is connected
         // Extra conditions handle cases where an entity is connected on multiple devices
-        // CONSIDER: How are multiple connections to the same entity be handled? (group client entries by validated signatures?)
-        // What to do about id theft, if anything? (should probably leave this to client side handling)
-        if (!(socket.id in clients) && (!(entity.id in entities) || !(socket.id in entities[entity.id]))) {
+        if (!(socket.id in clients) && (!(entity.id in entities) ||
+            (entities[entity.id].findIndex(entity => entity.socketId === socket.id) < 0))
+        ) {
             // Track the entity client
             clients[socket.id] = {
                 entityId: entity.id,
@@ -130,6 +140,7 @@ io.on('connection', socket => {
     // NOTE: It's possible for the same entity to appear more than once.
     // This is because it's possible for the same entity to have multiple connections.
     // CONSIDER: Change event name to better reflect the note above.
+    // TODO: Respond with digital signature public key as one of the fields per entity/client.
     // TODO: Optionally omit fields such as avatar, name etc.
     // Options:
     /*
@@ -172,9 +183,8 @@ io.on('connection', socket => {
             });
         }
 
-        console.log("Info: Responding to ListEntities request from socket " + socket.id);
-
         // Send list back to the client
+        console.log("Info: Responding to ListEntities request from socket " + socket.id);
         socket.emit("ListEntitiesResponse", listing);
     });
 
@@ -183,6 +193,7 @@ io.on('connection', socket => {
     // Always returns "id" and "available" fields. Also includes clientId if available.
     // Only returns other fields when specified.
     // TODO validate input
+    // TODO also provide digital signature public key in order to select the correct entity
     // Example meta request (for getting all entity metadata fields):
     /*
     {
@@ -195,13 +206,15 @@ io.on('connection', socket => {
         let meta = {
             id: request.id,
             available: available,
-            clientId: available ? entities[request.id].clientId : undefined,
-            name: available && request["name"] ? entities[request.id].name : undefined,
-            avatar: available && request["avatar"] ? entities[request.id].avatar : undefined
+            // Note: For time being, the first entity is used until digital signatures are supported.
+            clientId: (available ? entities[request.id][0].socketId : undefined),
+            name: available && request["name"] ? entities[request.id][0].name : undefined,
+            avatar: available && request["avatar"] ? entities[request.id][0].avatar : undefined
         }
 
         // Send back metadata as requested
-        socket.emit("EntityMeta", meta);
+        console.log("Info: Responding to GetEntityMeta with entity id " + request.id + " from socket " + socket.id);
+        socket.emit("EntityMetaResponse", meta);
     });
 
     // Callback to handle a peer joining a chat
