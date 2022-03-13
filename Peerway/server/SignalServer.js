@@ -245,7 +245,7 @@ io.on('connection', socket => {
 
     // A peer wishes to connect to another peer.
     socket.on("SendPeerRequest", payload => {
-        console.log("Received offer from client " + payload.target);
+        console.log("Info: Received peer connection request to client " + payload.target + " from client " + payload.caller);
         io.to(payload.target).emit("PeerConnectionRequest", payload);
     });
 
@@ -257,8 +257,8 @@ io.on('connection', socket => {
 
     // This is part of the ICE process for connecting peers once a request is accepted.
     socket.on('ice-candidate', incoming => {
-        console.log("Setting up ice candidate...");
-        io.to(incoming.target).emit('ice-candidate', incoming.candidate);
+        console.log("Sending ice candidate to target client " + incoming.target);
+        io.to(incoming.target).emit('ice-candidate', { id: incoming.id, candidate: incoming.candidate });
     })
 });
 

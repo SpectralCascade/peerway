@@ -10,6 +10,7 @@ import HandleEffect from '../Components/HandleEffect';
 import { io } from 'socket.io-client';
 import Constants from '../Constants';
 import AppState from '../AppState';
+import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc'
 
 const topbarHeight = 56;
 const iconSize = 56;
@@ -47,7 +48,7 @@ export default class MessagingOverview extends Component {
     // Callback on navigating to this screen.
     OnOpen() {
         console.log("OPENED MESSAGING OVERVIEW");
-        
+
         this.state.id = Database.active.getString("id");
         // Load up cached chats
         let chatIds = [];
@@ -105,9 +106,9 @@ export default class MessagingOverview extends Component {
     SendConnectionRequest(id, clientId) {
         console.log("Info: Sending a connection request to connect to entity " + id);
 
-        peersPending[clientId] = id;
+        this.peersPending[id] = clientId;
         AppState.peers[id] = this.CreatePeer(id);
-        AppState.channels[id] = AppState.peers[this.state.id].createDataChannel("sendChannel");
+        AppState.channels[id] = AppState.peers[id].createDataChannel("sendChannel");
         
         // listen to incoming messages from other peer
         AppState.channels[id].onmessage = (e) => this.handleReceiveMessage(e);
@@ -118,13 +119,17 @@ export default class MessagingOverview extends Component {
         console.log("Info: Received request to connect to peer with id " + peer.id);
 
         if (this.peersToConnect.length == 0) {
-            // Syncing may not have taken place yet, or this entity has never interacted with peers.
-            this.peersToConnect = JSON.parse(Database.active.getString("peers"));
+            if (Database.active.contains("peers")) {
+                // Syncing may not have taken place yet, or this entity has never interacted with peers.
+                this.peersToConnect = JSON.parse(Database.active.getString("peers"));
+            } else {
+                this.peersToConnect = [];
+            }
         }
 
         let meta = {};
         // TODO check in JSON object - might be faster than an array.
-        if (peer.id in this.peersToConnect) {
+        if (this.peersToConnect.includes(peer.id)) {
             meta = Database.active.getString("peer." + peer.id);
 
             // TODO: Check peer is genuine (verify signature)
@@ -165,6 +170,7 @@ export default class MessagingOverview extends Component {
                 return client.setLocalDescription(answer);
             }).then(() => {
                 const payload = {
+                    id: this.state.id,
                     target: peer.caller,
                     caller: client.id,
                     sdp: client.localDescription
@@ -176,14 +182,15 @@ export default class MessagingOverview extends Component {
 
     // Handle an answer made by the receiving peer
     OnConnectionAccepted(message) {
-        AppState.peers[this.state.id].setRemoteDescription(new RTCSessionDescription(message.sdp)).catch(
+        AppState.peers[message.id].setRemoteDescription(new RTCSessionDescription(message.sdp)).catch(
             e => console.log("Error: Failed to handle WebRTC connection answer. ", e)
         );
     }
 
     // Handle message from an ICE candidate
     handleNewICECandidateMsg(incoming) {
-        AppState.peers[this.state.id].addIceCandidate(
+        // TODO
+        AppState.peers[incoming.id].addIceCandidate(
             new RTCIceCandidate(incoming)
         ).catch(e => console.log(e));
     }
@@ -193,24 +200,24 @@ export default class MessagingOverview extends Component {
         console.log("Meta response: " + JSON.stringify(meta));
         if (meta.available) {
             // Check if the entity is supposed to be connected to.
-            if (meta.id in this.peersToConnect) {
+            if (this.peersToConnect.includes(meta.id)) {
                 // Make a connection request
                 console.log("Info: Sending connection request to peer." + meta.id + " of client " + meta.clientId);
                 this.SendConnectionRequest(meta.id, meta.clientId);
             } else {
                 // Might have a use case, e.g. interacting with a new entity for the first time.
-                console.log("Peer not in expected peersToConnect array.");
+                console.log("peer." + meta.id + " not in expected peersToConnect array " + JSON.stringify(this.peersToConnect));
             }
         }
     }
 
     // Callback for setting up ICE stuff
-    // TODO: figure out how to target the correct peer here
-    handleICECandidateEvent(e) {
+    handleICECandidateEvent(e, id) {
         if (e.candidate) {
             const payload = {
-                target: this.other.current,
-                candidate: e.candidate,
+                id: id, // Target entity id
+                target: this.peersPending[id], // Target client id
+                candidate: e.candidate, // ICE candidate
             }
             AppState.connection.current.emit("ice-candidate", payload);
         }
@@ -220,15 +227,15 @@ export default class MessagingOverview extends Component {
     // TODO: Check that correct peer is being used from AppState
     handleNegotiationNeededEvent(id) {
         if (id in this.peersPending) {
-            console.log("Sending peer request to client " + id + " (entity: " + this.peersPending[id] + ")");
-            AppState.peers[this.state.id].createOffer().then(offer => {
-                return AppState.peers[this.state.id].setLocalDescription(offer);
+            console.log("Sending peer request to client " + this.peersPending[id] + " (entity " + id + ")");
+            AppState.peers[id].createOffer().then(offer => {
+                return AppState.peers[id].setLocalDescription(offer);
             }).then(() => {
                 const payload = {
-                    id: this.peersPending[id],
-                    target: id,
-                    caller: AppState.connection.current.id,
-                    sdp: AppState.peers[this.state.id].localDescription,
+                    id: id, // Target entity id
+                    target: this.peersPending[id], // Target client
+                    caller: AppState.connection.current.id, // This client
+                    sdp: AppState.peers[id].localDescription,
                 };
                 AppState.connection.current.emit("SendPeerRequest", payload);
             }).catch(err => console.log("Error handling negotiation needed event", err));
@@ -255,7 +262,7 @@ export default class MessagingOverview extends Component {
             ]
         });
         // Callbacks for handling connection steps
-        peer.onicecandidate = (e) => this.handleICECandidateEvent(e);
+        peer.onicecandidate = (e) => this.handleICECandidateEvent(e, id);
         peer.onnegotiationneeded = () => this.handleNegotiationNeededEvent(id);
 
         AppState.peers[id] = peer;
