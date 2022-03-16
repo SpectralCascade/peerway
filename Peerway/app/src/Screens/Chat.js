@@ -55,22 +55,22 @@ export default class Chat extends React.Component {
         // Join the chat
         this.socket.current.emit("join room", this.chatID);
 
-        // Await other user(s) to join the chat
+        // Another user is already in the chat room, call them.
         this.socket.current.on("other user", id => {
             console.log("Setting up other user...");
             this.callUser(id);
             this.other.current = id;
         });
 
-        // Ditto
+        // A new user has joined the chat room.
         this.socket.current.on("user joined", id => {
             console.log("user joined");
             this.other.current = id;
         });
 
-        this.socket.current.on("offer", (socket) => { this.handleOffer(socket); });
+        this.socket.current.on("PeerConnectionRequest", (socket) => { this.handleOffer(socket); });
 
-        this.socket.current.on("answer", (socket) => { this.handleAnswer(socket); });
+        this.socket.current.on("PeerConnectionAccepted", (socket) => { this.handleAnswer(socket); });
 
         this.socket.current.on("ice-candidate", (socket) => { this.handleNewICECandidateMsg(socket); });
 
@@ -121,7 +121,8 @@ export default class Chat extends React.Component {
                 caller: this.socket.current.id,
                 sdp: this.peer.current.localDescription,
             };
-            this.socket.current.emit("offer", payload);
+            console.log("Sending offer...");
+            this.socket.current.emit("SendPeerRequest", payload);
         }).catch(err => console.log("Error handling negotiation needed event", err));
     }
 
@@ -161,12 +162,14 @@ export default class Chat extends React.Component {
                 caller: this.socket.current.id,
                 sdp: this.peer.current.localDescription
             }
-            this.socket.current.emit("answer", payload);
+            console.log("Sending answer...");
+            this.socket.current.emit("AcceptPeerRequest", payload);
         })
     }
 
     handleAnswer(message){
         // Handle answer by the receiving peer
+        console.log("received answer...");
         const desc = new RTCSessionDescription(message.sdp);
         this.peer.current.setRemoteDescription(desc).catch(e => console.log("Error handle answer", e));
     }
@@ -203,8 +206,8 @@ export default class Chat extends React.Component {
     }
 
     handleNewICECandidateMsg(incoming) {
-        const candidate = new RTCIceCandidate(incoming);
-
+        console.log("Received new ice candidate from peer...");
+        const candidate = new RTCIceCandidate(incoming.candidate);
         this.peer.current.addIceCandidate(candidate).catch(e => console.log(e));
     }
 

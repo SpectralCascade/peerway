@@ -245,20 +245,27 @@ io.on('connection', socket => {
 
     // A peer wishes to connect to another peer.
     socket.on("SendPeerRequest", payload => {
-        console.log("Info: Received peer connection request to client " + payload.target + " from client " + payload.caller);
+        console.log(
+            "Info: Relaying peer connection request to client " + payload.target +
+            " (entity: " + payload.remote + ") from client " + payload.caller +
+            " (entity: " + payload.local + ")"
+        );
         io.to(payload.target).emit("PeerConnectionRequest", payload);
     });
 
     // A peer accepts a request to connect to a peer.
     socket.on("AcceptPeerRequest", payload => {
-        console.log("Answered offer from client " + payload.target);
+        console.log("Answered connection request from client " + payload.target);
         io.to(payload.target).emit("PeerConnectionAccepted", payload);
     });
 
     // This is part of the ICE process for connecting peers once a request is accepted.
     socket.on('ice-candidate', incoming => {
-        console.log("Sending ice candidate to target client " + incoming.target);
-        io.to(incoming.target).emit('ice-candidate', { id: incoming.id, candidate: incoming.candidate });
+        console.log(
+            "Sending ice candidate to target client " + incoming.target +
+            " (entity: " + incoming.remote + ") from entity " + incoming.local
+        );
+        io.to(incoming.target).emit('ice-candidate', incoming);
     })
 });
 

@@ -11,6 +11,7 @@ import { io } from 'socket.io-client';
 import Constants from '../Constants';
 import AppState from '../AppState';
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc'
+import Log from "../Log";
 
 const topbarHeight = 56;
 const iconSize = 56;
@@ -22,6 +23,8 @@ export default class MessagingOverview extends Component {
     peersToConnect = [];
     // Peer entities that have been requested to connect, keyed by client id.
     peersPending = {};
+    // ICE candidates that need to be sent once a peer has accepted the connection.
+    pendingCandidates = {};
 
     // Setup initial state
     constructor(props) {
@@ -47,14 +50,14 @@ export default class MessagingOverview extends Component {
 
     // Callback on navigating to this screen.
     OnOpen() {
-        console.log("OPENED MESSAGING OVERVIEW");
+        Log.Debug("OPENED MESSAGING OVERVIEW");
 
         this.state.id = Database.active.getString("id");
         // Load up cached chats
         let chatIds = [];
         if (Database.active.contains("chats")) {
             chatIds = JSON.parse(Database.active.getString("chats"));
-            console.log("Chats = " + JSON.stringify(chatIds));
+            Log.Debug("Chats = " + JSON.stringify(chatIds));
         }
         this.state.chats = [];
         for (let i in chatIds) {
@@ -74,7 +77,7 @@ export default class MessagingOverview extends Component {
                     read: meta.read
                 });
             } else {
-                console.log("Error: Chat " + id + " does not exist, but is listed!");
+                Log.Error("Chat " + id + " does not exist, but is listed!");
             }
         }
 
@@ -94,29 +97,39 @@ export default class MessagingOverview extends Component {
         AppState.connection.current.on("PeerConnectionAccepted", (socket) => { this.OnConnectionAccepted(socket); });
 
         AppState.connection.current.off("ice-candidate");
-        AppState.connection.current.on("ice-candidate", incoming => {
-            this.handleNewICECandidateMsg(incoming);
-        });
+        AppState.connection.current.on("ice-candidate", incoming => { this.OnReceivedNewCandidate(incoming); });
 
         AppState.connection.current.off("EntityMetaResponse");
         AppState.connection.current.on("EntityMetaResponse", (meta) => { this.OnEntityMetaResponse(meta); });
     }
 
+    // Handle receiving data from peer.
+    OnPeerData(event) {
+        // Listener for receiving messages from the peer
+        Log.Debug("Message received from peer:\n" +  JSON.stringify(event));
+    };
+
+    // Send data to a specified peer.
+    SendPeerData(id, data) {
+        AppState.channels[id].send(data);
+    }
+
     // Send a request to connect to a specified entity.
     SendConnectionRequest(id, clientId) {
-        console.log("Info: Sending a connection request to connect to entity " + id);
-
+        // The client ID is required due to potential for duplicate entity IDs on the server.
         this.peersPending[id] = clientId;
-        AppState.peers[id] = this.CreatePeer(id);
-        AppState.channels[id] = AppState.peers[id].createDataChannel("sendChannel");
+        // Create local peer connection config
+        AppState.peers[id] = this.CreatePeerCall(id);
+        // Create a data channel for data transfer with the remote peer.
+        AppState.channels[id] = AppState.peers[id].createDataChannel(this.state.id + "[->]" + id);
         
-        // listen to incoming messages from other peer
-        AppState.channels[id].onmessage = (e) => this.handleReceiveMessage(e);
+        // listen to incoming messages from the other peer once a connection is established.
+        AppState.channels[id].onmessage = (event) => this.OnPeerData(event);
     }
     
     // Respond to an offer to connect to a peer.
     OnConnectionRequest(peer) {
-        console.log("Info: Received request to connect to peer with id " + peer.id);
+        Log.Info("Received request to connect from peer with id " + peer.local);
 
         if (this.peersToConnect.length == 0) {
             if (Database.active.contains("peers")) {
@@ -129,144 +142,204 @@ export default class MessagingOverview extends Component {
 
         let meta = {};
         // TODO check in JSON object - might be faster than an array.
-        if (this.peersToConnect.includes(peer.id)) {
-            meta = Database.active.getString("peer." + peer.id);
+        if (this.peersToConnect.includes(peer.local)) {
+            meta = Database.active.getString("peer." + peer.local);
 
             // TODO: Check peer is genuine (verify signature)
+            
+            // Remove from peers waiting to be connected
+            let toRemove = this.peersToConnect.indexOf(peer.local);
+            if (toRemove >= 0) {
+                this.peersToConnect.splice(toRemove, 1);
+            }
         } else {
-            // Not seen this peer before
-            meta = {
-                name: peer.name,
-                // TODO cache avatar as file and store path instead of base-64 wrapper/string
-                avatar: peer.avatar,
-                mutual: false,
-                blocked: false,
-                sync: (new Date()).getMilliseconds(),
-                verifier: "" // TODO
-            };
-            this.peersToConnect.push(peer.id);
-            Database.active.set("peers", JSON.stringify(this.peersToConnect));
-            Database.active.set("peer." + peer.id, JSON.stringify(meta));
+            // Not seen this peer before, add to the database
+            Database.AddPeer(peer.local);
+            meta = Database.active.getString("peer." + peer.local);
         }
 
-        let toRemove = this.peersToConnect.indexOf(peer.id);
-        if (toRemove >= 0) {
-            this.peersToConnect.splice(toRemove, 1);
-        }
-
+        // Check to ensure the peer isn't blocked.
         if (!meta.blocked) {
-            // Setup the active entity as a peer and prepare the appropriate channel for receiving data.
-            let client = this.CreatePeer(this.state.id);
-            client.ondatachannel = (event) => {
-                AppState.channels[this.state.id] = event.channel;
-                AppState.channels[this.state.id].onmessage = (e) => this.handleReceiveMessage(e);
-                console.log("Info: Connection established.");
+            this.peersPending[peer.local] = peer.caller;
+
+            // Setup the local peer connection and prepare the appropriate channel for receiving data.
+            // The ID passed in is the entity ID of the peer requesting this connection;
+            // it has no relevance to the returned value.
+            AppState.peers[peer.local] = this.CreatePeerAnswer(peer.local);
+            // Setup event handler for creation of the data channel by the remote peer. 
+            AppState.peers[peer.local].ondatachannel = (event) => {
+                // Create a channel for data transfer to the other peer.
+                AppState.channels[peer.local] = event.channel;
+                AppState.channels[peer.local].onmessage = (e) => this.OnPeerData(e);
+                Log.Info("Connection established to peer." + peer.local);
+                this.SendPeerData(peer.local, "TEST DATA MESSAGE from " + this.state.id);
             }
 
-            // Respond to the offer
-            client.setRemoteDescription(new RTCSessionDescription(peer.sdp)).then(() => {}).then(() => {
-                return client.createAnswer();
+            // Accept the call request
+            AppState.peers[peer.local].setRemoteDescription(new RTCSessionDescription(peer.sdp)).then(() => {}).then(() => {
+                Log.Debug("Creating WebRTC answer...");
+                return AppState.peers[peer.local].createAnswer();
             }).then(answer => {
-                return client.setLocalDescription(answer);
+                Log.Debug("Setting local SDP of the client...");
+                return AppState.peers[peer.local].setLocalDescription(answer);
             }).then(() => {
-                const payload = {
-                    id: this.state.id,
+                let payload = {
+                    local: peer.remote,
+                    remote: peer.local,
                     target: peer.caller,
-                    caller: client.id,
-                    sdp: client.localDescription
+                    caller: peer.target,
+                    sdp: AppState.peers[peer.local].localDescription
                 }
+                Log.Info("Accepting request from peer." + peer.local);
                 AppState.connection.current.emit("AcceptPeerRequest", payload);
             });
+        } else {
+            Log.Info("Discarding request received to connect to blocked peer." + peer.local);
         }
     }
 
-    // Handle an answer made by the receiving peer
-    OnConnectionAccepted(message) {
-        AppState.peers[message.id].setRemoteDescription(new RTCSessionDescription(message.sdp)).catch(
-            e => console.log("Error: Failed to handle WebRTC connection answer. ", e)
+    // Handle acception of a connection request to a peer.
+    OnConnectionAccepted(payload) {
+        Log.Info("Connection to peer." + payload.local + " accepted, setting SDP.");
+        AppState.peers[payload.local].setRemoteDescription(new RTCSessionDescription(payload.sdp)).then(() => {
+            // Check for any pending ICE candidates
+            if (payload.local in this.pendingCandidates) {
+                Log.Verbose("Some ICE candidates are pending, sending to peer." + payload.local);
+                for (i in this.pendingCandidates[payload.local]) {
+                    this.OnPeerConnectionCandidate((this.pendingCandidates[payload.local])[i], payload.local);
+                }
+                delete this.pendingCandidates[payload.local];
+            }
+        }).catch(
+            e => Log.Error("Failed to handle WebRTC connection answer. ", e)
         );
-    }
-
-    // Handle message from an ICE candidate
-    handleNewICECandidateMsg(incoming) {
-        // TODO
-        AppState.peers[incoming.id].addIceCandidate(
-            new RTCIceCandidate(incoming)
-        ).catch(e => console.log(e));
     }
 
     // Handle response to a request to get entity meta
     OnEntityMetaResponse(meta) {
-        console.log("Meta response: " + JSON.stringify(meta));
+        Log.Debug("Meta response: " + JSON.stringify(meta));
         if (meta.available) {
             // Check if the entity is supposed to be connected to.
             if (this.peersToConnect.includes(meta.id)) {
                 // Make a connection request
-                console.log("Info: Sending connection request to peer." + meta.id + " of client " + meta.clientId);
+                Log.Info("Sending connection request to peer." + meta.id + " of client " + meta.clientId);
                 this.SendConnectionRequest(meta.id, meta.clientId);
             } else {
                 // Might have a use case, e.g. interacting with a new entity for the first time.
-                console.log("peer." + meta.id + " not in expected peersToConnect array " + JSON.stringify(this.peersToConnect));
+                Log.Debug("peer." + meta.id + " not in expected peersToConnect array " + JSON.stringify(this.peersToConnect));
             }
         }
     }
 
-    // Callback for setting up ICE stuff
-    handleICECandidateEvent(e, id) {
-        if (e.candidate) {
-            const payload = {
-                id: id, // Target entity id
+    // Callback for handling local ICE candidates.
+    // Takes remote entity id to which the candidate pertains.
+    OnPeerConnectionCandidate(e, id) {
+        if (AppState.peers[id].remoteDescription == null) {
+            // Caller may find ICE candidates before the peer is ready to accept them
+            if (!(id in this.pendingCandidates)) {
+                this.pendingCandidates[id] = [];
+            }
+            this.pendingCandidates[id].push(e);
+        } else if (e.candidate) {
+            let payload = {
+                local: this.state.id,
+                remote: id,
                 target: this.peersPending[id], // Target client id
                 candidate: e.candidate, // ICE candidate
-            }
+            };
+            Log.Verbose(
+                "Sending new ice-candidate from " + payload.local +
+                " to " + payload.remote + " client " + payload.target
+            );
             AppState.connection.current.emit("ice-candidate", payload);
         }
     }
 
+    // Handle changes in connection state for a particular peer call connection.
+    OnPeerCallChange(connection, id) {
+        if (AppState.peers[id].connectionState === "connected") {
+            delete this.peersPending[id];
+            Log.Info("Connection established to peer." + id);
+        } else {
+            Log.Info("Connection call state to peer." + id + " changed to: " + AppState.peers[id].connectionState);
+        }
+    }
+
+    // Add relayed ICE candidate message from the peer we're trying to connect to.
+    OnReceivedNewCandidate(incoming) {
+        Log.Verbose("Received new ICE candidate from " + incoming.local);
+        AppState.peers[incoming.local].addIceCandidate(
+            new RTCIceCandidate(incoming.candidate)
+        ).catch(e => Log.Error(e));
+    }
+
     // Callback to respond to WebRTC negotiation. Actually makes the initial peer connection request.
-    // TODO: Check that correct peer is being used from AppState
-    handleNegotiationNeededEvent(id) {
+    // Takes the ID of the remote peer to connect to.
+    HandleNegotiationNeededEvent(id) {
+        // Make sure this is actually a peer we want to connect to.
         if (id in this.peersPending) {
-            console.log("Sending peer request to client " + this.peersPending[id] + " (entity " + id + ")");
+            Log.Verbose("Sending peer request to client " + this.peersPending[id] + " (entity " + id + ")");
             AppState.peers[id].createOffer().then(offer => {
+                Log.Info("Setting local SDP for peer." + id + "...");
                 return AppState.peers[id].setLocalDescription(offer);
             }).then(() => {
-                const payload = {
-                    id: id, // Target entity id
+                let payload = {
+                    local: this.state.id, // id of active entity
+                    remote: id, // Target entity id
                     target: this.peersPending[id], // Target client
                     caller: AppState.connection.current.id, // This client
                     sdp: AppState.peers[id].localDescription,
                 };
+                Log.Verbose("Sending peer request to signalling server...");
                 AppState.connection.current.emit("SendPeerRequest", payload);
-            }).catch(err => console.log("Error handling negotiation needed event", err));
+            }).catch(err => Log.Error("Error handling negotiation needed event", err));
         } else {
-            console.log("Error: No known peer pending with client id " + id + " - aborting connection request.");
+            Log.Error("No known peer pending with client id " + id + " - aborting connection request.");
         }
     }
 
-    // Creates an RTC peer connection object.
-    CreatePeer(id) {
-        console.log("Setting up RTC connection for peer " + id);
-        // Creates a connection using STUN and TURN servers.
+    // Create a call to a particular peer (specified by entity id).
+    CreatePeerCall(id) {
+        Log.Info("Setting up WebRTC connection to peer " + id);
+        
+        let peer = this.CreatePeerConnection();
+        let targetId = id;
+
+        // Callback when a new ICE candidate is found for the peer connection.
+        peer.onicecandidate = (e) => this.OnPeerConnectionCandidate(e, targetId);
+        // Callback when negotiation is required (only when calling)
+        peer.onnegotiationneeded = () => this.HandleNegotiationNeededEvent(targetId);
+        // Callback when connection state changes
+        peer.onconnectionstatechange = (connection) => this.OnPeerCallChange(connection, targetId);
+
+        return peer;
+    }
+
+    // Create an answer to a peer call request.
+    CreatePeerAnswer(id) {
+        let peer = this.CreatePeerConnection();
+
+        // Callback when a new ICE candidate is found for the peer connection.
+        peer.onicecandidate = (e) => this.OnPeerConnectionCandidate(e, id);
+
+        return peer;
+    }
+
+    // Creates a WebRTC connection object.
+    CreatePeerConnection() {
         // TODO: Run local STUN and TURN servers if possible, instead of using these?
-        let peer = new RTCPeerConnection({
+        return new RTCPeerConnection({
             iceServers: [
                 {
-                    urls: "stun:stun.stunprotocol.org"
+                    urls: "stun:openrelay.metered.ca:80"
                 },
                 {
-                    urls: 'turn:numb.viagenie.ca',
-                    credential: 'muazkh',
-                    username: 'webrtc@live.com'
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
                 },
             ]
         });
-        // Callbacks for handling connection steps
-        peer.onicecandidate = (e) => this.handleICECandidateEvent(e, id);
-        peer.onnegotiationneeded = () => this.handleNegotiationNeededEvent(id);
-
-        AppState.peers[id] = peer;
-        return peer;
     }
 
     // Synchronise messages and content with known peers, in order of peers last interacted with.
@@ -274,17 +347,17 @@ export default class MessagingOverview extends Component {
         this.peersToConnect = [];
         if (Database.active.contains("peers")) {
             this.peersToConnect = JSON.parse(Database.active.getString("peers"));
-            console.log("Ready to sync " + this.peersToConnect.length + " peer(s): " + JSON.stringify(this.peersToConnect));
+            Log.Debug("Ready to sync " + this.peersToConnect.length + " peer(s): " + JSON.stringify(this.peersToConnect));
         }
         for (let i in this.peersToConnect) {
             // Get local peer metadata
             let id = this.peersToConnect[i];
-            console.log("Syncing peer." + id);
+            Log.Debug("Syncing peer." + id);
             let meta = JSON.parse(Database.active.getString("peer." + id));
             // Don't sync with blocked peers.
             if (!meta.blocked) {
                 // Check with the server whether the peer is connected
-                console.log("Info: Requesting entity meta for peer." + id);
+                Log.Verbose("Requesting entity meta for peer." + id);
                 let params = { id: id };
                 AppState.connection.current.emit("GetEntityMeta", params);
             }
@@ -309,10 +382,10 @@ export default class MessagingOverview extends Component {
 
         AppState.connection.current.on("SetupResult", (success) => {
             if (success) {
-                console.log("Info: Server successfully setup entity connection.");
+                Log.Info("Server successfully setup entity connection.");
                 this.SyncPeers();
             } else {
-                console.log("Error: Server failed to setup entity connection.");
+                Log.Error("Server failed to setup entity connection.");
             }
         });
 
