@@ -6,6 +6,15 @@ Peerway consists of two main components.
 - The mobile app itself (written in JS with React Native)
 - A NodeJS server for establishing peer-to-peer connections over the internet.
 
+## Running the app
+You can build and run this app using react-native-cli; for more information, see https://reactnative.dev/docs/running-on-device
+
+You should have the server running before you use the app, e.g. in the command line
+```bash
+cd Peerway/server
+node .
+```
+
 ## Peerway API: Basic usage
 The mobile client includes a class that acts as an API for connecting to the signalling server and synchronising data between peers on the network.
 
