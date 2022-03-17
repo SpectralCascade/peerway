@@ -30,17 +30,17 @@ export default class MessagingOverview extends Component {
         this.state = {
             chats: []
         }
-
-        // TODO: Move this to the splash screen
-        Peerway.ConnectToSignalServer("http://" + Constants.server_ip + ":" + Constants.port);
     }
 
     // Callback on navigating to this screen.
     OnOpen() {
         Log.Debug("OPENED MESSAGING OVERVIEW");
+        Peerway.ConnectToSignalServer("http://" + Constants.server_ip + ":" + Constants.port);
 
         // Load up cached chats
         let chatIds = [];
+        // Metadata about chats for syncing purposes
+        let chatSyncMeta = [];
         if (Database.active.contains("chats")) {
             chatIds = JSON.parse(Database.active.getString("chats"));
             Log.Debug("Chats = " + JSON.stringify(chatIds));
@@ -50,6 +50,13 @@ export default class MessagingOverview extends Component {
             let id = chatIds[i];
             if (Database.active.contains("chat." + id)) {
                 let meta = JSON.parse(Database.active.getString("chat." + id));
+
+                // Add relevant data required for syncing
+                chatSyncMeta.push({
+                    id: id,
+                    received: meta.received,
+                    updated: meta.updated
+                });
 
                 // Create a chat entry for the UI
                 this.state.chats.push({
@@ -69,7 +76,11 @@ export default class MessagingOverview extends Component {
 
         // Connect to peers to update chats
         // TODO only synchronise messages, not feeds
-        Peerway.SyncPeers();
+        Peerway.SyncPeers({
+            config: {
+                chats: chatSyncMeta
+            }
+        });
 
         this.forceUpdate();
     }

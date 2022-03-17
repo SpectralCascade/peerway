@@ -39,6 +39,8 @@ class PeerwayAPI {
     _signalServerURL = "";
     // The id of the entity that is connected to the signal server
     _activeId = "";
+    // The current syncing configuration in use
+    _syncConfig = {};
 
     // Setup properties
     constructor() {
@@ -57,18 +59,18 @@ class PeerwayAPI {
     // overrideSocket determines what should happen if already connected to a signal server.
     // If already connected and overrideSocket == false, nothing happens. Otherwise simply disconnects.
     ConnectToSignalServer(url, overrideSocket = false) {
-        if (this.server != null && this.server.connected) {
+        if (this.isConnected) {
             if (overrideSocket) {
                 Log.Info("Overriding current signal server connection.");
             } else {
                 // Early out
-                Log.Info("Already connected to a signal server, ignoring call to connect to " + url);
+                Log.Verbose("Already connected to a signal server, ignoring call to connect to " + url);
                 return;
             }
         }
 
         Log.Info("Connecting to signal server at " + url);
-        this.signalServerURL = url;
+        this._signalServerURL = url;
 
         // TODO: Callback to error handler if connection fails
         this.server = io.connect(url);
@@ -103,30 +105,41 @@ class PeerwayAPI {
         this.server.on("ice-candidate", incoming => { this._OnReceivedNewCandidate(incoming); });
         this.server.on("EntityMetaResponse", (meta) => { this._OnEntityMetaResponse(meta); });
 
-
+        // Setup the active entity once connected
         this.server.emit("SetupEntity", entity);
     }
 
     // Establishes a temporary connection to all known peers and attempts to sync data.
     // Additional options can be specified to configure how the sync will work.
     // See README.md for details on these options.
-    SyncPeers(options = {}) {
+    SyncPeers(options = { config: {} }) {
+        this._syncConfig = options.config ? options.config : {};
         this._peersToConnect = "selectedPeers" in options ? options.selectedPeers.slice() : [];
         if (!("selectedPeers" in options) && Database.active.contains("peers")) {
             this._peersToConnect = JSON.parse(Database.active.getString("peers"));
             Log.Debug("Ready to sync " + this._peersToConnect.length + " peer(s): " + JSON.stringify(this._peersToConnect));
         }
         for (let i in this._peersToConnect) {
-            // Get local peer metadata
+            // First check whether already connected to these peers
             let id = this._peersToConnect[i];
-            Log.Debug("Syncing peer." + id);
-            let meta = JSON.parse(Database.active.getString("peer." + id));
-            // Don't sync with blocked peers.
-            if (!meta.blocked) {
-                // Check with the server whether the peer is connected
-                Log.Debug("Requesting entity meta for peer." + id);
-                let params = { id: id };
-                this.server.emit("GetEntityMeta", params);
+            if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
+                if (this._peers[id].connectionState === "connecting") {
+                    // If it's still connecting, peer syncing should automagically happen on connection
+                } else {
+                    Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
+                    this._SyncPeer(id, this._syncConfig);
+                }
+            } else {
+                // Get local peer metadata
+                Log.Debug("Syncing peer." + id);
+                let meta = JSON.parse(Database.active.getString("peer." + id));
+                // Don't sync with blocked peers.
+                if (!meta.blocked) {
+                    // Check with the server whether the peer is connected
+                    Log.Debug("Requesting entity meta for peer." + id);
+                    let params = { id: id };
+                    this.server.emit("GetEntityMeta", params);
+                }
             }
         }
     }
@@ -134,6 +147,18 @@ class PeerwayAPI {
     //
     // "Private" methods
     //
+
+    // Actually sync data with a connected peer.
+    // Returns true if syncing begins successfully (i.e. the other peer is connected).
+    _SyncPeer(id, config) {
+        if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
+            // Send sync request to the peer with the configuration data
+            this._SendPeerData(id, JSON.stringify({ type: "sync", from: this._activeId, to: id, config: config }));
+            return true;
+        }
+        Log.Warning("Cannot sync with disconnected peer." + id);
+        return false;
+    }
     
     // Handle response to emitting GetEntityMeta signal server request.
     _OnEntityMetaResponse(meta) {
@@ -182,6 +207,11 @@ class PeerwayAPI {
         if (this._peers[id].connectionState === "connected") {
             delete this._peersPending[id];
             Log.Info("Connection established to peer." + id);
+
+            // Automagically sync with the peer
+            if (this._syncConfig) {
+                this._SyncPeer(id, this._syncConfig);
+            }
         } else {
             Log.Info("Connection call state to peer." + id + " changed to: " + this._peers[id].connectionState);
         }
@@ -268,13 +298,55 @@ class PeerwayAPI {
 
     // Handle receiving data from peer.
     _OnPeerData(event) {
-        // Listener for receiving messages from the peer
-        Log.Debug("Message received from peer:\n" +  JSON.stringify(event));
+        if (typeof(event.data) === "string") {
+            // Listener for receiving messages from the peer
+            let json = JSON.parse(event.data);
+            Log.Debug("Data received from peer." + json.from);
+            switch (json.type) {
+                case "sync":
+                    this._RespondToSyncRequest(json.to, json.from, json.config);
+                    break;
+            }
+        }
     };
 
     // Send data to a specified peer.
     _SendPeerData(id, data) {
+        Log.Debug("Sending data to peer." + id);
         this._channels[id].send(data);
+    }
+
+    _RespondToSyncRequest(to, from, config) {
+        Log.Debug("Received sync request from peer." + from + " for entity " + to);
+        // Sync chats
+        if ("chats" in config) {
+            for (i in config.chats) {
+                if (Database.active.contains("chat." + config.chats[i].id)) {
+                    Log.Debug("Syncing chat." + config.chats[i].id);
+                    let localChat = JSON.parse(Database.active.getString("chat." + config.chats[i].id));
+
+                    // Time that the peer last received a message or change to the chat
+                    let remoteReceived = new Date(config.chats[i].received);
+                    // Time that the peer last sent a message or made a change to the chat
+                    let remoteUpdated = new Date(config.chats[i].updated);
+
+                    let localReceived = new Date(localChat.received);
+                    let localUpdated = new Date(localChat.updated);
+
+                    if (localReceived > remoteReceived || localUpdated > remoteReceived) {
+                        // Need to send new content to peer, locate all relevant messages
+                        // TODO: open chat file(s), send relevant content
+                    }
+                    
+                    if (localReceived < remoteReceived || localReceived < remoteUpdated) {
+                        // Need to get new content from peer
+                        // TODO: once syncing is done, send a sync request to the peer
+                    }
+                } else {
+                    Log.Debug("No such chat." + config.chats[i].id);
+                }
+            }
+        }
     }
 
     // Send a request to connect to a specified entity.
@@ -335,7 +407,6 @@ class PeerwayAPI {
                 this._channels[peer.local] = event.channel;
                 this._channels[peer.local].onmessage = (e) => this._OnPeerData(e);
                 Log.Info("Connection established to peer." + peer.local);
-                this._SendPeerData(peer.local, "TEST DATA MESSAGE from " + this._activeId);
             }
 
             // Accept the call request
