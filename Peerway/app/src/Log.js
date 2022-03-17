@@ -2,7 +2,7 @@
 export default class Log {
     // Which logs are enabled?
     static enabled = {
-        debug: false,
+        debug: true,
         info: true,
         verbose: false,
         warning: true,

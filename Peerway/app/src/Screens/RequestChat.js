@@ -5,10 +5,9 @@ import HandleEffect from '../Components/HandleEffect';
 import Text from '../Components/Text';
 import Colors from '../Stylesheets/Colors';
 import StyleMain from '../Stylesheets/StyleMain';
-import {v1 as uuidv1} from 'uuid';
 import Database from '../Database';
-import AppState from '../AppState';
 import { CommonActions } from '@react-navigation/native';
+import Peerway from '../Peerway';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.2;
@@ -40,13 +39,13 @@ export default class RequestChat extends Component {
         console.log("OPENED REQUEST CHAT");
         // Handle retrieval of entities list
         // TODO: Check if slice() copy is needed or not
-        AppState.connection.current.off("ListEntitiesResponse");
-        AppState.connection.current.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
+        Peerway.server.off("ListEntitiesResponse");
+        Peerway.server.on("ListEntitiesResponse", listing => this.onListEntitiesResponse(listing));
 
         // TODO: More data should be requested as user scrolls
         // TODO: Only list entities that the user knows of, i.e. mutuals and
         // other entities that they share a chat with.
-        AppState.connection.current.emit("ListEntities", {
+        Peerway.server.emit("ListEntities", {
             page: 1,
             sort: "alphanumeric"
         });

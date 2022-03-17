@@ -128,9 +128,11 @@ io.on('connection', socket => {
             sortedClientsAlphanumeric.push(socket.id);
             needSortAlphanumeric = true;
 
+            socket.emit("SetupResult", true);
             console.log("Info: Setup entity " + entity.id + " for client socket " + socket.id);
         } else {
             // CONSIDER: send error info back to client indicating they're already setup
+            socket.emit("SetupResult", false);
             console.log("Warn: Entity " + entity.id + " is already setup for client socket " + socket.id);
         }
     });
