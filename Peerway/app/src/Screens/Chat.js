@@ -53,7 +53,12 @@ export default class Chat extends React.Component {
         // Send the last message
         this.state.messages = GiftedChat.append(this.state.messages, message);
         Log.Debug("Sending message:\n" + message);
-        Peerway._SendPeerData(this.state.messages[0].text);
+        Peerway.SendChatMessage({
+            for: this.chatID,
+            author: Database.active.getString("id"),
+            mime: "text/plain",
+            content: this.state.messages[0].text
+        });
         this.forceUpdate();
     }
 

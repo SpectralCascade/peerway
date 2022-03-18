@@ -151,9 +151,6 @@ class PeerwayAPI {
     // Defaults to the active entity. Message should be a JSON object in the following format:
     /*
     {
-        // Part of a composite id for this message. It's just the number of messages sent by the entity
-        // in the particular chat.
-        id: "<incremental-number>",
         // ID of the chat
         for: "<chat-id>",
         // Which entity sent this message
