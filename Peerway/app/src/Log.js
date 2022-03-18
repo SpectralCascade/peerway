@@ -1,5 +1,5 @@
 
-export default class Log {
+/*export default */class Log {
     // Which logs are enabled?
     static enabled = {
         debug: true,
@@ -39,3 +39,5 @@ export default class Log {
         }
     }
 }
+
+module.exports = { Log };

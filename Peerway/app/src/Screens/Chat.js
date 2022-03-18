@@ -7,7 +7,7 @@ import { io } from "socket.io-client";
 import HandleEffect from '../Components/HandleEffect';
 import Database from '../Database';
 import Constants from '../Constants';
-import Log from '../Log';
+import { Log } from '../Log';
 import Peerway from '../Peerway';
 
 export default class Chat extends React.Component {
@@ -37,12 +37,13 @@ export default class Chat extends React.Component {
         };
 
         // Get the chat ID
-        this.chatID = "debug_chat";//props.route.params.chatID;
+        this.chatId = props.route.params.chatId;
     }
 
     // Called when the screen is opened.
     onOpen() {
-        console.log("OPENED CHAT with id: " + this.chatID);
+        this.chatId = this.props.route.params.chatId;
+        console.log("OPENED CHAT with id: " + this.chatId);
 
         // TODO load latest chat messages
 
@@ -52,9 +53,8 @@ export default class Chat extends React.Component {
     sendMessage(message) {
         // Send the last message
         this.state.messages = GiftedChat.append(this.state.messages, message);
-        Log.Debug("Sending message:\n" + message);
         Peerway.SendChatMessage({
-            for: this.chatID,
+            for: this.chatId,
             author: Database.active.getString("id"),
             mime: "text/plain",
             content: this.state.messages[0].text

@@ -3,7 +3,7 @@ import { MMKV } from 'react-native-mmkv';
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import AppKeys from './AppKeys';
 import RNFS from "react-native-fs";
-import Log from './Log';
+import { Log } from './Log';
 import { Buffer } from 'buffer';
 
 // This entity example shows what the different key-value fields are used for.

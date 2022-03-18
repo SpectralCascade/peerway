@@ -2,6 +2,7 @@
 const express = require('express');
 const http = require('http');
 const socket = require('socket.io');
+const { Log } = require('../app/src/Log');
 
 // Setup server and connection web socket
 const app = express();
@@ -82,7 +83,7 @@ io.on('connection', socket => {
         // Remove from clients and entity listings
         if (socket.id in clients) {
             let entityId = clients[socket.id].entityId;
-            console.log("Info: Client " + socket.id + " disconnected, removing entity " + entityId);
+            Log.Info("Client " + socket.id + " disconnected, removing entity " + entityId);
 
             // Remove from sorted client list(s)
             let clientIndex = sortedClientsAlphanumeric.indexOf(socket.id);
@@ -129,11 +130,11 @@ io.on('connection', socket => {
             needSortAlphanumeric = true;
 
             socket.emit("SetupResult", true);
-            console.log("Info: Setup entity " + entity.id + " for client socket " + socket.id);
+            Log.Info("Setup entity " + entity.id + " for client socket " + socket.id);
         } else {
             // CONSIDER: send error info back to client indicating they're already setup
             socket.emit("SetupResult", false);
-            console.log("Warn: Entity " + entity.id + " is already setup for client socket " + socket.id);
+            Log.Warning("Entity " + entity.id + " is already setup for client socket " + socket.id);
         }
     });
 
@@ -186,7 +187,7 @@ io.on('connection', socket => {
         }
 
         // Send list back to the client
-        console.log("Info: Responding to ListEntities request from socket " + socket.id);
+        Log.Info("Responding to ListEntities request from socket " + socket.id);
         socket.emit("ListEntitiesResponse", listing);
     });
 
@@ -215,40 +216,19 @@ io.on('connection', socket => {
         }
 
         // Send back metadata as requested
-        console.log("Info: Responding to GetEntityMeta with entity id " + request.id + " from socket " + socket.id);
+        Log.Info("Responding to GetEntityMeta with entity id " + request.id + " from socket " + socket.id);
         socket.emit("EntityMetaResponse", meta);
     });
 
-    // Callback to handle a peer joining a chat
-    // TODO: burn this
-    socket.on('join room', roomID => {
-
-        console.log("Received join request for chat room " + roomID + " from socket " + socket.id);
-
-        if (rooms[roomID]) {
-            // Receiving peer joins the room
-            rooms[roomID].push(socket.id)
-        } else {
-            // Initiating peer create a new room
-            rooms[roomID] = [socket.id];
-        }
-
-        /*
-            If both initiating and receiving peer joins the room,
-            we will get the other user details.
-            For initiating peer it would be receiving peer and vice versa.
-        */
-        const otherUser = rooms[roomID].find(id => id !== socket.id);
-        if (otherUser) {
-            socket.emit("other user", otherUser);
-            socket.to(otherUser).emit("user joined", socket.id);
-        }
+    // Handle request to send a push notification to various target entities
+    socket.on("PushNotification", (request) => {
+        Log.Debug("Received push notification to forward to " + JSON.stringify(request.targets));
     });
 
     // A peer wishes to connect to another peer.
     socket.on("SendPeerRequest", payload => {
-        console.log(
-            "Info: Relaying peer connection request to client " + payload.target +
+        Log.Info(
+            "Relaying peer connection request to client " + payload.target +
             " (entity: " + payload.remote + ") from client " + payload.caller +
             " (entity: " + payload.local + ")"
         );
@@ -257,13 +237,13 @@ io.on('connection', socket => {
 
     // A peer accepts a request to connect to a peer.
     socket.on("AcceptPeerRequest", payload => {
-        console.log("Answered connection request from client " + payload.target);
+        Log.Info("Answered connection request from client " + payload.target);
         io.to(payload.target).emit("PeerConnectionAccepted", payload);
     });
 
     // This is part of the ICE process for connecting peers once a request is accepted.
     socket.on('ice-candidate', incoming => {
-        console.log(
+        Log.Info(
             "Sending ice candidate to target client " + incoming.target +
             " (entity: " + incoming.remote + ") from entity " + incoming.local
         );
@@ -271,4 +251,4 @@ io.on('connection', socket => {
     })
 });
 
-server.listen(port, () => console.log("Server listening on port " + port));
+server.listen(port, () => Log.Info("Server listening on port " + port));

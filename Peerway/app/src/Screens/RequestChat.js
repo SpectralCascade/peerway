@@ -97,7 +97,7 @@ export default class RequestChat extends Component {
                 routes: [{ name: 'MessagingOverview' }]
             })
         );
-        //this.props.navigation.navigate("Chat", { chatID: id });
+        //this.props.navigation.navigate("Chat", { chatId: id });
     }
 
     render() {

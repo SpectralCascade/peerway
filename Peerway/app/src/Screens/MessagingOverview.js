@@ -8,7 +8,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
 import Constants from '../Constants';
-import Log from "../Log";
+import { Log } from "../Log";
 import Peerway from '../Peerway';
 
 const topbarHeight = 56;
@@ -96,7 +96,7 @@ export default class MessagingOverview extends Component {
             if (chat != null) {
                 chat.read = true;
                 this.forceUpdate();
-                this.props.navigation.navigate("Chat");
+                this.props.navigation.navigate("Chat", { chatId: chat.id });
             }
         };
 

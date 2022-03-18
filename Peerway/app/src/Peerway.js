@@ -1,7 +1,7 @@
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from "react-native-webrtc";
 import { io } from "socket.io-client";
 import Database from "./Database";
-import Log from "./Log";
+import { Log } from "./Log";
 import RNFS from "react-native-fs";
 import Constants from "./Constants";
 
@@ -201,7 +201,7 @@ class PeerwayAPI {
             });
         } else {
             // TODO handle error case where chat doesn't exist
-            Log.Error("Cannot send message as there is no such chat." + chatId);
+            Log.Error("Cannot send message as there is no such chat." + message.for);
         }
     }
 
