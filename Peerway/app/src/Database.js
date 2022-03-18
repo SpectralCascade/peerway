@@ -2,6 +2,9 @@ import 'react-native-get-random-values';
 import { MMKV } from 'react-native-mmkv';
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import AppKeys from './AppKeys';
+import RNFS from "react-native-fs";
+import Log from './Log';
+import { Buffer } from 'buffer';
 
 // This entity example shows what the different key-value fields are used for.
 // Note that the actual storage stores non-primitive objects as JSON strings.
@@ -172,15 +175,22 @@ export default class Database {
         }
         
         // Generate chat metadata
+        let timeNow = Date.now();
         let chatData = {
             name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[0].name,
             members: members,
-            received: "received" in meta ? meta.received : (new Date()).getUTCMilliseconds(),
-            updated: "updated" in meta ? meta.updated : (new Date()).getUTCMilliseconds(),
+            received: "received" in meta ? meta.received : timeNow,
+            updated: "updated" in meta ? meta.updated : timeNow,
             read: "read" in meta ? meta.read : false,
             muted: "muted" in meta ? meta.muted : false,
             blocked: "blocked" in meta ? meta.blocked : false,
             icon: "icon" in meta ? meta.icon : (isGroup ? "" : members[0].avatar),
+            // Number of messages the active entity has sent in this chat
+            sent: 0,
+            // Who sent the last message?
+            lastFrom: "",
+            // The last message content
+            lastMessage: ""
         };
         
         // Generate member entries if necessary
@@ -199,6 +209,117 @@ export default class Database {
         this.active.set("chat." + meta.id, JSON.stringify(chatData));
 
         return meta.id;
+    }
+
+    // Store some syncable content in a big data file.
+    // Every 50 messages, start a new index pointer, based partly on very crude estimate of
+    // 100 billion daily messages / 2 billion users for WhatsApp
+    // https://techcrunch.com/2020/10/29/whatsapp-is-now-delivering-roughly-100-billion-messages-a-day/
+    static Store(mmkv, path, data, itemsPerBlock = 50) {
+        // Get full path
+        let key = path;
+        path = RNFS.DocumentDirectoryPath + "/" + path;
+
+        // Function to append the data
+        const Append = () => {
+            // Update the index first
+            // Broad phase indexing by month and year, then by every itemsPerBlock block
+            let createdOn = "created" in data ? new Date(data.created) : Date.now();
+            let storeTime = createdOn.getUTCFullYear().toString() + "/" + createdOn.getUTCMonth().toString();
+            let lookup = mmkv.contains(key) ? JSON.parse(mmkv.getString(key)) : {
+                // The year and month at which this index begins
+                began: storeTime,
+                // Number of bytes used by the file
+                bytes: 0,
+                // Total items in the entire file
+                items: 0,
+                // Array indexed by year and month. E.g. if start = "2022/3" then that corresponds to
+                // index 0, "2022/4" corresponds to index 1, "2022/12" corresponds to index 9 etc.
+                index: []
+            };
+
+            // Get the array index from the current year/month
+            const GetIndex = (start, current) => {
+                let split = start.split('/');
+                let startYear = parseInt(split[0]);
+                let startMonth = parseInt(split[1])
+                split = current.split('/');
+                let currentYear = parseInt(split[0]);
+                let currentMonth = parseInt(split[1]);
+
+                // Get the year index, then add the month difference
+                return ((currentYear - startYear) * 12) + (currentMonth - startMonth);
+            };
+
+            let currentIndex = GetIndex(lookup.began, storeTime);
+            while (lookup.index.length <= currentIndex) {
+                lookup.index.push({});
+            }
+
+            // Now add the inner block pointers
+            if (!("start" in lookup.index[currentIndex])) {
+                lookup.index[currentIndex] = {
+                    // Byte position pointer to this part of the file
+                    start: lookup.bytes,
+                    // Byte end position of this part of the file
+                    end: lookup.bytes,
+                    // Number of items for this month of the year
+                    items: 0,
+                    // Array of blocks, of max size itemsPerBlock items
+                    blocks: [{
+                        // The cumulative byte position (to be added to the month of the year position)
+                        pos: 0,
+                        // The size of this block in bytes
+                        len: 0,
+                        // The number of items in this block, up to itemsPerBlock
+                        items: 0
+                    }],
+                };
+            }
+
+            // Raw data to be appended to the file
+            let raw = JSON.stringify(data);
+            let bytes = Buffer.byteLength(string, 'utf8');
+
+            // Actually add the item to the block
+            lookup.bytes += bytes;
+            lookup.index[currentIndex].items++;
+            lookup.index[currentIndex].end += bytes;
+
+            let blockIndex = lookup.index[currentIndex].blocks.length - 1;
+            lookup.index[currentIndex].blocks[blockIndex].items++;
+            lookup.index[currentIndex].blocks[blockIndex].len += bytes;
+
+            // Add a new block for next time
+            if (lookup.index[currentIndex].blocks[blockIndex].items >= itemsPerBlock) {
+                lookup.index[currentIndex].blocks.push({
+                    pos: lookup.index[currentIndex].blocks[blockIndex].pos + lookup.index[currentIndex].blocks[blockIndex].len,
+                    len: 0,
+                    items: 0
+                });
+                lookup.index[currentIndex].blocks[blockIndex].pos;
+            }
+
+            // Append the actual data to the file
+            RNFS.appendFile(path, raw);
+
+            // Finally, save the index
+            mmkv.set(key, JSON.stringify(lookup));
+        };
+
+        if (!RNFS.exists(path)) {
+            // Create a file
+            RNFS.writeFile(path, "", 'utf8').then((success) => {
+                Log.Info("Finished creating file at path: " + path);
+                if (success) {
+                    Append();
+                }
+            }).catch((err) => {
+                Log.Error(err);
+            });
+        } else {
+            Append();
+        }
     }
 
     static MarkPeerInteraction(id, peers=[], index=-1) {

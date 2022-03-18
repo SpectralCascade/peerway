@@ -63,7 +63,8 @@ export default class MessagingOverview extends Component {
                     id: id,
                     name: meta.name,
                     message: {
-                        content: "...", // TODO: insert last message text
+                        from: meta.lastFrom,
+                        content: meta.lastMessage,
                         timestamp: (new Date(meta.received)).toLocaleDateString("en-GB")
                     },
                     icon: meta.icon,
@@ -131,7 +132,7 @@ export default class MessagingOverview extends Component {
                                     numberOfLines={1}
                                     style={[styles.chatContentMessage, {color: item.read ? "#999" : "#000", fontWeight: item.read ? "normal" : "bold"}]}
                                 >
-                                    {item.message.content}
+                                    {item.message.from + item.message.content}
                                 </Text>
                             </View>
                             <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>

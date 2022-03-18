@@ -2,6 +2,8 @@ import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from "react
 import { io } from "socket.io-client";
 import Database from "./Database";
 import Log from "./Log";
+import RNFS from "react-native-fs";
+import Constants from "./Constants";
 
 // This class forms the primary API for communicating with peers
 class PeerwayAPI {
@@ -141,6 +143,87 @@ class PeerwayAPI {
                     this.server.emit("GetEntityMeta", params);
                 }
             }
+        }
+    }
+
+    // Send a message to a particular chat from a specified entity.
+    // TODO reuse format for parts of content posts?
+    // Defaults to the active entity. Message should be a JSON object in the following format:
+    /*
+    {
+        // Part of a composite id for this message. It's just the number of messages sent by the entity
+        // in the particular chat.
+        id: "<incremental-number>",
+        // ID of the chat
+        for: "<chat-id>",
+        // Which entity sent this message
+        author: "<entity-id>",
+        // The content type
+        mime: "text/plain",
+        // The data content; could be text, an image, or something else.
+        content: "bla bla what a cool message"
+    }
+    */
+    SendChatMessage(message) {
+        // TODO load database for the "from" entity, rather than using active
+        if (Database.active.contains("chat." + message.for)) {
+            // Load the MMKV metadata
+            let meta = JSON.parse(Database.active.getString("chat." + message.for));
+            
+            let timeNow = Date.now();
+            Database.Store(Database.active, "chats/" + message.author + ".chat." + message.for + ".json", {
+                // Sent counter
+                id: meta.sent,
+                // Timestamp for creation in UTC milliseconds
+                created: timeNow,
+                // Has this message been edited? 0 = no, 1 = yes
+                edit: 0,
+                // Has this message been deleted? 0 = no, 1 = yes
+                del: 0,
+                // MIME type of the content
+                mime: message.mime,
+                // The actual message content
+                content: message.content
+            });
+            
+            // Update the chat metadata
+            meta.sent = meta.sent + 1;
+            meta.lastFrom = "";
+            meta.lastMessage = message.mime.startsWith("text") ? message.content : message.mime;
+            meta.updated = timeNow;
+            Database.active.set("chat." + message.for, JSON.stringify(meta));
+
+            // Now send out a notification to all peers in the chat
+            // TODO: ENCRYPT NOTIFICATION CONTENT
+            this.NotifyEntities(meta.members, {
+                type: "chat",
+                for: message.for,
+                from: message.author,
+                created: timeNow,
+                content: meta.lastMessage
+            });
+        } else {
+            // TODO handle error case where chat doesn't exist
+            Log.Error("Cannot send message as there is no such chat." + chatId);
+        }
+    }
+
+    // Send a notification to one or more entities
+    NotifyEntities(entities, notification) {
+        Log.Debug("Sending notification:\n" + JSON.stringify(notification));
+
+        // Length can change each iteration, hence no caching
+        for (let i = 0; i < entities.length; i++) {
+            let id = entities[i];
+            if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
+                // Send directly to connected peers rather than notifying via server when possible
+                this._SendPeerData(id, notification);
+            }
+            entities.splice(i, 1);
+        }
+
+        if (entities.length > 0) {
+            this.server.emit("PushNotification", { targets: entities, notif: notification });
         }
     }
 
@@ -324,6 +407,8 @@ class PeerwayAPI {
                 if (Database.active.contains("chat." + config.chats[i].id)) {
                     Log.Debug("Syncing chat." + config.chats[i].id);
                     let localChat = JSON.parse(Database.active.getString("chat." + config.chats[i].id));
+
+                    // TODO received timestamp should be PER-ENTITY/PEER to ensure syncing is correct
 
                     // Time that the peer last received a message or change to the chat
                     let remoteReceived = new Date(config.chats[i].received);

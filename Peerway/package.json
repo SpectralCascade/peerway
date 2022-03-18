@@ -13,6 +13,7 @@
     "@react-native-community/masked-view": "^0.1.11",
     "@react-navigation/native": "^6.0.8",
     "@react-navigation/native-stack": "^6.5.0",
+    "buffer": "^6.0.3",
     "react": "17.0.2",
     "react-native": "0.67.3",
     "react-native-fs": "^2.19.0",
