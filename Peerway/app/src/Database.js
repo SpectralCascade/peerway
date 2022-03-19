@@ -320,10 +320,9 @@ export default class Database {
             if (lookup.index[currentIndex].blocks[blockIndex].items >= itemsPerBlock) {
                 // Close off previous block and start a new one
                 lookup.index[currentIndex].end++;
-                lookup.index[currentIndex].blocks[lookup.index[currentIndex].blocks.length - 1].len++;
+                lookup.index[currentIndex].blocks[blockIndex].len++;
                 lookup.bytes += 2;
                 fileBuffer += "][";
-                lookup.index[currentIndex].blocks[blockIndex].len++;
                 
                 lookup.index[currentIndex].blocks.push({
                     pos: lookup.index[currentIndex].blocks[blockIndex].pos +
@@ -331,7 +330,6 @@ export default class Database {
                     len: 1,
                     items: 0
                 });
-                lookup.index[currentIndex].blocks[blockIndex].pos;
             }
 
             // Append the actual data to the file
@@ -415,7 +413,8 @@ export default class Database {
                     lookup.index[monthIndex].start + lookup.index[monthIndex].blocks[block].pos,
                     'utf8'
                 ).then((raw) => {
-                    Log.Debug("RAW DATA FILE:\n\n" + raw + "\n\n");
+                    Log.Debug("INDEX DATA FILE:\n\n" + JSON.stringify(lookup) + "\n\n");
+                    //Log.Debug("RAW DATA FILE:\n\n" + raw + "\n\n");
                     return new Promise(function(resolve, reject) {
                         // The last block written may not be finished, so may need an end bracket
                         if (!raw.endsWith("]")) {
