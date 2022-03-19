@@ -53,7 +53,7 @@ export default class Chat extends React.Component {
             0
         ).then((block) => {
             Log.Debug("Opened chat data file, loaded block: " + JSON.stringify(block));
-            for (let i = block.length - 1; i > 0; i--) {
+            for (let i = block.length - 1; i >= 0; i--) {
                 let item = block[i];
                 this.state.messages.push({
                     _id: this.state.messages.length + 1,
