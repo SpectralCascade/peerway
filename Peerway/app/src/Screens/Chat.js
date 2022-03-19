@@ -45,9 +45,34 @@ export default class Chat extends React.Component {
         this.chatId = this.props.route.params.chatId;
         console.log("OPENED CHAT with id: " + this.chatId);
 
-        // TODO load latest chat messages
+        // TODO get latest block
+        Database.Load(
+            Database.active,
+            "chats/" + Database.active.getString("id") + ".chat." + this.chatId + ".json",
+            Date.now(),
+            0
+        ).then((block) => {
+            Log.Debug("Opened chat data file, loaded block: " + JSON.stringify(block));
+            for (let i = block.length - 1; i > 0; i--) {
+                let item = block[i];
+                this.state.messages.push({
+                    _id: this.state.messages.length + 1,
+                    text: item.mime.startsWith("text") ? item.content : item.mime, // TODO show multimedia
+                    createdAt: item.created,
+                    user: {
+                        _id: 1,
+                        name: "You",
+                        // TODO use active entity avatar
+                        avatar: "https://placeimg.com/140/140/any"
+                    }
+                });
+            }
+            this.forceUpdate();
+        }).catch((err) => {
+            Log.Error("Could not load messages for chat." + this.chatId + ": " + err);
+        });
 
-        this.forceUpdate();
+        // TODO show loading message?
     }
 
     sendMessage(message) {

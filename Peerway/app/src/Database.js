@@ -211,6 +211,24 @@ export default class Database {
         return meta.id;
     }
 
+
+    // Get the array index from the current year/month
+    static GetLookupMonthIndex(start, current) {
+        let split = start.split('/');
+        let startYear = parseInt(split[0]);
+        let startMonth = parseInt(split[1])
+        split = current.split('/');
+        let currentYear = parseInt(split[0]);
+        let currentMonth = parseInt(split[1]);
+
+        // Get the year index, then add the month difference
+        return ((currentYear - startYear) * 12) + (currentMonth - startMonth);
+    };
+
+    static GetMonthYearTS(date) {
+        return date.getUTCFullYear().toString() + "/" + date.getUTCMonth().toString();
+    }
+
     // Store some syncable JSON content in a big data file.
     // Every 50 messages, start a new index pointer, based partly on very crude estimate of
     // 100 billion daily messages / 2 billion users for WhatsApp
@@ -227,7 +245,7 @@ export default class Database {
             // Update the index first
             // Broad phase indexing by month and year, then by every itemsPerBlock block
             let createdOn = "created" in data ? new Date(data.created) : Date.now();
-            let storeTime = createdOn.getUTCFullYear().toString() + "/" + createdOn.getUTCMonth().toString();
+            let storeTime = this.GetMonthYearTS(createdOn);
             let lookup = mmkv.contains(key) ? JSON.parse(mmkv.getString(key)) : {
                 // The year and month at which this index begins
                 began: storeTime,
@@ -240,20 +258,7 @@ export default class Database {
                 index: []
             };
 
-            // Get the array index from the current year/month
-            const GetIndex = (start, current) => {
-                let split = start.split('/');
-                let startYear = parseInt(split[0]);
-                let startMonth = parseInt(split[1])
-                split = current.split('/');
-                let currentYear = parseInt(split[0]);
-                let currentMonth = parseInt(split[1]);
-
-                // Get the year index, then add the month difference
-                return ((currentYear - startYear) * 12) + (currentMonth - startMonth);
-            };
-
-            let currentIndex = GetIndex(lookup.began, storeTime);
+            let currentIndex = this.GetLookupMonthIndex(lookup.began, storeTime);
             let previousIndex = Math.max(0, lookup.index.length - 1);
             while (lookup.index.length <= currentIndex) {
                 lookup.index.push({});
@@ -267,7 +272,7 @@ export default class Database {
                     // Byte position pointer to this part of the file
                     start: lookup.bytes,
                     // Byte end position of this part of the file
-                    end: lookup.bytes + 1,
+                    end: lookup.bytes,
                     // Number of items for this month of the year
                     items: 0,
                     // Array of blocks, of max size itemsPerBlock items. Initialise with one block.
@@ -275,7 +280,7 @@ export default class Database {
                         // The cumulative relative byte position of this block
                         pos: 0,
                         // The size of this block in bytes, always includes wrapping [] brackets
-                        len: 2,
+                        len: 1,
                         // The number of items in this block, up to itemsPerBlock
                         items: 0
                     }],
@@ -284,6 +289,7 @@ export default class Database {
                 // Close off previous index array block
                 if (currentIndex > 0 && "items" in lookup.index[previousIndex] && lookup.index[previousIndex].items > 0) {
                     lookup.index[previousIndex].end++;
+                    lookup.index[previousIndex].blocks[lookup.index[previousIndex].blocks.length - 1].len++;
                     lookup.index[currentIndex].start++;
                     lookup.index[currentIndex].end++;
                     lookup.bytes++;
@@ -300,7 +306,6 @@ export default class Database {
             let bytes = Buffer.byteLength(raw, 'utf8');
 
             // Add the item to the block
-            lookup.bytes += bytes;
             lookup.index[currentIndex].items++;
             lookup.index[currentIndex].end += bytes;
             let blockIndex = lookup.index[currentIndex].blocks.length - 1;
@@ -308,23 +313,29 @@ export default class Database {
             lookup.index[currentIndex].blocks[blockIndex].len += bytes;
 
             // Add to buffer
+            lookup.bytes += bytes;
             fileBuffer += raw;
 
             // Add a new block for next time
             if (lookup.index[currentIndex].blocks[blockIndex].items >= itemsPerBlock) {
                 // Close off previous block and start a new one
+                lookup.index[currentIndex].end++;
+                lookup.index[currentIndex].blocks[lookup.index[currentIndex].blocks.length - 1].len++;
+                lookup.bytes += 2;
                 fileBuffer += "][";
+                lookup.index[currentIndex].blocks[blockIndex].len++;
                 
                 lookup.index[currentIndex].blocks.push({
-                    pos: lookup.index[currentIndex].blocks[blockIndex].pos + lookup.index[currentIndex].blocks[blockIndex].len,
-                    len: 2,
+                    pos: lookup.index[currentIndex].blocks[blockIndex].pos +
+                            lookup.index[currentIndex].blocks[blockIndex].len,
+                    len: 1,
                     items: 0
                 });
                 lookup.index[currentIndex].blocks[blockIndex].pos;
             }
 
             // Append the actual data to the file
-            RNFS.appendFile(path, fileBuffer).then((success) => {
+            RNFS.appendFile(path, fileBuffer, 'utf8').then((success) => {
                 Log.Debug("Finished appending file at path: " + path);
                 // Finally, save the index
                 mmkv.set(key, JSON.stringify(lookup));
@@ -368,6 +379,58 @@ export default class Database {
             Log.Error(err);
         });
     }
+
+    // Load a block of stored data in the same month as the given timestamp.
+    // Specify which block from that month you wish to load (e.g. block 0, block 1, block n).
+    // Promise returns the block as an array on success.
+    static Load(mmkv, path, timestamp, block) {
+        let key = path;
+        path = RNFS.DocumentDirectoryPath + "/" + path;
+        return RNFS.exists(path).then((exists) => {
+            if (!exists || !mmkv.contains(key)) {
+                throw new Error("Data and/or index does not exist for " + path);
+            }
+        }).then(() => {
+            let lookup = JSON.parse(mmkv.getString(key));
+            let date = new Date(timestamp);
+            let month = this.GetMonthYearTS(date);
+            let monthIndex = this.GetLookupMonthIndex(lookup.began, month);
+            
+            if (monthIndex < lookup.index.length && monthIndex >= 0 && "blocks" in lookup.index[monthIndex]) {
+                let totalBlocks = lookup.index[monthIndex].blocks.length;
+                if (block >= totalBlocks || block < 0) {
+                    return new Promise(function(resolve, reject) {
+                        Log.Debug(JSON.stringify(lookup.index[monthIndex]));
+                        reject(
+                            "Block " + block + " does not exist, total blocks in month " + month +
+                            " is " + totalBlocks
+                        );
+                    });
+                }
+                Log.Debug("Loading from file at path " + path);
+                // Read the data and then parse into an array
+                return RNFS.read(
+                    path,
+                    lookup.index[monthIndex].blocks[block].len,
+                    lookup.index[monthIndex].start + lookup.index[monthIndex].blocks[block].pos,
+                    'utf8'
+                ).then((raw) => {
+                    Log.Debug("RAW DATA FILE:\n\n" + raw + "\n\n");
+                    return new Promise(function(resolve, reject) {
+                        // The last block written may not be finished, so may need an end bracket
+                        if (!raw.endsWith("]")) {
+                            raw += "]";
+                        }
+                        resolve(JSON.parse(raw));
+                    });
+                });
+            } else {
+                // Nothing available in this month
+                Log.Debug("Nothing to load in block " + block + " for month " + month + " (date: " + date.toString() + ")" + " month index = " + monthIndex);
+                return new Promise(function(resolve, reject) { resolve([]); });
+            }
+        });
+    };
 
     static MarkPeerInteraction(id, peers=[], index=-1) {
         if (peers.length == 0) {
