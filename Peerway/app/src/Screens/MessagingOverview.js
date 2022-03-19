@@ -95,6 +95,12 @@ export default class MessagingOverview extends Component {
             chat = chat != null ? this.state.chats.find((item) => item.id === chat.id) : null;
             if (chat != null) {
                 chat.read = true;
+                if (Database.active.contains("chat." + chat.id)) {
+                    let meta = JSON.parse(Database.active.getString("chat." + chat.id));
+                    meta.read = true;
+                    Database.active.set("chat." + chat.id, JSON.stringify(meta));
+                }
+
                 this.forceUpdate();
                 this.props.navigation.navigate("Chat", { chatId: chat.id });
             }
