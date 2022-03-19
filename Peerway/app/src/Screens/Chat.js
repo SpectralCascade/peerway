@@ -168,10 +168,7 @@ export default class Chat extends React.Component {
 
     // Callback to render the actions when pressed in the input toolbar
     RenderActions(props) {
-        return (<Actions
-            {...props}
-            containerStyle={styles.actions}
-        />);
+        return (<Actions {...props} containerStyle={styles.actions} />);
     };
 
     // Main render call

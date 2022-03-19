@@ -22,7 +22,7 @@ export default class RequestChat extends Component {
         this.state = {
             profiles: [],
             selected: {},
-            chatID: "",
+            chatId: "",
         }
     }
 
@@ -62,7 +62,7 @@ export default class RequestChat extends Component {
     }
 
     // Callback when the invitations are confirmed.
-    // For now this always creates a new chat
+    // For now this just creates a new chat
     onConfirm() {
         // TODO REMOVE ME debug only
         Database.active.delete("chats");
@@ -70,7 +70,7 @@ export default class RequestChat extends Component {
 
         // Create a chat entry in the database
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
-        let id = Database.CreateChat(selected);
+        let id = Database.CreateChat(selected, { read: true });
         let chats = Database.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
         // Add chat to top
         chats = [id].concat(chats);
@@ -89,15 +89,14 @@ export default class RequestChat extends Component {
 
         console.log("Created chat with id " + id);
 
-        this.setState({chatID: id});
+        this.setState({chatId: id});
         // TODO: Open chat instead of messaging overview
         this.props.navigation.dispatch(
             CommonActions.reset({
-                index: 1,
-                routes: [{ name: 'MessagingOverview' }]
+                index: 2,
+                routes: [{ name: 'MessagingOverview' }, { name: 'Chat', params: { chatId: id } }]
             })
         );
-        //this.props.navigation.navigate("Chat", { chatId: id });
     }
 
     render() {
