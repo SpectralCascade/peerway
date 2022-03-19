@@ -95,6 +95,7 @@ export default class Chat extends React.Component {
 
         // Check if there are actually any messages
         if (Database.active.contains(this.GetChatDataPath())) {
+            let didLoad = false;
             while (!("blocks" in meta) && this.state.began < this.state.loadedTS) {
                 meta = Database.GetStoreMeta(Database.active, this.GetChatDataPath(), this.state.loadedTS);
                 let hasBlocks = "blocks" in meta;
@@ -113,6 +114,7 @@ export default class Chat extends React.Component {
                         date.setUTCMonth(date.getUTCMonth() - 1);
                         this.state.loadedTS = date.valueOf();
                     }
+                    didLoad = true;
                     // Exit out of the loop, job here is done
                     break;
                 } else {
@@ -120,6 +122,10 @@ export default class Chat extends React.Component {
                     date.setUTCMonth(date.getUTCMonth() - 1);
                     this.state.loadedTS = date.valueOf();
                 }
+            }
+
+            if (!didLoad) {
+                Log.Debug("No earlier messages to load.");
             }
         }
     }
@@ -187,6 +193,7 @@ export default class Chat extends React.Component {
                     scrollToBottom
                     renderActions={(props) => this.RenderActions(props)}
                     loadEarlier
+                    infiniteScroll
                     onLoadEarlier={() => this.LoadMessages()}
                 />
             </View>
