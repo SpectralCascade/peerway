@@ -1,5 +1,5 @@
 import 'react-native-get-random-values';
-import { MMKV } from 'react-native-mmkv';
+import { MMKV, useMMKVObject } from 'react-native-mmkv';
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import AppKeys from './AppKeys';
 import RNFS from "react-native-fs";
@@ -247,21 +247,29 @@ export default class Database {
             let createdOn = "created" in data ? new Date(data.created) : Date.now();
             let storeTime = this.GetMonthYearTS(createdOn);
             let lookup = mmkv.contains(key) ? JSON.parse(mmkv.getString(key)) : {
-                // The year and month at which this index begins
-                began: storeTime,
+                // Identical to the timestamp of the first message
+                began: createdOn.valueOf(),
                 // Number of bytes used by the file
                 bytes: 0,
                 // Total items in the entire file
                 items: 0,
+                // The total number of blocks
+                blocks: 0,
                 // Array indexed by year and month. E.g. if start = "2022/3" then that corresponds to
                 // index 0, "2022/4" corresponds to index 1, "2022/12" corresponds to index 9 etc.
-                index: []
+                index: [],
+                // Corresponding array keeps track of the number of blocks per month
+                bpm: []
             };
 
-            let currentIndex = this.GetLookupMonthIndex(lookup.began, storeTime);
+            let currentIndex = this.GetLookupMonthIndex(
+                this.GetMonthYearTS(new Date(lookup.began)),
+                storeTime
+            );
             let previousIndex = Math.max(0, lookup.index.length - 1);
             while (lookup.index.length <= currentIndex) {
                 lookup.index.push({});
+                lookup.bpm.push(0);
             }
 
             let fileBuffer = "";
@@ -285,6 +293,8 @@ export default class Database {
                         items: 0
                     }],
                 };
+                lookup.bpm[currentIndex]++;
+                lookup.blocks++;
 
                 // Close off previous index array block
                 if (currentIndex > 0 && "items" in lookup.index[previousIndex] && lookup.index[previousIndex].items > 0) {
@@ -302,13 +312,13 @@ export default class Database {
             }
 
             // Raw data to be appended to the file
-            let raw = (lookup.index[currentIndex].items > 0 ? "," : "") + JSON.stringify(data);
+            let blockIndex = lookup.index[currentIndex].blocks.length - 1;
+            let raw = (lookup.index[currentIndex].blocks[blockIndex].items > 0 ? "," : "") + JSON.stringify(data);
             let bytes = Buffer.byteLength(raw, 'utf8');
 
             // Add the item to the block
             lookup.index[currentIndex].items++;
             lookup.index[currentIndex].end += bytes;
-            let blockIndex = lookup.index[currentIndex].blocks.length - 1;
             lookup.index[currentIndex].blocks[blockIndex].items++;
             lookup.index[currentIndex].blocks[blockIndex].len += bytes;
 
@@ -330,6 +340,8 @@ export default class Database {
                     len: 1,
                     items: 0
                 });
+                lookup.bpm[currentIndex]++;
+                lookup.blocks++;
             }
 
             // Append the actual data to the file
@@ -392,7 +404,10 @@ export default class Database {
             let lookup = JSON.parse(mmkv.getString(key));
             let date = new Date(timestamp);
             let month = this.GetMonthYearTS(date);
-            let monthIndex = this.GetLookupMonthIndex(lookup.began, month);
+            let monthIndex = this.GetLookupMonthIndex(
+                this.GetMonthYearTS(new Date(lookup.began)),
+                month
+            );
             
             if (monthIndex < lookup.index.length && monthIndex >= 0 && "blocks" in lookup.index[monthIndex]) {
                 let totalBlocks = lookup.index[monthIndex].blocks.length;
@@ -414,7 +429,7 @@ export default class Database {
                     'utf8'
                 ).then((raw) => {
                     Log.Debug("INDEX DATA FILE:\n\n" + JSON.stringify(lookup) + "\n\n");
-                    //Log.Debug("RAW DATA FILE:\n\n" + raw + "\n\n");
+                    //Log.Debug("RAW BLOCK DATA FROM FILE:\n\n" + raw + "\n\n");
                     return new Promise(function(resolve, reject) {
                         // The last block written may not be finished, so may need an end bracket
                         if (!raw.endsWith("]")) {
@@ -430,6 +445,24 @@ export default class Database {
             }
         });
     };
+
+    // Get the blocks metadata for the month of the given timestamp
+    static GetStoreMeta(mmkv, path, timestamp) {
+        if (!mmkv.contains(path)) {
+            return {};
+        }
+        let lookup = JSON.parse(mmkv.getString(path));
+        let date = new Date(timestamp);
+        let month = this.GetMonthYearTS(date);
+        let monthIndex = this.GetLookupMonthIndex(
+            this.GetMonthYearTS(new Date(lookup.began)),
+            month
+        );
+        if (monthIndex < lookup.index.length && monthIndex >= 0 && "blocks" in lookup.index[monthIndex]) {
+            return lookup.index[monthIndex];
+        }
+        return {};
+    }
 
     static MarkPeerInteraction(id, peers=[], index=-1) {
         if (peers.length == 0) {

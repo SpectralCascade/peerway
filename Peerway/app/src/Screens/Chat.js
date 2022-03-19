@@ -39,25 +39,26 @@ export default class Chat extends React.Component {
         // Get the chat ID
         this.chatId = props.route.params.chatId;
     }
+    
+    GetChatDataPath() {
+        return "chats/" + Database.active.getString("id") + ".chat." + this.chatId + ".json";
+    }
 
-    // Called when the screen is opened.
-    onOpen() {
-        this.chatId = this.props.route.params.chatId;
-        console.log("OPENED CHAT with id: " + this.chatId);
-
-        // TODO get latest block
-        Database.Load(
+    // Load a block of messages
+    LoadMessageBlock(timestamp, index) {
+        return Database.Load(
             Database.active,
-            "chats/" + Database.active.getString("id") + ".chat." + this.chatId + ".json",
-            Date.now(),
-            0
+            this.GetChatDataPath(),
+            timestamp,
+            index
         ).then((block) => {
             Log.Debug("Opened chat data file, loaded block: " + JSON.stringify(block));
             for (let i = block.length - 1; i >= 0; i--) {
                 let item = block[i];
                 this.state.messages.push({
                     _id: this.state.messages.length + 1,
-                    text: item.mime.startsWith("text") ? item.content : item.mime, // TODO show multimedia
+                    // TODO show multimedia
+                    text: item.mime.startsWith("text") ? item.content : item.mime,
                     createdAt: item.created,
                     user: {
                         _id: 1,
@@ -67,12 +68,39 @@ export default class Chat extends React.Component {
                     }
                 });
             }
-            this.forceUpdate();
         }).catch((err) => {
             Log.Error("Could not load messages for chat." + this.chatId + ": " + err);
         });
+    }
 
-        // TODO show loading message?
+    // Called when the screen is opened.
+    onOpen() {
+        this.chatId = this.props.route.params.chatId;
+        console.log("OPENED CHAT with id: " + this.chatId);
+
+        // Find the most recent messages
+        this.state.messages = [];
+        let date = new Date(Date.now());
+        let millis = date.valueOf();
+        let meta = {};
+
+        // Check if there are actually any messages
+        if (Database.active.contains(this.GetChatDataPath())) {
+            let began = JSON.parse(Database.active.getString(this.GetChatDataPath())).began;
+            while (!("blocks" in meta) && began < millis) {
+                millis = date.valueOf();
+                meta = Database.GetStoreMeta(Database.active, this.GetChatDataPath(), millis);
+                if ("blocks" in meta) {
+                    // Show most recent messages
+                    this.LoadMessageBlock(millis, meta.blocks.length - 1).then(() => { this.forceUpdate(); });
+                } else {
+                    // Go back a month
+                    date.setUTCMonth(date.getUTCMonth() - 1);
+                }
+            }
+        }
+
+        // TODO indicate that messages are loading
     }
 
     sendMessage(message) {
