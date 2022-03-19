@@ -8,6 +8,7 @@ import StyleMain from '../Stylesheets/StyleMain';
 import Database from '../Database';
 import { CommonActions } from '@react-navigation/native';
 import Peerway from '../Peerway';
+import { Log } from '../Log';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.2;
@@ -21,8 +22,7 @@ export default class RequestChat extends Component {
 
         this.state = {
             profiles: [],
-            selected: {},
-            chatId: "",
+            selected: {}
         }
     }
 
@@ -69,32 +69,36 @@ export default class RequestChat extends Component {
         Database.active.delete("peers");
 
         // Create a chat entry in the database
+        let activeId = Database.active.getString("id");
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
-        let id = Database.CreateChat(selected, { read: true });
-        let chats = Database.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
-        // Add chat to top
-        chats = [id].concat(chats);
-        Database.active.set("chats", JSON.stringify(chats));
+        let profile = JSON.parse(Database.active.getString("profile"));
+        let meta = Database.CreateChat(
+            [{ id: activeId, name: profile.name, avatar: ""/*profile.avatar*/}].concat(selected),
+            { read: true }
+        );
 
         // Add peer entries when necessary
-        for (i in selected) {
-            console.log("Adding peer " + selected[i].id);
-            Database.AddPeer(selected[i].id);
-            let peer = JSON.parse(Database.active.getString("peer." + selected[i].id));
-            // This will be the most up-to-date data, so overwrite.
-            peer.name = selected[i].name;
-            peer.avatar = selected[i].avatar;
-            //Database.active.set("peer." + selected[i].id, JSON.stringify(peer));
+        let peerIds = [];
+        for (let i in selected) {
+            peerIds.push(selected[i].id);
         }
 
-        console.log("Created chat with id " + id);
+        Log.Debug("Sending chat request to peers: " + JSON.stringify(peerIds));
+        Peerway.NotifyEntities(peerIds, {
+            type: "chat.request",
+            chatId: meta.id,
+            from: activeId,
+            updated: meta.updated,
+            name: meta.name,
+            icon: "",//meta.icon,
+            members: meta.members.slice()
+        });
+        console.log("Created chat with id " + meta.id);
 
-        this.setState({chatId: id});
-        // TODO: Open chat instead of messaging overview
         this.props.navigation.dispatch(
             CommonActions.reset({
                 index: 2,
-                routes: [{ name: 'MessagingOverview' }, { name: 'Chat', params: { chatId: id } }]
+                routes: [{ name: 'MessagingOverview' }, { name: 'Chat', params: { chatId: meta.id } }]
             })
         );
     }

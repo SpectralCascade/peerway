@@ -163,7 +163,8 @@ export default class Database {
     // Create a new chat for the currently active entity with other entities.
     // Takes a list of members (NOT including the active entity) and optional meta to copy.
     static CreateChat(members, meta={}) {
-        let isGroup = members.length > 1;
+        let isGroup = members.length > 2;
+        let lastMember = members.length - 1;
 
         if (meta == undefined) {
             meta = {};
@@ -177,14 +178,15 @@ export default class Database {
         // Generate chat metadata
         let timeNow = Date.now();
         let chatData = {
-            name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[0].name,
+            id: meta.id,
+            name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[lastMember].name,
             members: members,
             received: "received" in meta ? meta.received : timeNow,
             updated: "updated" in meta ? meta.updated : timeNow,
             read: "read" in meta ? meta.read : false,
             muted: "muted" in meta ? meta.muted : false,
             blocked: "blocked" in meta ? meta.blocked : false,
-            icon: "icon" in meta ? meta.icon : (isGroup ? "" : members[0].avatar),
+            icon: "icon" in meta ? meta.icon : (isGroup ? "" : members[lastMember].avatar),
             // Number of messages the active entity has sent in this chat
             sent: 0,
             // Who sent the last message?
@@ -193,22 +195,27 @@ export default class Database {
             lastMessage: ""
         };
         
-        // Generate member entries if necessary
-        if (chatData.members.length == 0) {
-            for (let member in members) {
-                chatData.members.push({
-                    id: member.id,
-                    keys: {
-                        // TODO digital signature and encryption keys
-                    }
-                });
+        let activeId = this.active.getString("id");
+        for (let i in members) {
+            if (members[i].id === activeId) {
+                // Skip self
+                continue;
             }
+            let peer = this.AddPeer(members[i].id);
+            // This will be the most up-to-date data, so overwrite.
+            peer.name = members[i].name;
+            //peer.avatar = members[i].avatar;
+            this.active.set("peer." + members[i].id, JSON.stringify(peer));
         }
 
         // Create a chat entry
         this.active.set("chat." + meta.id, JSON.stringify(chatData));
+        let chats = this.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
+        // Add chat to top
+        chats = [meta.id].concat(chats);
+        this.active.set("chats", JSON.stringify(chats));
 
-        return meta.id;
+        return chatData;
     }
 
 
@@ -484,6 +491,7 @@ export default class Database {
 
     // Add a peer entry to the database, if it isn't already there
     static AddPeer(id, markInteraction=true) {
+        let peer = {};
         let peers = [];
         if (this.active.contains("peers")) {
             console.log("Database contains peers array");
@@ -498,20 +506,22 @@ export default class Database {
             if (markInteraction) {
                 this.MarkPeerInteraction(id, peers, index);
             }
+            peer = JSON.parse(this.active.getString("peer." + id));
         } else {
             // Add to the front of the list
             console.log("Adding NEW peer to list: peer." + id);
-            this.active.set("peers", JSON.stringify(([id].concat(peers))));
-            this.active.set("peer." + id, JSON.stringify({
+            peer = {
                 name: "",
                 avatar: "",
                 mutual: false,
                 blocked: false,
                 sync: "",
                 verifier: ""
-            }));
+            };
+            this.active.set("peers", JSON.stringify(([id].concat(peers))));
+            this.active.set("peer." + id, JSON.stringify(peer));
         }
-        
+        return peer;
     }
 
 }

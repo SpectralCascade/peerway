@@ -128,8 +128,8 @@ class PeerwayAPI {
                 if (this._peers[id].connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
                 } else {
-                    Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
-                    this._SyncPeer(id, this._syncConfig);
+                    /*Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
+                    this._SyncPeer(id, this._syncConfig);*/
                 }
             } else {
                 // Get local peer metadata
@@ -190,10 +190,18 @@ class PeerwayAPI {
             meta.updated = timeNow;
             Database.active.set("chat." + message.for, JSON.stringify(meta));
 
+            let targets = [];
+            for (let i in meta.members) {
+                if (meta.members[i] === message.author) {
+                    continue;
+                }
+                targets.push(meta.members[i].id);
+            }
+
             // Now send out a notification to all peers in the chat
             // TODO: ENCRYPT NOTIFICATION CONTENT
-            this.NotifyEntities(meta.members, {
-                type: "chat",
+            this.NotifyEntities(targets, {
+                type: "chat.message",
                 for: message.for,
                 from: message.author,
                 created: timeNow,
@@ -207,16 +215,18 @@ class PeerwayAPI {
 
     // Send a notification to one or more entities
     NotifyEntities(entities, notification) {
-        Log.Debug("Sending notification:\n" + JSON.stringify(notification));
+        let raw = JSON.stringify(notification);
+        //Log.Debug("Sending notification:\n" + raw);
+        Log.Debug("Sending notif to entities: " + JSON.stringify(entities));
 
         // Length can change each iteration, hence no caching
         for (let i = 0; i < entities.length; i++) {
             let id = entities[i];
             if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
                 // Send directly to connected peers rather than notifying via server when possible
-                this._SendPeerData(id, notification);
+                this._SendPeerData(id, raw);
+                entities.splice(i, 1);
             }
-            entities.splice(i, 1);
         }
 
         if (entities.length > 0) {
@@ -290,7 +300,7 @@ class PeerwayAPI {
 
             // Automagically sync with the peer
             if (this._syncConfig) {
-                this._SyncPeer(id, this._syncConfig);
+                //this._SyncPeer(id, this._syncConfig);
             }
         } else {
             Log.Info("Connection call state to peer." + id + " changed to: " + this._peers[id].connectionState);
@@ -386,6 +396,12 @@ class PeerwayAPI {
                 case "sync":
                     this._RespondToSyncRequest(json.to, json.from, json.config);
                     break;
+                case "chat.request":
+                    this._OnChatRequest(json);
+                    break;
+                case "chat.message":
+                    this._OnChatMessage(json);
+                    break;
             }
         }
     };
@@ -431,6 +447,25 @@ class PeerwayAPI {
         }
     }
 
+    // Handle chat request
+    _OnChatRequest(data) {
+        // TODO notify and let user accept or reject
+        // TODO REMOVE THIS DEBUG CODE BEFORE RELEASE
+        alert("Received chat request from peer." + data.from);
+        Database.CreateChat(data.members, {
+            id: data.chatId,
+            name: data.name,
+            icon: data.icon,
+            updated: data.updated
+        });
+    }
+
+    // Handle chat message
+    _OnChatMessage(data) {
+        // TODO reject messages from chats that the user hasn't accepted or has blocked
+        Log.Debug("RECEIVED CHAT MESSAGE: " + JSON.stringify(data));
+    }
+
     // Send a request to connect to a specified entity.
     _SendConnectionRequest(id, clientId) {
         // The client ID is required due to potential for duplicate entity IDs on the server.
@@ -471,8 +506,7 @@ class PeerwayAPI {
             }
         } else {
             // Not seen this peer before, add to the database
-            Database.AddPeer(peer.local);
-            meta = Database.active.getString("peer." + peer.local);
+            meta = Database.AddPeer(peer.local);
         }
 
         // Check to ensure the peer isn't blocked.
