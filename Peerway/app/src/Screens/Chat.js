@@ -189,12 +189,12 @@ export default class Chat extends React.Component {
                     user={{
                         _id: 1,
                     }}
-                    alwaysShowSend
                     scrollToBottom
                     renderActions={(props) => this.RenderActions(props)}
                     loadEarlier
                     infiniteScroll
                     onLoadEarlier={() => this.LoadMessages()}
+                    textInputStyle={styles.inputToolbar}
                 />
             </View>
         );
