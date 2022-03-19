@@ -22,6 +22,8 @@ class PeerwayAPI {
     onSyncPeersComplete = () => { Log.Info("Peer syncing has finished."); };
     // Callback when all peers have been synced.
     onSyncPeersError = (error) => { Log.Error(error.message); };
+    // Callback when a message is received
+    onChatMessage = (message) => { Log.Debug("Received message for chat." + message.for); }
 
     //
     // "Private" members
@@ -463,7 +465,7 @@ class PeerwayAPI {
     // Handle chat message
     _OnChatMessage(data) {
         // TODO reject messages from chats that the user hasn't accepted or has blocked
-        Log.Debug("RECEIVED CHAT MESSAGE: " + JSON.stringify(data));
+        this.onChatMessage(data);
     }
 
     // Send a request to connect to a specified entity.

@@ -143,6 +143,23 @@ export default class Chat extends React.Component {
         this.state.loadedTS = 0;
         this.LoadMessages();
 
+        Peerway.onChatMessage = (message) => {
+            this.state.messages.unshift({
+                _id: this.state.messages.length + 1,
+                // TODO show multimedia
+                text: message.content,//.startsWith("text") ? message.content : message.mime,
+                createdAt: message.created,
+                user: {
+                    _id: message.from,
+                    // TODO get peer name
+                    name: message.from,
+                    // TODO get peer avatar
+                    avatar: "https://placeimg.com/140/140/any"
+                }
+            });
+            this.forceUpdate();
+        };
+
         // TODO indicate that messages are loading
     }
 
