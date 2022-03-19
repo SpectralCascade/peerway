@@ -211,7 +211,7 @@ export default class Database {
         return meta.id;
     }
 
-    // Store some syncable content in a big data file.
+    // Store some syncable JSON content in a big data file.
     // Every 50 messages, start a new index pointer, based partly on very crude estimate of
     // 100 billion daily messages / 2 billion users for WhatsApp
     // https://techcrunch.com/2020/10/29/whatsapp-is-now-delivering-roughly-100-billion-messages-a-day/
@@ -222,6 +222,8 @@ export default class Database {
 
         // Function to append the data
         const Append = () => {
+            Log.Debug("Appending data to store...");
+
             // Update the index first
             // Broad phase indexing by month and year, then by every itemsPerBlock block
             let createdOn = "created" in data ? new Date(data.created) : Date.now();
@@ -252,9 +254,12 @@ export default class Database {
             };
 
             let currentIndex = GetIndex(lookup.began, storeTime);
+            let previousIndex = Math.max(0, lookup.index.length - 1);
             while (lookup.index.length <= currentIndex) {
                 lookup.index.push({});
             }
+
+            let fileBuffer = "";
 
             // Now add the inner block pointers
             if (!("start" in lookup.index[currentIndex])) {
@@ -262,64 +267,106 @@ export default class Database {
                     // Byte position pointer to this part of the file
                     start: lookup.bytes,
                     // Byte end position of this part of the file
-                    end: lookup.bytes,
+                    end: lookup.bytes + 1,
                     // Number of items for this month of the year
                     items: 0,
-                    // Array of blocks, of max size itemsPerBlock items
+                    // Array of blocks, of max size itemsPerBlock items. Initialise with one block.
                     blocks: [{
-                        // The cumulative byte position (to be added to the month of the year position)
+                        // The cumulative relative byte position of this block
                         pos: 0,
-                        // The size of this block in bytes
-                        len: 0,
+                        // The size of this block in bytes, always includes wrapping [] brackets
+                        len: 2,
                         // The number of items in this block, up to itemsPerBlock
                         items: 0
                     }],
                 };
+
+                // Close off previous index array block
+                if (currentIndex > 0 && "items" in lookup.index[previousIndex] && lookup.index[previousIndex].items > 0) {
+                    lookup.index[previousIndex].end++;
+                    lookup.index[currentIndex].start++;
+                    lookup.index[currentIndex].end++;
+                    lookup.bytes++;
+                    fileBuffer += "]";
+                }
+
+                // Start a new block in the file
+                lookup.bytes++;
+                fileBuffer += "[";
             }
 
             // Raw data to be appended to the file
-            let raw = JSON.stringify(data);
-            let bytes = Buffer.byteLength(string, 'utf8');
+            let raw = (lookup.index[currentIndex].items > 0 ? "," : "") + JSON.stringify(data);
+            let bytes = Buffer.byteLength(raw, 'utf8');
 
-            // Actually add the item to the block
+            // Add the item to the block
             lookup.bytes += bytes;
             lookup.index[currentIndex].items++;
             lookup.index[currentIndex].end += bytes;
-
             let blockIndex = lookup.index[currentIndex].blocks.length - 1;
             lookup.index[currentIndex].blocks[blockIndex].items++;
             lookup.index[currentIndex].blocks[blockIndex].len += bytes;
 
+            // Add to buffer
+            fileBuffer += raw;
+
             // Add a new block for next time
             if (lookup.index[currentIndex].blocks[blockIndex].items >= itemsPerBlock) {
+                // Close off previous block and start a new one
+                fileBuffer += "][";
+                
                 lookup.index[currentIndex].blocks.push({
                     pos: lookup.index[currentIndex].blocks[blockIndex].pos + lookup.index[currentIndex].blocks[blockIndex].len,
-                    len: 0,
+                    len: 2,
                     items: 0
                 });
                 lookup.index[currentIndex].blocks[blockIndex].pos;
             }
 
             // Append the actual data to the file
-            RNFS.appendFile(path, raw);
+            RNFS.appendFile(path, fileBuffer).then((success) => {
+                Log.Debug("Finished appending file at path: " + path);
+                // Finally, save the index
+                mmkv.set(key, JSON.stringify(lookup));
+            }).catch((err) => {
+                Log.Error("Failed to append to file. " + err);
+            });
 
-            // Finally, save the index
-            mmkv.set(key, JSON.stringify(lookup));
         };
 
-        if (!RNFS.exists(path)) {
-            // Create a file
-            RNFS.writeFile(path, "", 'utf8').then((success) => {
-                Log.Info("Finished creating file at path: " + path);
-                if (success) {
-                    Append();
+        RNFS.exists(path).then((exists) => {
+            if (!exists) {
+                const CreateStore = () => {
+                    // Create a file
+                    Log.Info("Creating new file at " + path);
+                    RNFS.writeFile(path, "", 'utf8').then(() => {
+                        Log.Info("Finished creating file at path: " + path);
+                        Append();
+                    }).catch((err) => {
+                        Log.Error("Failed to create file. " + err);
+                    });
                 }
-            }).catch((err) => {
-                Log.Error(err);
-            });
-        } else {
-            Append();
-        }
+
+                let sepIndex = path.lastIndexOf('/');
+                if (sepIndex >= 0) {
+                    // Make path if it doesn't already exist
+                    let dir = path.substr(0, sepIndex);
+                    RNFS.mkdir(dir).then(() => {
+                        Log.Info("Created directory \"" + dir + "\"");
+                        CreateStore();
+                    }).catch((err) => {
+                        Log.Error("Failed to execute mkdir. " + err);
+                    });
+                } else {
+                    CreateStore();
+                }
+                
+            } else {
+                Append();
+            }
+        }).catch((err) => {
+            Log.Error(err);
+        });
     }
 
     static MarkPeerInteraction(id, peers=[], index=-1) {
