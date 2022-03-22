@@ -5,16 +5,32 @@ import AppState from '../AppState';
 import HandleEffect from '../Components/HandleEffect';
 import Text from '../Components/Text';
 import Database from '../Database';
+import { Log } from '../Log';
 import StyleMain from '../Stylesheets/StyleMain';
 
 export default class SplashScreen extends React.Component {
 
+    OpenSetup() {
+        setTimeout(() => {
+            this.props.navigation.dispatch(
+                CommonActions.reset({
+                    index: 1,
+                    routes: [{ name: 'Setup' }]
+                })
+            );
+        }, 1000);
+    }
+
     onOpen() {
-        console.log("Opened splash screen...");
+        Log.Debug("Opened splash screen...");
         // Check if there is an active entity
+        let active = "";
         if (Database.userdata.contains("active")) {
-            let active = Database.userdata.getString("active");
-            console.log("Switching to active entity " + active);
+            active = Database.userdata.getString("active");
+        }
+        
+        if (active && active.length > 0) {
+            Log.Info("Switching to active entity " + active);
             Database.SwitchActiveEntity(active);
             this.props.navigation.dispatch(
                 CommonActions.reset({
@@ -23,18 +39,13 @@ export default class SplashScreen extends React.Component {
                 })
             );
         } else {
-            this.props.navigation.dispatch(
-                CommonActions.reset({
-                    index: 1,
-                    routes: [{ name: 'Setup' }]
-                })
-            );
+            this.OpenSetup();
         }
     }
 
     render() {
         return (
-            <View style={[StyleMain.background, {justifyContent: "center"}]}>
+            <View style={[StyleMain.background, {justifyContent: "center", alignItems: "center"}]}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => this.onOpen()}/>
                 
                 <Image source={require("../../assets/Logo.png")} />

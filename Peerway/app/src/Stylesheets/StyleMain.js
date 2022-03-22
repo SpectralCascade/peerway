@@ -42,12 +42,12 @@ const StyleMain = StyleSheet.create({
         backgroundColor: "#000"
     },
     logo: {
-        width: dimensions.width,
-        height: dimensions.height / 2
+        width: dimensions.width / 2,
     },
     logoContainer: {
         flex: 1,
-        alignItems: "center"
+        alignItems: "center",
+        padding: 10
     },
     mainContent: {
         flex: 1,

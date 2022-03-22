@@ -35,8 +35,25 @@ export default class MessagingOverview extends Component {
     // Callback on navigating to this screen.
     OnOpen() {
         Log.Debug("OPENED MESSAGING OVERVIEW");
-        Peerway.ConnectToSignalServer("http://" + Constants.server_ip + ":" + Constants.port);
+        Peerway.ConnectToSignalServer(
+            Database.userdata.contains("SignalServerURL") ?
+                Database.userdata.getString("SignalServerURL")
+                : "http://" + Constants.server_ip + ":" + Constants.port
+        );
+        
+        this.Refresh();
 
+        // Handle request from a peer to chat
+        if (this.onChatRequest) {
+            this.onChatRequest.remove();
+        }
+        this.onChatRequest = Peerway.addListener("chat.request", (data) => {
+            Log.Info("Received chat request from peer." + data.from);
+            this.Refresh();
+        });
+    }
+
+    Refresh() {
         // Load up cached chats
         let chatIds = [];
         // Metadata about chats for syncing purposes
@@ -106,6 +123,10 @@ export default class MessagingOverview extends Component {
             }
         };
 
+        const onOpenSettings = () => {
+            this.props.navigation.navigate("Settings");
+        }
+
         return (
             <SafeAreaView style={StyleMain.background}>
                 
@@ -115,7 +136,7 @@ export default class MessagingOverview extends Component {
                     <TouchableOpacity style={[styles.menuButton]}>
                         <Icon name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.settingsButton]}>
+                    <TouchableOpacity onPress={() => onOpenSettings()} style={[styles.settingsButton]}>
                         <Icon name="settings" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                 </View>

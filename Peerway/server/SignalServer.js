@@ -8,7 +8,6 @@ const { Log } = require('../app/src/Log');
 const app = express();
 const server = http.createServer(app);
 const io = socket(server);
-const rooms = {};
 const port = 20222;
 
 // Info on connected and previously connected clients

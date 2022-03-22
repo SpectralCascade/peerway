@@ -7,6 +7,7 @@ import Chat from './app/src/Screens/Chat';
 import MessagingOverview from './app/src/Screens/MessagingOverview';
 import RequestChat from './app/src/Screens/RequestChat';
 import SplashScreen from './app/src/Screens/SplashScreen';
+import Settings from './app/src/Screens/Settings';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,11 @@ export default function App() {
             <Stack.Screen
               name="MessagingOverview"
               component={MessagingOverview}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={Settings}
+              options={{title: "Settings", animation: 'slide_from_right', headerShown: true,}}
             />
             <Stack.Screen
               name="Chat"

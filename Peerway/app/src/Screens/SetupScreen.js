@@ -19,9 +19,8 @@ export default function SetupScreen(props) {
         <SafeAreaView style={StyleMain.background}>
 
             <View style={StyleMain.logoContainer}>
-                <Image style={StyleMain.logo} source={require("../../assets/adaptive-icon.png")}>
-                </Image>
-                <Text>All your data are belong to... you.</Text>
+                <Image style={StyleMain.logo} source={require("../../assets/Logo.png")} />
+                <Text style={{margin: 10, fontSize: 36, fontWeight: "bold", fontFamily: "monospace"}}>Peerway</Text>
             </View>
             
             <View style={StyleMain.bottomContent}>

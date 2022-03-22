@@ -143,7 +143,10 @@ export default class Chat extends React.Component {
         this.state.loadedTS = 0;
         this.LoadMessages();
 
-        Peerway.onChatMessage = (message) => {
+        if (this.onChatMessage) {
+            this.onChatMessage.remove();
+        }
+        this.onChatMessage = Peerway.addListener("chat.message", (message) => {
             this.state.messages.unshift({
                 _id: this.state.messages.length + 1,
                 // TODO show multimedia
@@ -158,9 +161,16 @@ export default class Chat extends React.Component {
                 }
             });
             this.forceUpdate();
-        };
+        });
 
         // TODO indicate that messages are loading
+    }
+
+    OnClose() {
+        if (this.onChatMessage) {
+            this.onChatMessage.remove();
+            this.onChatMessage = null;
+        }
     }
 
     SendMessage(message) {
@@ -194,6 +204,8 @@ export default class Chat extends React.Component {
             <View style={StyleMain.background}>
                 {/* Handles screen opening callback */}
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => this.OnOpen()}/>
+                {/* Handles screen closing callback */}
+                <HandleEffect navigation={this.props.navigation} effect="blue" callback={() => this.OnClose()}/>
 
                 {/* Setup the chat component */}
                 <GiftedChat

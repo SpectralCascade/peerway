@@ -4,6 +4,8 @@ import Database from "./Database";
 import { Log } from "./Log";
 import RNFS from "react-native-fs";
 import Constants from "./Constants";
+import { EventEmitter } from "react-native";
+import { EventListener } from "./Components/EventListener";
 
 // This class forms the primary API for communicating with peers
 class PeerwayAPI {
@@ -22,8 +24,6 @@ class PeerwayAPI {
     onSyncPeersComplete = () => { Log.Info("Peer syncing has finished."); };
     // Callback when all peers have been synced.
     onSyncPeersError = (error) => { Log.Error(error.message); };
-    // Callback when a message is received
-    onChatMessage = (message) => { Log.Debug("Received message for chat." + message.for); }
 
     //
     // "Private" members
@@ -53,6 +53,25 @@ class PeerwayAPI {
         Object.defineProperty(this, "isConnected", {
             get: () => { return this.server != null && this.server.connected && this._activeId === Database.active.getString("id"); }
         });
+        this._events = {};
+        this._handleCount = 0;
+    }
+
+    //
+    // Events interface
+    //
+
+    addListener(eventType, listener) {
+        this._handleCount++;
+        return new EventListener(this._events, eventType, this._handleCount.toString(), listener);
+    }
+
+    emit(eventType, ...args) {
+        if (eventType in this._events) {
+            Object.keys(this._events[eventType]).forEach((key) => {
+                this._events[eventType][key].invoke(...args);
+            });
+        }
     }
 
     //
@@ -63,9 +82,11 @@ class PeerwayAPI {
     // overrideSocket determines what should happen if already connected to a signal server.
     // If already connected and overrideSocket == false, nothing happens. Otherwise simply disconnects.
     ConnectToSignalServer(url, overrideSocket = false) {
+        Log.Debug("Connecting with URL " + url);
         if (this.isConnected) {
-            if (overrideSocket) {
+            if (overrideSocket || this._signalServerURL !== url) {
                 Log.Info("Overriding current signal server connection.");
+                this.server.disconnect();
             } else {
                 // Early out
                 Log.Verbose("Already connected to a signal server, ignoring call to connect to " + url);
@@ -404,6 +425,9 @@ class PeerwayAPI {
                 case "chat.message":
                     this._OnChatMessage(json);
                     break;
+                default:
+                    this.emit(json.type, json);
+                    break;
             }
         }
     };
@@ -453,19 +477,19 @@ class PeerwayAPI {
     _OnChatRequest(data) {
         // TODO notify and let user accept or reject
         // TODO REMOVE THIS DEBUG CODE BEFORE RELEASE
-        alert("Received chat request from peer." + data.from);
         Database.CreateChat(data.members, {
             id: data.chatId,
             name: data.name,
             icon: data.icon,
             updated: data.updated
         });
+        this.emit("chat.request", data);
     }
 
     // Handle chat message
     _OnChatMessage(data) {
         // TODO reject messages from chats that the user hasn't accepted or has blocked
-        this.onChatMessage(data);
+        this.emit("chat.message", data);
     }
 
     // Send a request to connect to a specified entity.
