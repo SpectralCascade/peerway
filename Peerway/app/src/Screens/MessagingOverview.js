@@ -49,11 +49,11 @@ export default class MessagingOverview extends Component {
         }
         this.onChatRequest = Peerway.addListener("chat.request", (data) => {
             Log.Info("Received chat request from peer." + data.from);
-            this.Refresh();
+            this.Refresh(false);
         });
     }
 
-    Refresh() {
+    Refresh(doSync = true) {
         // Load up cached chats
         let chatIds = [];
         // Metadata about chats for syncing purposes
@@ -69,11 +69,13 @@ export default class MessagingOverview extends Component {
                 let meta = JSON.parse(Database.active.getString("chat." + id));
 
                 // Add relevant data required for syncing
-                chatSyncMeta.push({
-                    id: id,
-                    received: meta.received,
-                    updated: meta.updated
-                });
+                if (doSync) {
+                    chatSyncMeta.push({
+                        id: id,
+                        received: meta.received,
+                        updated: meta.updated
+                    });
+                }
 
                 // Create a chat entry for the UI
                 this.state.chats.push({
@@ -92,13 +94,15 @@ export default class MessagingOverview extends Component {
             }
         }
 
-        // Connect to peers to update chats
-        // TODO only synchronise messages, not feeds
-        Peerway.SyncPeers({
-            config: {
-                chats: chatSyncMeta
-            }
-        });
+        if (doSync) {
+            // Connect to peers to update chats
+            // TODO only synchronise messages, not feeds
+            Peerway.SyncPeers({
+                config: {
+                    chats: chatSyncMeta
+                }
+            });
+        }
 
         this.forceUpdate();
     }
