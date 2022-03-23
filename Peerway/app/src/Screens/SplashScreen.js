@@ -11,14 +11,12 @@ import StyleMain from '../Stylesheets/StyleMain';
 export default class SplashScreen extends React.Component {
 
     OpenSetup() {
-        setTimeout(() => {
-            this.props.navigation.dispatch(
-                CommonActions.reset({
-                    index: 1,
-                    routes: [{ name: 'Setup' }]
-                })
-            );
-        }, 1000);
+        this.props.navigation.dispatch(
+            CommonActions.reset({
+                index: 1,
+                routes: [{ name: 'Setup' }]
+            })
+        );
     }
 
     onOpen() {
