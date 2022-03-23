@@ -42,7 +42,6 @@ const StyleMain = StyleSheet.create({
         backgroundColor: "#000"
     },
     logo: {
-        width: dimensions.width / 2,
     },
     logoContainer: {
         flex: 1,
