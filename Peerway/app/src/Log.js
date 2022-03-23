@@ -35,7 +35,7 @@
     
     static Error(data) {
         if (this.enabled.error) {
-            console.log("Error: " + data);
+            console.log("ERROR: " + data);
         }
     }
 }

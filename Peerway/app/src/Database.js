@@ -1,10 +1,12 @@
 import 'react-native-get-random-values';
-import { MMKV, useMMKVObject } from 'react-native-mmkv';
+import 'react-native-quick-sqlite';
+import { MMKV } from 'react-native-mmkv';
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import AppKeys from './AppKeys';
 import RNFS from "react-native-fs";
 import { Log } from './Log';
 import { Buffer } from 'buffer';
+import Constants from './Constants';
 
 // This entity example shows what the different key-value fields are used for.
 // Note that the actual storage stores non-primitive objects as JSON strings.
@@ -93,11 +95,19 @@ export default class Database {
     static entities = {};
     static active = null;
 
+    // Name of the open SQLite database.
+    static db = null;
+
     // Local user data, tracking entities and general app settings.
     static userdata = new MMKV({ id: "userdata", encryptionKey: AppKeys.userdata });
 
     // Changes the current active entity storage slot.
     static SwitchActiveEntity(id) {
+        if (this.db) {
+            sqlite.close(this.db);
+            this.db = null;
+        }
+
         if (id == null || id == "") {
             this.userdata.set("active", "");
             this.active = null;
@@ -113,6 +123,14 @@ export default class Database {
                 });
             }
             this.active = this.entities[id];
+            // Open SQLite database
+            let location = RNFS.DocumentDirectoryPath;
+            let result = sqlite.open(id, location);
+            if (result.status) {
+                Log.Error("Failed to open SQLite database " + id + " at " + location);
+            } else {
+                this.db = id;
+            }
         }
         return this.active;
     }
@@ -137,6 +155,73 @@ export default class Database {
 
         // Add entity to userdata.
         this.userdata.set(id, key);
+
+        // Setup SQLite database tables
+        let location = RNFS.DocumentDirectoryPath;
+        let result = sqlite.open(id, location);
+        if (result.status) {
+            Log.Error("Failed to open SQLite database " + id + " at " + location);
+        } else {
+            // Setup the database tables
+            let commands = [
+                // Table of peers
+                ["CREATE TABLE IF NOT EXISTS " + "Peers" + "(" +
+                    "PeerID TEXT PRIMARY KEY," + // Peer UUID
+                    "Name TEXT," + // The name of this peer
+                    "Mutual INTEGER," + // Is this peer a mutual?
+                    "Blocked INTEGER," + // Is this peer blocked?
+                    "Sync TEXT," + // When the last sync took place; UTC timestamp in ISO-8601 format
+                    "Verifier TEXT" + // Digital signature verification key
+                ")"],
+                // Table of chats
+                ["CREATE TABLE IF NOT EXISTS " + "Chats" + "(" +
+                    "ChatID TEXT PRIMARY KEY," + // Chat UUID
+                    "Name TEXT," + // Name of this chat
+                    "Read INTEGER," + // Has this chat been read by the user?
+                    "Muted INTEGER," + // Is this chat muted?
+                    "Blocked INTEGER," + // Is this chat blocked?
+                    "LastChatID TEXT" + // UUID of the last message sent/received in this chat
+                ")"],
+                // Table linking many peers to many chats
+                ["CREATE TABLE IF NOT EXISTS " + "ChatMembers" + "(" +
+                    "ChatID TEXT," + // Chat UUID
+                    "PeerID TEXT," + // Peer UUID
+                    "PRIMARY KEY (ChatID, PeerID)," + // Composite primary key
+                    "FOREIGN KEY (ChatID) " +
+                        "REFERENCES Chats (ChatID) " +
+                            "ON DELETE CASCADE " +
+                            "ON UPDATE NO ACTION," +
+                    "FOREIGN KEY (PeerID) " + 
+                        "REFERENCES Peers (PeerID) " +
+                            "ON DELETE CASCADE " +
+                            "ON UPDATE NO ACTION" +
+                ")"],
+                // Table of many messages each linked to a particular chat
+                ["CREATE TABLE IF NOT EXISTS " + "Messages" + "(" +
+                    "ChatID TEXT," + // Chat UUID
+                    "ID TEXT," + // Message UUID
+                    "PeerID TEXT" + // Sender UUID
+                    "Created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
+                    "Content TEXT," + // Text content
+                    "Attached TEXT," + // Attached media filenames
+                    "PRIMARY KEY (ChatID, ID)" + // Composite primary key
+                    "FOREIGN KEY (ChatID) " +
+                        "REFERENCES Chats (ChatID) " +
+                            "ON DELETE CASCADE " +
+                            "ON UPDATE NO ACTION" +
+                ")"]
+                // TODO table of posts
+            ];
+
+            let result = sqlite.executeSqlBatch(id, commands);
+            if (result.status) {
+                Log.Error("Failed to setup database tables");
+            } else {
+                Log.Debug("Setup database tables successfully.");
+            }
+
+            sqlite.close(id);
+        }
 
         return id;
     }
