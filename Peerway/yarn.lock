@@ -5687,6 +5687,11 @@
   dependencies:
     "prop-types" "^15.7.x"
 
+"react-native-quick-sqlite@^3.0.2":
+  "integrity" "sha512-m48kRGGfZPU5SonxbX++xBIh2d7ATcG7U3W9Ck/MkscHqx+0B0oXubHrK33Qe/4Dv/dGW/KI4ubaz+nJvfHFQw=="
+  "resolved" "https://registry.npmjs.org/react-native-quick-sqlite/-/react-native-quick-sqlite-3.0.2.tgz"
+  "version" "3.0.2"
+
 "react-native-safe-area-context@>= 3.0.0", "react-native-safe-area-context@3.3.2":
   "integrity" "sha512-yOwiiPJ1rk+/nfK13eafbpW6sKW0jOnsRem2C1LPJjM3tfTof6hlvV5eWHATye3XOpu2cJ7N+HdkUvUDGwFD2Q=="
   "resolved" "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-3.3.2.tgz"
