@@ -89,6 +89,35 @@ const ExampleEntity = {
     }
 };
 
+// Automagically converts string into an SQL escaped single quote wrapped string.
+// Non-strings are unaffected by this function.
+function wrapSQL(value) {
+    if (typeof(value) === "string") {
+        // Escape single quotes
+        let escaped = "";
+        for (let i = 0, counti = value.length; i < counti; i++) {
+            if (value[i] === "'") {
+                escaped += "'";
+            }
+            escaped += value[i];
+        }
+        return "'" + value + "'";
+    }
+    return value;
+}
+
+// Get comma separated list of values from keys
+// Helper for SQL statements
+function ToCSV(obj, keys) {
+    let sql = keys[0] in obj ? wrapSQL(obj[keys[0]]) : "";
+    for (let i = 1, counti = keys.length; i < counti; i++) {
+        if (keys[i] in obj) {
+            sql += ", " + wrapSQL(obj[keys[i]]);
+        }
+    }
+    return sql;
+}
+
 export default class Database {
 
     // All entities, by entity ID.
@@ -145,7 +174,6 @@ export default class Database {
         // In future, this could be a user password or pin instead of RNG UUID.
         let key = uuidv4();
 
-        //console.log("Created id " + id + " and key: " + key);
         // Create new entity storage slot
         this.entities[id] = new MMKV({
             id: id,
@@ -166,47 +194,48 @@ export default class Database {
             let commands = [
                 // Table of peers
                 ["CREATE TABLE IF NOT EXISTS " + "Peers" + "(" +
-                    "PeerID TEXT PRIMARY KEY," + // Peer UUID
-                    "Name TEXT," + // The name of this peer
-                    "Mutual INTEGER," + // Is this peer a mutual?
-                    "Blocked INTEGER," + // Is this peer blocked?
-                    "Sync TEXT," + // When the last sync took place; UTC timestamp in ISO-8601 format
-                    "Verifier TEXT" + // Digital signature verification key
+                    "id TEXT PRIMARY KEY," + // Peer UUID
+                    "name TEXT," + // The name of this peer
+                    "mutual INTEGER," + // Is this peer a mutual?
+                    "blocked INTEGER," + // Is this peer blocked?
+                    "sync TEXT," + // Time of last sync; UTC timestamp in ISO-8601 format
+                    "interaction TEXT," + // Time of last interaction; UTC timestamp in ISO-8601 format
+                    "verifier TEXT" + // Digital signature verification key
                 ")"],
                 // Table of chats
                 ["CREATE TABLE IF NOT EXISTS " + "Chats" + "(" +
-                    "ChatID TEXT PRIMARY KEY," + // Chat UUID
-                    "Name TEXT," + // Name of this chat
-                    "Read INTEGER," + // Has this chat been read by the user?
-                    "Muted INTEGER," + // Is this chat muted?
-                    "Blocked INTEGER," + // Is this chat blocked?
-                    "LastChatID TEXT" + // UUID of the last message sent/received in this chat
+                    "id TEXT PRIMARY KEY," + // Chat UUID
+                    "name TEXT," + // Name of this chat
+                    "read INTEGER," + // Has this chat been read by the user?
+                    "muted INTEGER," + // Is this chat muted?
+                    "blocked INTEGER," + // Is this chat blocked?
+                    "lastMessage TEXT" + // UUID of the last message sent/received in this chat
                 ")"],
                 // Table linking many peers to many chats
                 ["CREATE TABLE IF NOT EXISTS " + "ChatMembers" + "(" +
-                    "ChatID TEXT," + // Chat UUID
-                    "PeerID TEXT," + // Peer UUID
-                    "PRIMARY KEY (ChatID, PeerID)," + // Composite primary key
-                    "FOREIGN KEY (ChatID) " +
-                        "REFERENCES Chats (ChatID) " +
+                    "chat TEXT," + // Chat UUID
+                    "peer TEXT," + // Peer UUID
+                    "PRIMARY KEY (chat, peer)," + // Composite primary key
+                    "FOREIGN KEY (chat) " +
+                        "REFERENCES Chats (id) " +
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION," +
-                    "FOREIGN KEY (PeerID) " + 
-                        "REFERENCES Peers (PeerID) " +
+                    "FOREIGN KEY (peer) " + 
+                        "REFERENCES Peers (id) " +
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION" +
                 ")"],
                 // Table of many messages each linked to a particular chat
                 ["CREATE TABLE IF NOT EXISTS " + "Messages" + "(" +
-                    "ChatID TEXT," + // Chat UUID
-                    "ID TEXT," + // Message UUID
-                    "PeerID TEXT" + // Sender UUID
-                    "Created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
-                    "Content TEXT," + // Text content
-                    "Attached TEXT," + // Attached media filenames
-                    "PRIMARY KEY (ChatID, ID)" + // Composite primary key
-                    "FOREIGN KEY (ChatID) " +
-                        "REFERENCES Chats (ChatID) " +
+                    "chat TEXT," + // Chat UUID
+                    "id TEXT," + // Message UUID
+                    "peer TEXT" + // Sender UUID
+                    "created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
+                    "content TEXT," + // Text content
+                    "mime TEXT," + // MIME type of the content
+                    "PRIMARY KEY (chat, id)" + // Composite primary key
+                    "FOREIGN KEY (chat) " +
+                        "REFERENCES Chats (id) " +
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION" +
                 ")"]
@@ -217,7 +246,7 @@ export default class Database {
             if (result.status) {
                 Log.Error("Failed to setup database tables");
             } else {
-                Log.Debug("Setup database tables successfully.");
+                Log.Info("Setup database tables successfully.");
             }
 
             sqlite.close(id);
@@ -246,8 +275,9 @@ export default class Database {
     }
 
     // Create a new chat for the currently active entity with other entities.
-    // Takes a list of members (NOT including the active entity) and optional meta to copy.
+    // Takes a list of members and optional meta to copy.
     static CreateChat(members, meta={}) {
+        Log.Debug("Creating chat...");
         let isGroup = members.length > 2;
         let lastMember = members.length - 1;
 
@@ -261,24 +291,27 @@ export default class Database {
         }
         
         // Generate chat metadata
-        let timeNow = Date.now();
         let chatData = {
             id: meta.id,
-            name: "name" in meta ? meta.name : isGroup ? "group." + meta.id : members[lastMember].name,
-            members: members,
-            received: "received" in meta ? meta.received : timeNow,
-            updated: "updated" in meta ? meta.updated : timeNow,
-            read: "read" in meta ? meta.read : false,
-            muted: "muted" in meta ? meta.muted : false,
-            blocked: "blocked" in meta ? meta.blocked : false,
-            icon: "icon" in meta ? meta.icon : (isGroup ? "" : members[lastMember].avatar),
-            // Number of messages the active entity has sent in this chat
-            sent: 0,
-            // Who sent the last message?
-            lastFrom: "",
-            // The last message content
+            name: "name" in meta ? meta.name : isGroup ? "Group." + meta.id : members[lastMember].name,
+            read: "read" in meta ? meta.read : 0,
+            muted: "muted" in meta ? meta.muted : 0,
+            blocked: "blocked" in meta ? meta.blocked : 0,
             lastMessage: ""
         };
+
+        // TODO batch these SQL commands
+
+        // Create a chat entry
+        let csvData = ToCSV(chatData, ["id", "name", "read", "muted", "blocked", "lastMessage"]);
+        let query = sqlite.executeSql(
+            this.db,
+            "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage) VALUES (" +
+                csvData +
+            ")"
+        );
+
+        Log.Debug("Query = " + JSON.stringify(query));
         
         let activeId = this.active.getString("id");
         for (let i in members) {
@@ -286,19 +319,16 @@ export default class Database {
                 // Skip self
                 continue;
             }
-            let peer = this.AddPeer(members[i].id);
-            // This will be the most up-to-date data, so overwrite.
-            peer.name = members[i].name;
-            //peer.avatar = members[i].avatar;
-            this.active.set("peer." + members[i].id, JSON.stringify(peer));
-        }
+            this.AddPeer(members[i].id, {name: members[i].name});
 
-        // Create a chat entry
-        this.active.set("chat." + meta.id, JSON.stringify(chatData));
-        let chats = this.active.contains("chats") ? JSON.parse(Database.active.getString("chats")) : [];
-        // Add chat to top
-        chats = [meta.id].concat(chats);
-        this.active.set("chats", JSON.stringify(chats));
+            // Link member to chat
+            query = sqlite.executeSql(
+                this.db,
+                "INSERT INTO ChatMembers (chat,peer) VALUES ('" + meta.id + "','" + members[i].id + "')"
+            );
+            Log.Debug("Query = " + JSON.stringify(query));
+
+        }
 
         return chatData;
     }
@@ -556,55 +586,48 @@ export default class Database {
         return {};
     }
 
-    static MarkPeerInteraction(id, peers=[], index=-1) {
-        if (peers.length == 0) {
-            peers = JSON.parse(this.active.getString("peers"));
-        }
-
-        if (index < 0) {
-            index = peers.indexOf(id);
-        }
-
-        // Move to top of the list
-        // TODO: more efficient solution?
-        let bottom = peers.length > 1 ? peers.slice(index, index + 1) : [];
-        let top = peers.length > 1 ? peers.slice(0, Math.max(0, index)) : [];
-        peers = [id].concat(top.concat(bottom));
-
-        this.active.set("peers", JSON.stringify(peers));
+    static MarkPeerInteraction(id) {
+        let dateNow = new Date();
+        sqlite.executeSql(this.db,
+            "UPDATE Peers SET interaction='" + dateNow.toISOString() + "' " +
+            "WHERE id='" + id + "'"
+        );
     }
 
     // Add a peer entry to the database, if it isn't already there
-    static AddPeer(id, markInteraction=true) {
-        let peer = {};
-        let peers = [];
-        if (this.active.contains("peers")) {
-            console.log("Database contains peers array");
-            peers = JSON.parse(this.active.getString("peers"));
-        } else {
-            console.log("Database DOES NOT contain peers array");
-        }
-
-        let index = peers.indexOf(id);
-        if (index >= 0) {
-            console.log("peer." + id + " already exists, no need to add new.");
+    static AddPeer(id, peer={}, markInteraction=true) {
+        // Check if the peer already exists
+        let query = sqlite.executeSql(this.db, "SELECT * FROM Peers WHERE id='" + id + "'");
+        Log.Debug("Peer = " + JSON.stringify(query));
+        if (!query.status && "rows" in query && query.rows.length > 0) {
+            Log.Debug("peer." + id + " already exists, no need to add to database.");
             if (markInteraction) {
-                this.MarkPeerInteraction(id, peers, index);
+                this.MarkPeerInteraction(id);
             }
-            peer = JSON.parse(this.active.getString("peer." + id));
+            peer = query.rows._array[0];
         } else {
-            // Add to the front of the list
-            console.log("Adding NEW peer to list: peer." + id);
+            // Add to the database
+            Log.Debug("Adding peer." + id);
+            let dateNow = (new Date()).toISOString();
             peer = {
-                name: "",
-                avatar: "",
-                mutual: false,
-                blocked: false,
-                sync: "",
-                verifier: ""
+                id: id,
+                name: "name" in peer ? peer.name : "",
+                mutual: "mutual" in peer ? peer.mutual : 0,
+                blocked: "blocked" in peer ? peer.blocked : 0,
+                sync: "sync" in peer ? peer.sync : (new Date(0)).toISOString(),
+                interaction: "interaction" in peer ? peer.interaction : dateNow,
+                verifier: "verifier" in peer ? peer.verifier : ""
             };
-            this.active.set("peers", JSON.stringify(([id].concat(peers))));
-            this.active.set("peer." + id, JSON.stringify(peer));
+            // Insert blank peer entry
+            sqlite.executeSql(
+                this.db,
+                "INSERT INTO Peers (id,name,mutual,blocked,sync,interaction,verifier) VALUES (" +
+                    ToCSV(
+                        peer,
+                        ["id", "name", "mutual", "blocked", "sync", "interaction", "verifier"]
+                    ) +
+                ")"
+            );
         }
         return peer;
     }

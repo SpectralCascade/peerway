@@ -6,6 +6,8 @@ import RNFS from "react-native-fs";
 import Constants from "./Constants";
 import { EventEmitter } from "react-native";
 import { EventListener } from "./Components/EventListener";
+import { v1 as uuidv1 } from "uuid";
+import QuickReplies from "react-native-gifted-chat/lib/QuickReplies";
 
 // This class forms the primary API for communicating with peers
 class PeerwayAPI {
@@ -140,8 +142,9 @@ class PeerwayAPI {
     SyncPeers(options = { config: {} }) {
         this._syncConfig = options.config ? options.config : {};
         this._peersToConnect = "selectedPeers" in options ? options.selectedPeers.slice() : [];
-        if (!("selectedPeers" in options) && Database.active.contains("peers")) {
-            this._peersToConnect = JSON.parse(Database.active.getString("peers"));
+        if (!("selectedPeers" in options)) {
+            let query = sqlite.executeSql(Database.db, "SELECT id FROM Peers");
+            this._peersToConnect = "rows" in query ? query.rows._array.map(x => x.id) : [];
             Log.Debug("Ready to sync " + this._peersToConnect.length + " peer(s): " + JSON.stringify(this._peersToConnect));
         }
         for (let i in this._peersToConnect) {
@@ -151,13 +154,14 @@ class PeerwayAPI {
                 if (this._peers[id].connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
                 } else {
-                    /*Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
-                    this._SyncPeer(id, this._syncConfig);*/
+                    Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
+                    this._SyncPeer(id, this._syncConfig);
                 }
             } else {
                 // Get local peer metadata
                 Log.Debug("Syncing peer." + id);
-                let meta = JSON.parse(Database.active.getString("peer." + id));
+                let query = sqlite.executeSql(Database.db, "SELECT * FROM Peers WHERE id='" + id + "'");
+                let meta = query.status || query.rows.length == 0 ? {} : query.rows._array[0];
                 // Don't sync with blocked peers.
                 if (!meta.blocked) {
                     // Check with the server whether the peer is connected
@@ -186,39 +190,44 @@ class PeerwayAPI {
     */
     SendChatMessage(message) {
         // TODO load database for the "from" entity, rather than using active
-        if (Database.active.contains("chat." + message.for)) {
-            // Load the MMKV metadata
-            let meta = JSON.parse(Database.active.getString("chat." + message.for));
+        let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + message.for + "'");
+        if (!query.status && "rows" in query && query.rows.length > 0) {
+            // Load the chat data
+            let meta = query.rows._array[0];
             
-            let timeNow = Date.now();
-            Database.Store(Database.active, "chats/" + message.author + ".chat." + message.for + ".json", {
-                // Sent counter
-                id: meta.sent,
-                // Timestamp for creation in UTC milliseconds
-                created: timeNow,
-                // Has this message been edited? 0 = no, 1 = yes
-                edit: 0,
-                // Has this message been deleted? 0 = no, 1 = yes
-                del: 0,
-                // MIME type of the content
-                mime: message.mime,
-                // The actual message content
-                content: message.content
-            });
+            let timeNow = new Date();
+            let id = uuidv1();
+            sqlite.executeSql(
+                Database.db,
+                "INSERT INTO Messages (chat,id,peer,created,content,mime) VALUES ('" +
+                    meta.id + "','" + // Chat id
+                    id + "','" + // Generate an ID for this message
+                    message.author + "','" +
+                    timeNow.toISOString() + "','" +
+                    message.content + "','" + // TODO only insert text content; link to non-text content
+                    message.mime + "'" + 
+                ")"
+            );
             
-            // Update the chat metadata
-            meta.sent = meta.sent + 1;
-            meta.lastFrom = "";
+            // Update the last message sent of the chat
             meta.lastMessage = message.mime.startsWith("text") ? message.content : message.mime;
-            meta.updated = timeNow;
-            Database.active.set("chat." + message.for, JSON.stringify(meta));
+            sqlite.executeSql(
+                Database.db,
+                "UPDATE Chats SET lastMessage='" + id + "' WHERE id='" + meta.id + "'"
+            );
 
+            // Get members of the chat
             let targets = [];
-            for (let i in meta.members) {
-                if (meta.members[i] === message.author) {
+            query = sqlite.executeSql(
+                Database.db,
+                "SELECT peer FROM ChatMembers WHERE chat='" + meta.id + "'"
+            );
+            for (let i in query.rows) {
+                // Skip self
+                if (query.rows._array[i].peer === message.author) {
                     continue;
                 }
-                targets.push(meta.members[i].id);
+                targets.push(query.rows._array[i].peer);
             }
 
             // Now send out a notification to all peers in the chat
@@ -323,7 +332,7 @@ class PeerwayAPI {
 
             // Automagically sync with the peer
             if (this._syncConfig) {
-                //this._SyncPeer(id, this._syncConfig);
+                this._SyncPeer(id, this._syncConfig);
             }
         } else {
             Log.Info("Connection call state to peer." + id + " changed to: " + this._peers[id].connectionState);
@@ -443,14 +452,16 @@ class PeerwayAPI {
         // Sync chats
         if ("chats" in config) {
             for (i in config.chats) {
-                if (Database.active.contains("chat." + config.chats[i].id)) {
+                // Select chats in common
+                let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + config.chats[i].id + "'");
+                if (!query.status && "rows" in query && query.rows.length > 0) {
                     Log.Debug("Syncing chat." + config.chats[i].id);
-                    let localChat = JSON.parse(Database.active.getString("chat." + config.chats[i].id));
+                    let localChat = query.rows._array[0];
 
-                    // TODO received timestamp should be PER-ENTITY/PEER to ensure syncing is correct
+                    // TODO received timestamp should be of the last message received from the peer
 
                     // Time that the peer last received a message or change to the chat
-                    let remoteReceived = new Date(config.chats[i].received);
+                    /*let remoteReceived = new Date(config.chats[i].received);
                     // Time that the peer last sent a message or made a change to the chat
                     let remoteUpdated = new Date(config.chats[i].updated);
 
@@ -465,7 +476,7 @@ class PeerwayAPI {
                     if (localReceived < remoteReceived || localReceived < remoteUpdated) {
                         // Need to get new content from peer
                         // TODO: once syncing is done, send a sync request to the peer
-                    }
+                    }*/
                 } else {
                     Log.Debug("No such chat." + config.chats[i].id);
                 }
@@ -480,7 +491,6 @@ class PeerwayAPI {
         Database.CreateChat(data.members, {
             id: data.chatId,
             name: data.name,
-            icon: data.icon,
             updated: data.updated
         });
         this.emit("chat.request", data);
@@ -509,22 +519,16 @@ class PeerwayAPI {
     _OnConnectionRequest(peer) {
         Log.Info("Received request to connect from peer with id " + peer.local);
 
+        // Syncing may not have taken place yet
         if (this._peersToConnect.length == 0) {
-            if (Database.active.contains("peers")) {
-                // Syncing may not have taken place yet, or this entity has never interacted with peers.
-                this._peersToConnect = JSON.parse(Database.active.getString("peers"));
-            } else {
-                this._peersToConnect = [];
-            }
+            let query = sqlite.executeSql(Database.db, "SELECT id FROM Peers");
+            this._peersToConnect = "rows" in query ? query.rows._array.map(x => x.id) : [];
         }
 
         let meta = {};
-        // TODO check in JSON object - might be faster than an array.
-        if (this._peersToConnect.includes(peer.local)) {
-            meta = Database.active.getString("peer." + peer.local);
-
-            // TODO: Check peer is genuine (verify signature)
-            
+        // Check if peer has been seen before
+        let query = sqlite.executeSql(Database.db, "SELECT * FROM Peers WHERE id='" + peer.local + "'");
+        if (!query.status && "rows" in query && query.rows.length > 0) {
             // Remove from peers waiting to be connected
             let toRemove = this._peersToConnect.indexOf(peer.local);
             if (toRemove >= 0) {

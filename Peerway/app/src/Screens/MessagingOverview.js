@@ -58,15 +58,19 @@ export default class MessagingOverview extends Component {
         let chatIds = [];
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
-        if (Database.active.contains("chats")) {
-            chatIds = JSON.parse(Database.active.getString("chats"));
+        let query = sqlite.executeSql(Database.db, "SELECT id FROM Chats");
+        Log.Debug("Query = " + JSON.stringify(query));
+        if (!query.status && "rows" in query && query.rows.length > 0) {
+            chatIds = query.rows._array.map(x => x.id);
             Log.Debug("Chats = " + JSON.stringify(chatIds));
         }
         this.state.chats = [];
         for (let i in chatIds) {
             let id = chatIds[i];
-            if (Database.active.contains("chat." + id)) {
-                let meta = JSON.parse(Database.active.getString("chat." + id));
+            let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + id + "'");
+            Log.Debug("Query = " + JSON.stringify(query));
+            if (!query.status && "rows" in query && query.rows.length > 0) {
+                let meta = query.rows._array[0];
 
                 // Add relevant data required for syncing
                 if (doSync) {
@@ -86,7 +90,6 @@ export default class MessagingOverview extends Component {
                         content: meta.lastMessage,
                         timestamp: (new Date(meta.received)).toLocaleDateString("en-GB")
                     },
-                    icon: meta.icon,
                     read: meta.read
                 });
             } else {
@@ -116,11 +119,10 @@ export default class MessagingOverview extends Component {
             chat = chat != null ? this.state.chats.find((item) => item.id === chat.id) : null;
             if (chat != null) {
                 chat.read = true;
-                if (Database.active.contains("chat." + chat.id)) {
-                    let meta = JSON.parse(Database.active.getString("chat." + chat.id));
-                    meta.read = true;
-                    Database.active.set("chat." + chat.id, JSON.stringify(meta));
-                }
+                let query = sqlite.executeSql(
+                    Database.db,
+                    "UPDATE Chats SET read=1 WHERE id='" + chat.id + "'"
+                );
 
                 this.forceUpdate();
                 this.props.navigation.navigate("Chat", { chatId: chat.id });

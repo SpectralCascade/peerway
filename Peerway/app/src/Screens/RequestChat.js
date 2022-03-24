@@ -64,16 +64,12 @@ export default class RequestChat extends Component {
     // Callback when the invitations are confirmed.
     // For now this just creates a new chat
     onConfirm() {
-        // TODO REMOVE ME debug only
-        Database.active.delete("chats");
-        Database.active.delete("peers");
-
         // Create a chat entry in the database
         let activeId = Database.active.getString("id");
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
         let profile = JSON.parse(Database.active.getString("profile"));
         let meta = Database.CreateChat(
-            [{ id: activeId, name: profile.name, avatar: ""/*profile.avatar*/}].concat(selected),
+            [{ id: activeId, name: profile.name}].concat(selected),
             { read: true }
         );
 
@@ -84,14 +80,16 @@ export default class RequestChat extends Component {
         }
 
         Log.Debug("Sending chat request to peers: " + JSON.stringify(peerIds));
+
+        // TODO select from ChatMembers here
+        let members = [];
+
         Peerway.NotifyEntities(peerIds, {
             type: "chat.request",
             chatId: meta.id,
             from: activeId,
-            updated: meta.updated,
             name: meta.name,
-            icon: "",//meta.icon,
-            members: meta.members.slice()
+            members: members
         });
         console.log("Created chat with id " + meta.id);
 
