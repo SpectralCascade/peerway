@@ -64,7 +64,7 @@ export default class Chat extends React.Component {
                 });
             }
             // Set loaded timestamp to latest loaded message timestamp
-            this.state.loadedTS = query.data[query.data.length - 1].created;
+            this.state.loadedTS = query.data[0].created;
         } else {
             Log.Debug("No more messages to load.");
         }
