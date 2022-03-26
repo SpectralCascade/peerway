@@ -91,6 +91,7 @@ io.on('connection', socket => {
             // Remove from entities
             let index = entities[entityId].findIndex(entity => entity.socketId === socket.id);
             if (index >= 0) {
+                Log.Debug("Removing entity " + entityId + " at index " + index + ".Before: " + JSON.stringify(entities[entityId]));
                 entities[entityId].splice(index, 1);
             }
 
@@ -204,7 +205,7 @@ io.on('connection', socket => {
     }
     */
     socket.on("GetEntityMeta", (request) => {
-        let available = request.id in entities;
+        let available = request.id in entities && entities[request.id].length > 0;
         let meta = {
             id: request.id,
             available: available,
@@ -219,9 +220,18 @@ io.on('connection', socket => {
         socket.emit("EntityMetaResponse", meta);
     });
 
-    // Handle request to send a push notification to various target entities
+    // Handle request to send a push notification to various target entities.
     socket.on("PushNotification", (request) => {
         Log.Debug("Received push notification to forward to " + JSON.stringify(request.targets));
+        // TODO send to push notifications server
+        // For now, this will send directly to the entities if available
+        for (let i in request.targets) {
+            let id = request.targets[i];
+            if (id in entities) {
+                // Note: For time being, the first entity is used until digital signatures are supported.
+                io.to(entities[id][0].socketId).emit("PushNotification", request.notif);
+            }
+        }
     });
 
     // A peer wishes to connect to another peer.

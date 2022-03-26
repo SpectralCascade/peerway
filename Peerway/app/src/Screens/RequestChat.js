@@ -67,29 +67,27 @@ export default class RequestChat extends Component {
         // Create a chat entry in the database
         let activeId = Database.active.getString("id");
         let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
-        let profile = JSON.parse(Database.active.getString("profile"));
-        let meta = Database.CreateChat(
-            [{ id: activeId, name: profile.name}].concat(selected),
-            { read: true }
-        );
-
-        // Add peer entries when necessary
+        
+        // Get peer IDs from selected
         let peerIds = [];
         for (let i in selected) {
             peerIds.push(selected[i].id);
         }
+        let allMembers = [activeId].concat(peerIds);
+
+        let meta = Database.CreateChat(
+            allMembers,
+            { name: peerIds.length > 1 ? "Group." + meta.id : selected[selected.length - 1].name, read: 1 }
+        );
 
         Log.Debug("Sending chat request to peers: " + JSON.stringify(peerIds));
-
-        // TODO select from ChatMembers here
-        let members = [];
 
         Peerway.NotifyEntities(peerIds, {
             type: "chat.request",
             chatId: meta.id,
             from: activeId,
             name: meta.name,
-            members: members
+            members: allMembers
         });
         console.log("Created chat with id " + meta.id);
 

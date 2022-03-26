@@ -131,6 +131,7 @@ class PeerwayAPI {
         this.server.on("PeerConnectionAccepted", (socket) => { this._OnConnectionAccepted(socket); });
         this.server.on("ice-candidate", incoming => { this._OnReceivedNewCandidate(incoming); });
         this.server.on("EntityMetaResponse", (meta) => { this._OnEntityMetaResponse(meta); });
+        this.server.on("PushNotification", (notif) => { this._OnNotification(notif); });
 
         // Setup the active entity once connected
         this.server.emit("SetupEntity", entity);
@@ -143,8 +144,8 @@ class PeerwayAPI {
         this._syncConfig = options.config ? options.config : {};
         this._peersToConnect = "selectedPeers" in options ? options.selectedPeers.slice() : [];
         if (!("selectedPeers" in options)) {
-            let query = sqlite.executeSql(Database.db, "SELECT id FROM Peers");
-            this._peersToConnect = "rows" in query ? query.rows._array.map(x => x.id) : [];
+            let query = Database.Execute("SELECT id FROM Peers");
+            this._peersToConnect = query.data.length > 0 ? query.data.map(x => x.id) : [];
             Log.Debug("Ready to sync " + this._peersToConnect.length + " peer(s): " + JSON.stringify(this._peersToConnect));
         }
         for (let i in this._peersToConnect) {
@@ -160,8 +161,8 @@ class PeerwayAPI {
             } else {
                 // Get local peer metadata
                 Log.Debug("Syncing peer." + id);
-                let query = sqlite.executeSql(Database.db, "SELECT * FROM Peers WHERE id='" + id + "'");
-                let meta = query.status || query.rows.length == 0 ? {} : query.rows._array[0];
+                let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
+                let meta = query.success && query.data.length > 0 ? {} : query.data[0];
                 // Don't sync with blocked peers.
                 if (!meta.blocked) {
                     // Check with the server whether the peer is connected
@@ -190,20 +191,20 @@ class PeerwayAPI {
     */
     SendChatMessage(message) {
         // TODO load database for the "from" entity, rather than using active
-        let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + message.for + "'");
-        if (!query.status && "rows" in query && query.rows.length > 0) {
+        let query = Database.Execute("SELECT * FROM Chats WHERE id='" + message.for + "'");
+        if (query.success && query.data.length > 0) {
             // Load the chat data
-            let meta = query.rows._array[0];
+            let meta = query.data[0];
             
             let timeNow = new Date();
+            let isoTime = timeNow.toISOString();
             let id = uuidv1();
-            sqlite.executeSql(
-                Database.db,
+            Database.Execute(
                 "INSERT INTO Messages (chat,id,peer,created,content,mime) VALUES ('" +
                     meta.id + "','" + // Chat id
                     id + "','" + // Generate an ID for this message
                     message.author + "','" +
-                    timeNow.toISOString() + "','" +
+                    isoTime + "','" +
                     message.content + "','" + // TODO only insert text content; link to non-text content
                     message.mime + "'" + 
                 ")"
@@ -211,33 +212,34 @@ class PeerwayAPI {
             
             // Update the last message sent of the chat
             meta.lastMessage = message.mime.startsWith("text") ? message.content : message.mime;
-            sqlite.executeSql(
-                Database.db,
+            Database.Execute(
+                // TODO set to actual message content rather than message ID
                 "UPDATE Chats SET lastMessage='" + id + "' WHERE id='" + meta.id + "'"
             );
 
             // Get members of the chat
             let targets = [];
-            query = sqlite.executeSql(
-                Database.db,
-                "SELECT peer FROM ChatMembers WHERE chat='" + meta.id + "'"
+            query = Database.Execute(
+                "SELECT * FROM ChatMembers WHERE chat='" + meta.id + "'"
             );
-            for (let i in query.rows) {
+            for (let i = 0, counti = query.data.length; i < counti; i++) {
                 // Skip self
-                if (query.rows._array[i].peer === message.author) {
+                if (query.data[i].peer === message.author) {
                     continue;
                 }
-                targets.push(query.rows._array[i].peer);
+                targets.push(query.data[i].peer);
             }
 
             // Now send out a notification to all peers in the chat
             // TODO: ENCRYPT NOTIFICATION CONTENT
             this.NotifyEntities(targets, {
                 type: "chat.message",
+                id: id,
                 for: message.for,
                 from: message.author,
-                created: timeNow,
-                content: meta.lastMessage
+                created: isoTime,
+                content: message.content,
+                mime: message.mime
             });
         } else {
             // TODO handle error case where chat doesn't exist
@@ -418,28 +420,31 @@ class PeerwayAPI {
         });
     }
 
-    // Handle receiving data from peer.
+    // Handle receiving data from peer over WebRTC.
     _OnPeerData(event) {
         if (typeof(event.data) === "string") {
-            // Listener for receiving messages from the peer
-            let json = JSON.parse(event.data);
-            Log.Debug("Data received from peer." + json.from);
-            switch (json.type) {
-                case "sync":
-                    this._RespondToSyncRequest(json.to, json.from, json.config);
-                    break;
-                case "chat.request":
-                    this._OnChatRequest(json);
-                    break;
-                case "chat.message":
-                    this._OnChatMessage(json);
-                    break;
-                default:
-                    this.emit(json.type, json);
-                    break;
-            }
+            this._OnNotification(JSON.parse(event.data));
         }
     };
+
+    // Listener for receiving notifications from peers.
+    _OnNotification(notif) {
+        Log.Debug("Data received from peer." + notif.from);
+        switch (notif.type) {
+            case "sync":
+                this._RespondToSyncRequest(notif.to, notif.from, notif.config);
+                break;
+            case "chat.request":
+                this._OnChatRequest(notif);
+                break;
+            case "chat.message":
+                this._OnChatMessage(notif);
+                break;
+            default:
+                this.emit(notif.type, notif);
+                break;
+        }
+    }
 
     // Send data to a specified peer.
     _SendPeerData(id, data) {
@@ -453,10 +458,10 @@ class PeerwayAPI {
         if ("chats" in config) {
             for (i in config.chats) {
                 // Select chats in common
-                let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + config.chats[i].id + "'");
-                if (!query.status && "rows" in query && query.rows.length > 0) {
+                let query = Database.Execute("SELECT * FROM Chats WHERE id='" + config.chats[i].id + "'");
+                if (query.data.length > 0) {
                     Log.Debug("Syncing chat." + config.chats[i].id);
-                    let localChat = query.rows._array[0];
+                    let localChat = query.data[0];
 
                     // TODO received timestamp should be of the last message received from the peer
 
@@ -499,6 +504,26 @@ class PeerwayAPI {
     // Handle chat message
     _OnChatMessage(data) {
         // TODO reject messages from chats that the user hasn't accepted or has blocked
+        Log.Debug("Received chat message from peer." + data.from);
+
+        // Add the message to the database
+        Database.Execute(
+            "INSERT INTO Messages (chat,id,peer,created,content,mime) VALUES ('" +
+                data.for + "','" +
+                data.id + "','" +
+                data.from + "','" +
+                data.created + "','" +
+                data.content + "','" + // TODO only insert text content; link to non-text content
+                data.mime + "'" + 
+            ")"
+        );
+        
+        // Update the last message sent of the chat
+        Database.Execute(
+            // TODO set to actual message content rather than message ID
+            "UPDATE Chats SET lastMessage='" + data.id + "' WHERE id='" + data.for + "'"
+        );
+
         this.emit("chat.message", data);
     }
 
@@ -521,14 +546,14 @@ class PeerwayAPI {
 
         // Syncing may not have taken place yet
         if (this._peersToConnect.length == 0) {
-            let query = sqlite.executeSql(Database.db, "SELECT id FROM Peers");
-            this._peersToConnect = "rows" in query ? query.rows._array.map(x => x.id) : [];
+            let query = Database.Execute("SELECT id FROM Peers");
+            this._peersToConnect = query.data.map(x => x.id);
         }
 
         let meta = {};
         // Check if peer has been seen before
-        let query = sqlite.executeSql(Database.db, "SELECT * FROM Peers WHERE id='" + peer.local + "'");
-        if (!query.status && "rows" in query && query.rows.length > 0) {
+        let query = Database.Execute("SELECT * FROM Peers WHERE id='" + peer.local + "'");
+        if (query.data.length > 0) {
             // Remove from peers waiting to be connected
             let toRemove = this._peersToConnect.indexOf(peer.local);
             if (toRemove >= 0) {

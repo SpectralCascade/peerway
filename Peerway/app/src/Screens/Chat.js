@@ -14,153 +14,101 @@ export default class Chat extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            messages: [/*{
-                _id: 1,
-                text: 'Hello, world!\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nwow what a long message this is\n\n\n\n\ncrazy',
-                createdAt: new Date(),
-                user: {
-                    _id: 2,
-                    name: 'React Native',
-                    avatar: 'https://placeimg.com/140/140/any',
-                }
-            },
-            {
-                _id: 2,
-                text: 'woah\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nwoah',
-                createdAt: new Date(),
-                user: {
-                    _id: 2,
-                    name: 'React Native',
-                    avatar: 'https://placeimg.com/140/140/any',
-                }
-            }*/],
-            block: 0,
-            loadedTS: 0,
+            messages: [],
+            loadedTS: "",
             began: 0
         };
 
         // Get the chat ID
         this.chatId = props.route.params.chatId;
+        this.activeId = "";
     }
     
     GetChatDataPath() {
         return "chats/" + Database.active.getString("id") + ".chat." + this.chatId + ".json";
     }
 
-    // Load a block of messages
-    LoadMessageBlock(timestamp, index) {
-        return Database.Load(
-            Database.active,
-            this.GetChatDataPath(),
-            timestamp,
-            index
-        ).then((block) => {
-            //Log.Debug("Opened chat data file, loaded block: " + JSON.stringify(block));
-            for (let i = block.length - 1; i >= 0; i--) {
-                let item = block[i];
-                this.state.messages.push({
+    LoadMessages() {
+        Log.Debug("Attempting to load more messages...");
+
+        // Must have just opened the chat, need to initialise
+        if (this.state.loadedTS === "") {
+            Log.Debug("Initialising chat messages");
+            this.state.loadedTS = (new Date(Date.now())).toISOString();
+        }
+
+        // Get the last N messages
+        // TODO make this async
+        let query = Database.Execute(
+            "SELECT * FROM Messages " +
+                "WHERE chat='" + this.chatId + "' AND created < '" + this.state.loadedTS + "' " +
+                "ORDER BY created ASC " +
+                "LIMIT " + Constants.messagesPerLoad
+        );
+        if (query.data.length > 0) {
+            for (let i in query.data) {
+                let message = query.data[i];
+                let fromActive = message.peer === this.activeId;
+                this.state.messages.unshift({
                     _id: this.state.messages.length + 1,
                     // TODO show multimedia
-                    text: item.mime.startsWith("text") ? item.content : item.mime,
-                    createdAt: item.created,
+                    text: message.mime.startsWith("text") ? message.content : message.mime,
+                    createdAt: message.created,
                     user: {
-                        _id: 1,
-                        name: "You",
-                        // TODO use active entity avatar
+                        _id: message.peer,
+                        // TODO get actual author name
+                        name: fromActive ? "You" : message.peer,
+                        // TODO use actual entity avatar
                         avatar: "https://placeimg.com/140/140/any"
                     }
                 });
             }
-        }).catch((err) => {
-            Log.Error("Could not load messages for chat." + this.chatId + ": " + err);
-        });
-    }
-
-    LoadMessages() {
-        Log.Debug("Attempting to load more messages...");
-
-        // Must have just opened the chat, need to initialise to most recent time
-        if (this.state.loadedTS == 0) {
-            Log.Debug("Initialising chat messages");
-            // Set initial timestamp to next month, so the first loop does nothing
-            let nextMonth = new Date(Date.now());
-            nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
-            this.state.loadedTS = nextMonth.valueOf();
-            this.state.block = -1;
+            // Set loaded timestamp to latest loaded message timestamp
+            this.state.loadedTS = query.data[query.data.length - 1].created;
+        } else {
+            Log.Debug("No more messages to load.");
         }
 
-        let date = new Date(this.state.loadedTS);
-        this.state.loadedTS = date.valueOf();
-        let meta = {};
-
-        // Check if there are actually any messages
-        if (Database.active.contains(this.GetChatDataPath())) {
-            let didLoad = false;
-            while (!("blocks" in meta) && this.state.began < this.state.loadedTS) {
-                meta = Database.GetStoreMeta(Database.active, this.GetChatDataPath(), this.state.loadedTS);
-                let hasBlocks = "blocks" in meta;
-                if (this.state.block < 0) {
-                    // Start from end block
-                    this.state.block = hasBlocks ? meta.blocks.length - 1 : -1;
-                }
-
-                if (this.state.block >= 0) {
-                    // Now actually try to load the block
-                    this.LoadMessageBlock(this.state.loadedTS, this.state.block).then(() => {
-                        this.forceUpdate();
-                    });
-                    this.state.block--;
-                    if (this.state.block < 0) {
-                        date.setUTCMonth(date.getUTCMonth() - 1);
-                        this.state.loadedTS = date.valueOf();
-                    }
-                    didLoad = true;
-                    // Exit out of the loop, job here is done
-                    break;
-                } else {
-                    // Go back a month
-                    date.setUTCMonth(date.getUTCMonth() - 1);
-                    this.state.loadedTS = date.valueOf();
-                }
-            }
-
-            if (!didLoad) {
-                Log.Debug("No earlier messages to load.");
-            }
-        }
+        this.forceUpdate();
     }
 
     // Called when the screen is opened.
     OnOpen() {
         this.chatId = this.props.route.params.chatId;
         console.log("OPENED CHAT with id: " + this.chatId);
+
+        this.activeId = Database.active.getString("id");
         let key = this.GetChatDataPath();
         this.state.began = Database.active.contains(key) ?
             JSON.parse(Database.active.getString(key)).began : Date.now();
 
         // Find the most recent messages
         this.state.messages = [];
-        this.state.loadedTS = 0;
+        this.state.loadedTS = "";
         this.LoadMessages();
 
+        // Handle chat messages
         if (this.onChatMessage) {
             this.onChatMessage.remove();
         }
         this.onChatMessage = Peerway.addListener("chat.message", (message) => {
-            this.state.messages.unshift({
-                _id: this.state.messages.length + 1,
-                // TODO show multimedia
-                text: message.content,//.startsWith("text") ? message.content : message.mime,
-                createdAt: message.created,
-                user: {
-                    _id: message.from,
-                    // TODO get peer name
-                    name: message.from,
-                    // TODO get peer avatar
-                    avatar: "https://placeimg.com/140/140/any"
-                }
-            });
-            this.forceUpdate();
+            if (message.for === this.chatId) {
+                // Add the message to the UI
+                this.state.messages.unshift({
+                    _id: this.state.messages.length + 1,
+                    // TODO show multimedia
+                    text: message.content,//.startsWith("text") ? message.content : message.mime,
+                    createdAt: message.created,
+                    user: {
+                        _id: message.from,
+                        // TODO get peer name
+                        name: message.from,
+                        // TODO get peer avatar
+                        avatar: "https://placeimg.com/140/140/any"
+                    }
+                });
+                this.forceUpdate();
+            }
         });
 
         // TODO indicate that messages are loading
@@ -176,6 +124,7 @@ export default class Chat extends React.Component {
     SendMessage(message) {
         // Send the last message
         this.state.messages = GiftedChat.append(this.state.messages, message);
+        Log.Debug("Sending message " + JSON.stringify(message));
         Peerway.SendChatMessage({
             for: this.chatId,
             author: Database.active.getString("id"),
@@ -213,7 +162,7 @@ export default class Chat extends React.Component {
                     renderInputToolbar={(props) => this.RenderInputToolbar(props)}
                     onSend={(message) => this.SendMessage(message)}
                     user={{
-                        _id: 1,
+                        _id: this.activeId,
                     }}
                     scrollToBottom
                     renderActions={(props) => this.RenderActions(props)}

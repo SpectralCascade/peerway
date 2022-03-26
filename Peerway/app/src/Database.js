@@ -229,7 +229,7 @@ export default class Database {
                 ["CREATE TABLE IF NOT EXISTS " + "Messages" + "(" +
                     "chat TEXT," + // Chat UUID
                     "id TEXT," + // Message UUID
-                    "peer TEXT" + // Sender UUID
+                    "peer TEXT," + // Sender UUID
                     "created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
                     "content TEXT," + // Text content
                     "mime TEXT," + // MIME type of the content
@@ -274,12 +274,21 @@ export default class Database {
         return success;
     }
 
+    // Execute some arbitrary SQL command (synchronous)
+    static Execute(sql) {
+        Log.Debug("Executing SQL command:\n" + sql);
+        let query = sqlite.executeSql(this.db, sql);
+        if (query.status) {
+            Log.Error("Failed to execute SQL command \"" + sql + "\":\n" + query.message);
+            return { success: false, data: [] };
+        }
+        return { success: true, data: "rows" in query ? query.rows._array : [] };
+    }
+
     // Create a new chat for the currently active entity with other entities.
     // Takes a list of members and optional meta to copy.
     static CreateChat(members, meta={}) {
-        Log.Debug("Creating chat...");
-        let isGroup = members.length > 2;
-        let lastMember = members.length - 1;
+        Log.Debug("Creating chat... members = " + JSON.stringify(members));
 
         if (meta == undefined) {
             meta = {};
@@ -293,7 +302,7 @@ export default class Database {
         // Generate chat metadata
         let chatData = {
             id: meta.id,
-            name: "name" in meta ? meta.name : isGroup ? "Group." + meta.id : members[lastMember].name,
+            name: "name" in meta ? meta.name : "Untitled Chat",
             read: "read" in meta ? meta.read : 0,
             muted: "muted" in meta ? meta.muted : 0,
             blocked: "blocked" in meta ? meta.blocked : 0,
@@ -304,30 +313,24 @@ export default class Database {
 
         // Create a chat entry
         let csvData = ToCSV(chatData, ["id", "name", "read", "muted", "blocked", "lastMessage"]);
-        let query = sqlite.executeSql(
-            this.db,
+        this.Execute(
             "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage) VALUES (" +
                 csvData +
             ")"
         );
-
-        Log.Debug("Query = " + JSON.stringify(query));
         
         let activeId = this.active.getString("id");
         for (let i in members) {
-            if (members[i].id === activeId) {
+            if (members[i] === activeId) {
                 // Skip self
                 continue;
             }
-            this.AddPeer(members[i].id, {name: members[i].name});
+            this.AddPeer(members[i]);
 
             // Link member to chat
-            query = sqlite.executeSql(
-                this.db,
-                "INSERT INTO ChatMembers (chat,peer) VALUES ('" + meta.id + "','" + members[i].id + "')"
+            this.Execute(
+                "INSERT INTO ChatMembers (chat,peer) VALUES ('" + meta.id + "','" + members[i] + "')"
             );
-            Log.Debug("Query = " + JSON.stringify(query));
-
         }
 
         return chatData;
@@ -351,244 +354,9 @@ export default class Database {
         return date.getUTCFullYear().toString() + "/" + date.getUTCMonth().toString();
     }
 
-    // Store some syncable JSON content in a big data file.
-    // Every 50 messages, start a new index pointer, based partly on very crude estimate of
-    // 100 billion daily messages / 2 billion users for WhatsApp
-    // https://techcrunch.com/2020/10/29/whatsapp-is-now-delivering-roughly-100-billion-messages-a-day/
-    static Store(mmkv, path, data, itemsPerBlock = 50) {
-        // Get full path
-        let key = path;
-        path = RNFS.DocumentDirectoryPath + "/" + path;
-
-        // Function to append the data
-        const Append = () => {
-            Log.Debug("Appending data to store...");
-
-            // Update the index first
-            // Broad phase indexing by month and year, then by every itemsPerBlock block
-            let createdOn = "created" in data ? new Date(data.created) : Date.now();
-            let storeTime = this.GetMonthYearTS(createdOn);
-            let lookup = mmkv.contains(key) ? JSON.parse(mmkv.getString(key)) : {
-                // Identical to the timestamp of the first message
-                began: createdOn.valueOf(),
-                // Number of bytes used by the file
-                bytes: 0,
-                // Total items in the entire file
-                items: 0,
-                // The total number of blocks
-                blocks: 0,
-                // Array indexed by year and month. E.g. if start = "2022/3" then that corresponds to
-                // index 0, "2022/4" corresponds to index 1, "2022/12" corresponds to index 9 etc.
-                index: [],
-                // Corresponding array keeps track of the number of blocks per month
-                bpm: []
-            };
-
-            let currentIndex = this.GetLookupMonthIndex(
-                this.GetMonthYearTS(new Date(lookup.began)),
-                storeTime
-            );
-            let previousIndex = Math.max(0, lookup.index.length - 1);
-            while (lookup.index.length <= currentIndex) {
-                lookup.index.push({});
-                lookup.bpm.push(0);
-            }
-
-            let fileBuffer = "";
-
-            // Now add the inner block pointers
-            if (!("start" in lookup.index[currentIndex])) {
-                lookup.index[currentIndex] = {
-                    // Byte position pointer to this part of the file
-                    start: lookup.bytes,
-                    // Byte end position of this part of the file
-                    end: lookup.bytes,
-                    // Number of items for this month of the year
-                    items: 0,
-                    // Array of blocks, of max size itemsPerBlock items. Initialise with one block.
-                    blocks: [{
-                        // The cumulative relative byte position of this block
-                        pos: 0,
-                        // The size of this block in bytes, always includes wrapping [] brackets
-                        len: 1,
-                        // The number of items in this block, up to itemsPerBlock
-                        items: 0
-                    }],
-                };
-                lookup.bpm[currentIndex]++;
-                lookup.blocks++;
-
-                // Close off previous index array block
-                if (currentIndex > 0 && "items" in lookup.index[previousIndex] && lookup.index[previousIndex].items > 0) {
-                    lookup.index[previousIndex].end++;
-                    lookup.index[previousIndex].blocks[lookup.index[previousIndex].blocks.length - 1].len++;
-                    lookup.index[currentIndex].start++;
-                    lookup.index[currentIndex].end++;
-                    lookup.bytes++;
-                    fileBuffer += "]";
-                }
-
-                // Start a new block in the file
-                lookup.bytes++;
-                fileBuffer += "[";
-            }
-
-            // Raw data to be appended to the file
-            let blockIndex = lookup.index[currentIndex].blocks.length - 1;
-            let raw = (lookup.index[currentIndex].blocks[blockIndex].items > 0 ? "," : "") + JSON.stringify(data);
-            let bytes = Buffer.byteLength(raw, 'utf8');
-
-            // Add the item to the block
-            lookup.index[currentIndex].items++;
-            lookup.index[currentIndex].end += bytes;
-            lookup.index[currentIndex].blocks[blockIndex].items++;
-            lookup.index[currentIndex].blocks[blockIndex].len += bytes;
-
-            // Add to buffer
-            lookup.bytes += bytes;
-            fileBuffer += raw;
-
-            // Add a new block for next time
-            if (lookup.index[currentIndex].blocks[blockIndex].items >= itemsPerBlock) {
-                // Close off previous block and start a new one
-                lookup.index[currentIndex].end++;
-                lookup.index[currentIndex].blocks[blockIndex].len++;
-                lookup.bytes += 2;
-                fileBuffer += "][";
-                
-                lookup.index[currentIndex].blocks.push({
-                    pos: lookup.index[currentIndex].blocks[blockIndex].pos +
-                            lookup.index[currentIndex].blocks[blockIndex].len,
-                    len: 1,
-                    items: 0
-                });
-                lookup.bpm[currentIndex]++;
-                lookup.blocks++;
-            }
-
-            // Append the actual data to the file
-            RNFS.appendFile(path, fileBuffer, 'utf8').then((success) => {
-                Log.Debug("Finished appending file at path: " + path);
-                // Finally, save the index
-                mmkv.set(key, JSON.stringify(lookup));
-            }).catch((err) => {
-                Log.Error("Failed to append to file. " + err);
-            });
-
-        };
-
-        RNFS.exists(path).then((exists) => {
-            if (!exists) {
-                const CreateStore = () => {
-                    // Create a file
-                    Log.Info("Creating new file at " + path);
-                    RNFS.writeFile(path, "", 'utf8').then(() => {
-                        Log.Info("Finished creating file at path: " + path);
-                        Append();
-                    }).catch((err) => {
-                        Log.Error("Failed to create file. " + err);
-                    });
-                }
-
-                let sepIndex = path.lastIndexOf('/');
-                if (sepIndex >= 0) {
-                    // Make path if it doesn't already exist
-                    let dir = path.substr(0, sepIndex);
-                    RNFS.mkdir(dir).then(() => {
-                        Log.Info("Created directory \"" + dir + "\"");
-                        CreateStore();
-                    }).catch((err) => {
-                        Log.Error("Failed to execute mkdir. " + err);
-                    });
-                } else {
-                    CreateStore();
-                }
-                
-            } else {
-                Append();
-            }
-        }).catch((err) => {
-            Log.Error(err);
-        });
-    }
-
-    // Load a block of stored data in the same month as the given timestamp.
-    // Specify which block from that month you wish to load (e.g. block 0, block 1, block n).
-    // Promise returns the block as an array on success.
-    static Load(mmkv, path, timestamp, block) {
-        let key = path;
-        path = RNFS.DocumentDirectoryPath + "/" + path;
-        return RNFS.exists(path).then((exists) => {
-            if (!exists || !mmkv.contains(key)) {
-                throw new Error("Data and/or index does not exist for " + path);
-            }
-        }).then(() => {
-            let lookup = JSON.parse(mmkv.getString(key));
-            let date = new Date(timestamp);
-            let month = this.GetMonthYearTS(date);
-            let monthIndex = this.GetLookupMonthIndex(
-                this.GetMonthYearTS(new Date(lookup.began)),
-                month
-            );
-            
-            if (monthIndex < lookup.index.length && monthIndex >= 0 && "blocks" in lookup.index[monthIndex]) {
-                let totalBlocks = lookup.index[monthIndex].blocks.length;
-                if (block >= totalBlocks || block < 0) {
-                    return new Promise(function(resolve, reject) {
-                        Log.Debug(JSON.stringify(lookup.index[monthIndex]));
-                        reject(
-                            "Block " + block + " does not exist, total blocks in month " + month +
-                            " is " + totalBlocks
-                        );
-                    });
-                }
-                Log.Debug("Loading from file at path " + path);
-                // Read the data and then parse into an array
-                return RNFS.read(
-                    path,
-                    lookup.index[monthIndex].blocks[block].len,
-                    lookup.index[monthIndex].start + lookup.index[monthIndex].blocks[block].pos,
-                    'utf8'
-                ).then((raw) => {
-                    Log.Debug("INDEX DATA FILE:\n\n" + JSON.stringify(lookup) + "\n\n");
-                    //Log.Debug("RAW BLOCK DATA FROM FILE:\n\n" + raw + "\n\n");
-                    return new Promise(function(resolve, reject) {
-                        // The last block written may not be finished, so may need an end bracket
-                        if (!raw.endsWith("]")) {
-                            raw += "]";
-                        }
-                        resolve(JSON.parse(raw));
-                    });
-                });
-            } else {
-                // Nothing available in this month
-                Log.Debug("Nothing to load in block " + block + " for month " + month + " (date: " + date.toString() + ")" + " month index = " + monthIndex);
-                return new Promise(function(resolve, reject) { resolve([]); });
-            }
-        });
-    };
-
-    // Get the blocks metadata for the month of the given timestamp
-    static GetStoreMeta(mmkv, path, timestamp) {
-        if (!mmkv.contains(path)) {
-            return {};
-        }
-        let lookup = JSON.parse(mmkv.getString(path));
-        let date = new Date(timestamp);
-        let month = this.GetMonthYearTS(date);
-        let monthIndex = this.GetLookupMonthIndex(
-            this.GetMonthYearTS(new Date(lookup.began)),
-            month
-        );
-        if (monthIndex < lookup.index.length && monthIndex >= 0 && "blocks" in lookup.index[monthIndex]) {
-            return lookup.index[monthIndex];
-        }
-        return {};
-    }
-
     static MarkPeerInteraction(id) {
         let dateNow = new Date();
-        sqlite.executeSql(this.db,
+        this.Execute(
             "UPDATE Peers SET interaction='" + dateNow.toISOString() + "' " +
             "WHERE id='" + id + "'"
         );
@@ -597,14 +365,13 @@ export default class Database {
     // Add a peer entry to the database, if it isn't already there
     static AddPeer(id, peer={}, markInteraction=true) {
         // Check if the peer already exists
-        let query = sqlite.executeSql(this.db, "SELECT * FROM Peers WHERE id='" + id + "'");
-        Log.Debug("Peer = " + JSON.stringify(query));
-        if (!query.status && "rows" in query && query.rows.length > 0) {
+        let query = this.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
+        if (query.data.length > 0) {
             Log.Debug("peer." + id + " already exists, no need to add to database.");
             if (markInteraction) {
                 this.MarkPeerInteraction(id);
             }
-            peer = query.rows._array[0];
+            peer = query.data[0];
         } else {
             // Add to the database
             Log.Debug("Adding peer." + id);
@@ -619,8 +386,7 @@ export default class Database {
                 verifier: "verifier" in peer ? peer.verifier : ""
             };
             // Insert blank peer entry
-            sqlite.executeSql(
-                this.db,
+            this.Execute(
                 "INSERT INTO Peers (id,name,mutual,blocked,sync,interaction,verifier) VALUES (" +
                     ToCSV(
                         peer,

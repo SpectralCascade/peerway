@@ -58,19 +58,16 @@ export default class MessagingOverview extends Component {
         let chatIds = [];
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
-        let query = sqlite.executeSql(Database.db, "SELECT id FROM Chats");
-        Log.Debug("Query = " + JSON.stringify(query));
-        if (!query.status && "rows" in query && query.rows.length > 0) {
-            chatIds = query.rows._array.map(x => x.id);
-            Log.Debug("Chats = " + JSON.stringify(chatIds));
+        let query = Database.Execute("SELECT id FROM Chats");
+        if (query.data.length > 0) {
+            chatIds = query.data.map(x => x.id);
         }
         this.state.chats = [];
         for (let i in chatIds) {
             let id = chatIds[i];
-            let query = sqlite.executeSql(Database.db, "SELECT * FROM Chats WHERE id='" + id + "'");
-            Log.Debug("Query = " + JSON.stringify(query));
-            if (!query.status && "rows" in query && query.rows.length > 0) {
-                let meta = query.rows._array[0];
+            let query = Database.Execute("SELECT * FROM Chats WHERE id='" + id + "'");
+            if (query.data.length > 0) {
+                let meta = query.data[0];
 
                 // Add relevant data required for syncing
                 if (doSync) {
@@ -119,8 +116,7 @@ export default class MessagingOverview extends Component {
             chat = chat != null ? this.state.chats.find((item) => item.id === chat.id) : null;
             if (chat != null) {
                 chat.read = true;
-                let query = sqlite.executeSql(
-                    Database.db,
+                Database.Execute(
                     "UPDATE Chats SET read=1 WHERE id='" + chat.id + "'"
                 );
 
