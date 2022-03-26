@@ -91,7 +91,6 @@ io.on('connection', socket => {
             // Remove from entities
             let index = entities[entityId].findIndex(entity => entity.socketId === socket.id);
             if (index >= 0) {
-                Log.Debug("Removing entity " + entityId + " at index " + index + ".Before: " + JSON.stringify(entities[entityId]));
                 entities[entityId].splice(index, 1);
             }
 

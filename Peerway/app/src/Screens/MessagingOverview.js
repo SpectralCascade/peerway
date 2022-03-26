@@ -30,10 +30,12 @@ export default class MessagingOverview extends Component {
         this.state = {
             chats: []
         }
+        this.activeId = "";
     }
 
     // Callback on navigating to this screen.
     OnOpen() {
+        this.activeId = Database.active.getString("id");
         Log.Debug("OPENED MESSAGING OVERVIEW");
         Peerway.ConnectToSignalServer(
             Database.userdata.contains("SignalServerURL") ?
@@ -78,13 +80,21 @@ export default class MessagingOverview extends Component {
                     });
                 }
 
+                // Get last message
+                query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
+                let lastMessage = query.data.length > 0 ? query.data[0] : { from: "", content: "", mime: "" };
+                // Get peer who sent last message
+                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
+                let peer = query.data.length > 0 ? query.data[0] : {};
+
                 // Create a chat entry for the UI
+                Log.Debug("Chat last message content = " + lastMessage.from);
                 this.state.chats.push({
                     id: id,
                     name: meta.name,
                     message: {
-                        from: meta.lastFrom,
-                        content: meta.lastMessage,
+                        from: lastMessage.from === this.activeId ? "You: " : (peer.name ? peer.name + ": " : ""),
+                        content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
                         timestamp: (new Date(meta.received)).toLocaleDateString("en-GB")
                     },
                     read: meta.read
