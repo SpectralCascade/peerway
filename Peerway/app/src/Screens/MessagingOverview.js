@@ -95,7 +95,7 @@ export default class MessagingOverview extends Component {
                     message: {
                         from: lastMessage.from === this.activeId ? "You: " : (peer.name ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
-                        timestamp: (new Date(meta.received)).toLocaleDateString("en-GB")
+                        timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
                     },
                     read: meta.read
                 });
