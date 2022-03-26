@@ -2,8 +2,6 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Actions, GiftedChat, InputToolbar } from 'react-native-gifted-chat'
 import StyleMain from '../Stylesheets/StyleMain';
-import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc'
-import { io } from "socket.io-client";
 import HandleEffect from '../Components/HandleEffect';
 import Database from '../Database';
 import Constants from '../Constants';
@@ -42,14 +40,14 @@ export default class Chat extends React.Component {
         let query = Database.Execute(
             "SELECT * FROM Messages " +
                 "WHERE chat='" + this.chatId + "' AND created < '" + this.state.loadedTS + "' " +
-                "ORDER BY created ASC " +
+                "ORDER BY created DESC " +
                 "LIMIT " + Constants.messagesPerLoad
         );
         if (query.data.length > 0) {
             for (let i in query.data) {
                 let message = query.data[i];
                 let fromActive = message.peer === this.activeId;
-                this.state.messages.unshift({
+                this.state.messages.push({
                     _id: this.state.messages.length + 1,
                     // TODO show multimedia
                     text: message.mime.startsWith("text") ? message.content : message.mime,
@@ -64,7 +62,7 @@ export default class Chat extends React.Component {
                 });
             }
             // Set loaded timestamp to latest loaded message timestamp
-            this.state.loadedTS = query.data[0].created;
+            this.state.loadedTS = query.data[query.data.length - 1].created;
         } else {
             Log.Debug("No more messages to load.");
         }
@@ -93,6 +91,9 @@ export default class Chat extends React.Component {
         }
         this.onChatMessage = Peerway.addListener("chat.message", (message) => {
             if (message.for === this.chatId) {
+                // Automatically mark as read
+                Database.Execute("UPDATE Chats SET read=" + 1 + " WHERE id='" + this.chatId + "'");
+
                 // Add the message to the UI
                 this.state.messages.unshift({
                     _id: this.state.messages.length + 1,
@@ -115,6 +116,7 @@ export default class Chat extends React.Component {
     }
 
     OnClose() {
+        Log.Debug("CLOSING CHAT");
         if (this.onChatMessage) {
             this.onChatMessage.remove();
             this.onChatMessage = null;
@@ -150,10 +152,8 @@ export default class Chat extends React.Component {
     render() {
         return (
             <View style={StyleMain.background}>
-                {/* Handles screen opening callback */}
-                <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => this.OnOpen()}/>
-                {/* Handles screen closing callback */}
-                <HandleEffect navigation={this.props.navigation} effect="blue" callback={() => this.OnClose()}/>
+                <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
+                <HandleEffect navigation={this.props.navigation} effect="blur" callback={() => { this.OnClose() }}/>
 
                 {/* Setup the chat component */}
                 <GiftedChat

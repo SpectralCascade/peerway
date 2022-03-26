@@ -76,6 +76,14 @@ class PeerwayAPI {
         }
     }
 
+    removeAllListeners(eventType) {
+        if (eventType in this._events) {
+            Object.keys(this._events[eventType]).forEach((key) => {
+                delete this._events[eventType][key];
+            });
+        }
+    }
+
     //
     // "Public" API methods
     //
@@ -192,7 +200,7 @@ class PeerwayAPI {
     SendChatMessage(message) {
         // TODO load database for the "from" entity, rather than using active
         let query = Database.Execute("SELECT * FROM Chats WHERE id='" + message.for + "'");
-        if (query.success && query.data.length > 0) {
+        if (query.data.length > 0) {
             // Load the chat data
             let meta = query.data[0];
             
@@ -213,7 +221,6 @@ class PeerwayAPI {
             // Update the last message sent of the chat
             meta.lastMessage = message.mime.startsWith("text") ? message.content : message.mime;
             Database.Execute(
-                // TODO set to actual message content rather than message ID
                 "UPDATE Chats SET lastMessage='" + id + "' WHERE id='" + meta.id + "'"
             );
 
@@ -520,8 +527,7 @@ class PeerwayAPI {
         
         // Update the last message sent of the chat
         Database.Execute(
-            // TODO set to actual message content rather than message ID
-            "UPDATE Chats SET lastMessage='" + data.id + "' WHERE id='" + data.for + "'"
+            "UPDATE Chats SET lastMessage='" + data.id + "', read=" + 0 + " WHERE id='" + data.for + "'"
         );
 
         this.emit("chat.message", data);

@@ -45,14 +45,28 @@ export default class MessagingOverview extends Component {
         
         this.Refresh();
 
-        // Handle request from a peer to chat
-        if (this.onChatRequest) {
-            this.onChatRequest.remove();
-        }
+        // Handle all chat related events
+        Peerway.removeAllListeners("chat.request");
+        Peerway.removeAllListeners("chat.message");
         this.onChatRequest = Peerway.addListener("chat.request", (data) => {
             Log.Info("Received chat request from peer." + data.from);
             this.Refresh(false);
         });
+        this.onChatMessage = Peerway.addListener("chat.message", (data) => {
+            this.Refresh(false);
+        });
+    }
+
+    OnClose() {
+        Log.Debug("CLOSING MESSAGING OVERVIEW");
+        if (this.onChatRequest) {
+            this.onChatRequest.remove();
+            this.onChatRequest = null;
+        }
+        if (this.onChatMessage) {
+            this.onChatMessage.remove();
+            this.onChatMessage = null;
+        }
     }
 
     Refresh(doSync = true) {
@@ -82,18 +96,17 @@ export default class MessagingOverview extends Component {
 
                 // Get last message
                 query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
-                let lastMessage = query.data.length > 0 ? query.data[0] : { from: "", content: "", mime: "" };
+                let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
                 // Get peer who sent last message
-                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
+                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.peer + "'");
                 let peer = query.data.length > 0 ? query.data[0] : {};
 
                 // Create a chat entry for the UI
-                Log.Debug("Chat last message content = " + lastMessage.from);
                 this.state.chats.push({
                     id: id,
                     name: meta.name,
                     message: {
-                        from: lastMessage.from === this.activeId ? "You: " : (peer.name ? peer.name + ": " : ""),
+                        from: lastMessage.peer === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
                         timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
                     },
@@ -143,6 +156,7 @@ export default class MessagingOverview extends Component {
             <SafeAreaView style={StyleMain.background}>
                 
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
+                <HandleEffect navigation={this.props.navigation} effect="blur" callback={() => { this.OnClose() }}/>
 
                 <View style={styles.topbar}>
                     <TouchableOpacity style={[styles.menuButton]}>
