@@ -43,7 +43,7 @@ export default class ProfileEdit extends React.Component {
                 profile = JSON.parse(Database.active.getString("profile"));
                 this.setState({
                     name: profile.name,
-                    selectedDate: getFormatedDate(new Date(profile.dob)),
+                    selectedDate: getFormatedDate(Date.parse(profile.dob)),
                     location: profile.location,
                     website: profile.website,
                     bio: profile.bio,
@@ -165,15 +165,16 @@ export default class ProfileEdit extends React.Component {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
                             // Extract state
+                            let timeNow = (new Date()).toISOString();
                             var profile = {
                                 name: this.state.name,
                                 dob: (this.state.selectedDate != "" ? 
-                                    (new Date(Date.parse(this.state.selectedDate))).toJSON() :
-                                    (new Date()).toJSON()),
+                                    (new Date(Date.parse(this.state.selectedDate))).toISOString() : timeNow),
                                 location: this.state.location,
                                 website: this.state.website,
                                 bio: this.state.bio,
-                                avatar: this.state.avatar
+                                avatar: this.state.avatar,
+                                updated: timeNow
                             };
                             // Save profile in database
                             Database.active.set("profile", JSON.stringify(profile));

@@ -148,8 +148,8 @@ class PeerwayAPI {
     // Establishes a temporary connection to all known peers and attempts to sync data.
     // Additional options can be specified to configure how the sync will work.
     // See README.md for details on these options.
-    SyncPeers(options = { config: {} }) {
-        this._syncConfig = options.config ? options.config : {};
+    SyncPeers(options = {}) {
+        this._syncConfig = { params: options };
         this._peersToConnect = "selectedPeers" in options ? options.selectedPeers.slice() : [];
         if (!("selectedPeers" in options)) {
             let query = Database.Execute("SELECT id FROM Peers");
@@ -157,8 +157,14 @@ class PeerwayAPI {
             Log.Debug("Ready to sync " + this._peersToConnect.length + " peer(s): " + JSON.stringify(this._peersToConnect));
         }
         for (let i in this._peersToConnect) {
-            // First check whether already connected to these peers
             let id = this._peersToConnect[i];
+            
+            // Get local peer metadata
+            let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
+            let meta = query.data.length > 0 ? query.data[0] : {};
+            this._syncConfig.last = meta.sync;
+
+            // First check whether already connected to these peers
             if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
                 if (this._peers[id].connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
@@ -167,10 +173,7 @@ class PeerwayAPI {
                     this._SyncPeer(id, this._syncConfig);
                 }
             } else {
-                // Get local peer metadata
                 Log.Debug("Syncing peer." + id);
-                let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
-                let meta = query.success && query.data.length > 0 ? {} : query.data[0];
                 // Don't sync with blocked peers.
                 if (!meta.blocked) {
                     // Check with the server whether the peer is connected
@@ -284,7 +287,7 @@ class PeerwayAPI {
     _SyncPeer(id, config) {
         if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
             // Send sync request to the peer with the configuration data
-            this._SendPeerData(id, JSON.stringify({ type: "sync", from: this._activeId, to: id, config: config }));
+            this._SendPeerData(id, JSON.stringify({ type: "sync", from: this._activeId, to: id, last: config.last, config: config.params }));
             return true;
         }
         Log.Warning("Cannot sync with disconnected peer." + id);
@@ -333,9 +336,8 @@ class PeerwayAPI {
         }
     }
 
-    // Handle changes in connection state for a particular peer call connection.
-    _OnPeerCallChange(connection, id) {
-        if (this._peers[id].connectionState === "connected") {
+    _OnPeerConnected(id) {
+        if (id in this._peersPending && id in this._peers && this._peers[id].connectionState === "connected") {
             delete this._peersPending[id];
             Log.Info("Connection established to peer." + id);
 
@@ -344,7 +346,7 @@ class PeerwayAPI {
                 this._SyncPeer(id, this._syncConfig);
             }
         } else {
-            Log.Info("Connection call state to peer." + id + " changed to: " + this._peers[id].connectionState);
+            Log.Warning("Peer acknowledged non-existent connection!");
         }
     }
 
@@ -394,8 +396,6 @@ class PeerwayAPI {
         peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, targetId);
         // Callback when negotiation is required (only when calling)
         peer.onnegotiationneeded = () => this._HandleNegotiationNeededEvent(targetId);
-        // Callback when connection state changes
-        peer.onconnectionstatechange = (connection) => this._OnPeerCallChange(connection, targetId);
 
         return peer;
     }
@@ -438,14 +438,20 @@ class PeerwayAPI {
     _OnNotification(notif) {
         Log.Debug("Data received from peer." + notif.from);
         switch (notif.type) {
+            case "connected":
+                this._OnPeerConnected(notif.from);
+                break;
             case "sync":
-                this._RespondToSyncRequest(notif.to, notif.from, notif.config);
+                this._OnPeerSync(notif);
                 break;
             case "chat.request":
                 this._OnChatRequest(notif);
                 break;
             case "chat.message":
                 this._OnChatMessage(notif);
+                break;
+            case "update.peer":
+                this._OnUpdatePeer(notif);
                 break;
             default:
                 this.emit(notif.type, notif);
@@ -459,15 +465,31 @@ class PeerwayAPI {
         this._channels[id].send(data);
     }
 
-    _RespondToSyncRequest(to, from, config) {
-        Log.Debug("Received sync request from peer." + from + " for entity " + to);
+    _OnPeerSync(data) {
+        Log.Debug("Received sync request from peer." + data.from + " for entity " + data.to);
+
+        // Always sync entity
+        let profile = JSON.parse(Database.active.getString("profile"));
+        // Compare ISO timestamps
+        if (data.last < profile.updated) {
+            Peerway.NotifyEntities(
+                [data.from],
+                {
+                    ts: (new Date()).toISOString(),
+                    type: "update.peer",
+                    profile: profile,
+                    from: Database.active.getString("id")
+                }
+            );
+        }
+
         // Sync chats
-        if ("chats" in config) {
-            for (i in config.chats) {
+        if ("chats" in data.config) {
+            for (i in data.config.chats) {
                 // Select chats in common
-                let query = Database.Execute("SELECT * FROM Chats WHERE id='" + config.chats[i].id + "'");
+                let query = Database.Execute("SELECT * FROM Chats WHERE id='" + data.config.chats[i].id + "'");
                 if (query.data.length > 0) {
-                    Log.Debug("Syncing chat." + config.chats[i].id);
+                    Log.Debug("Syncing chat." + data.config.chats[i].id);
                     let localChat = query.data[0];
 
                     // TODO received timestamp should be of the last message received from the peer
@@ -490,7 +512,7 @@ class PeerwayAPI {
                         // TODO: once syncing is done, send a sync request to the peer
                     }*/
                 } else {
-                    Log.Debug("No such chat." + config.chats[i].id);
+                    Log.Debug("No such chat." + data.config.chats[i].id);
                 }
             }
         }
@@ -531,6 +553,14 @@ class PeerwayAPI {
         );
 
         this.emit("chat.message", data);
+    }
+
+    // Handle updated peer data
+    _OnUpdatePeer(data) {
+        Database.Execute(
+            "UPDATE Peers SET name='" + data.profile.name + "', sync='" + data.ts + "' " +
+            "WHERE id='" + data.from + "'"
+        );
     }
 
     // Send a request to connect to a specified entity.
@@ -584,6 +614,9 @@ class PeerwayAPI {
                 this._channels[peer.local] = event.channel;
                 this._channels[peer.local].onmessage = (e) => this._OnPeerData(e);
                 Log.Info("Connection established to peer." + peer.local);
+
+                // Send acknowledgement of connection
+                this.NotifyEntities([peer.local], { type: "connected", from: peer.remote });
             }
 
             // Accept the call request

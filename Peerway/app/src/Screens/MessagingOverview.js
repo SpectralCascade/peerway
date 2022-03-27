@@ -121,9 +121,7 @@ export default class MessagingOverview extends Component {
             // Connect to peers to update chats
             // TODO only synchronise messages, not feeds
             Peerway.SyncPeers({
-                config: {
-                    chats: chatSyncMeta
-                }
+                chats: chatSyncMeta
             });
         }
 
