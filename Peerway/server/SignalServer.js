@@ -226,7 +226,7 @@ io.on('connection', socket => {
         // For now, this will send directly to the entities if available
         for (let i in request.targets) {
             let id = request.targets[i];
-            if (id in entities) {
+            if (id in entities && entities[id].length > 0) {
                 // Note: For time being, the first entity is used until digital signatures are supported.
                 io.to(entities[id][0].socketId).emit("PushNotification", request.notif);
             }

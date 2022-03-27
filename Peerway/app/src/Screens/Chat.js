@@ -46,16 +46,16 @@ export default class Chat extends React.Component {
         if (query.data.length > 0) {
             for (let i in query.data) {
                 let message = query.data[i];
-                let fromActive = message.peer === this.activeId;
+                let fromActive = message.from === this.activeId;
                 this.state.messages.push({
                     _id: this.state.messages.length + 1,
                     // TODO show multimedia
                     text: message.mime.startsWith("text") ? message.content : message.mime,
                     createdAt: message.created,
                     user: {
-                        _id: message.peer,
+                        _id: message.from,
                         // TODO get actual author name
-                        name: fromActive ? "You" : message.peer,
+                        name: fromActive ? "You" : message.from,
                         // TODO use actual entity avatar
                         avatar: "https://placeimg.com/140/140/any"
                     }
@@ -90,7 +90,7 @@ export default class Chat extends React.Component {
             this.onChatMessage.remove();
         }
         this.onChatMessage = Peerway.addListener("chat.message", (message) => {
-            if (message.for === this.chatId) {
+            if (message.chat === this.chatId) {
                 // Automatically mark as read
                 Database.Execute("UPDATE Chats SET read=" + 1 + " WHERE id='" + this.chatId + "'");
 
@@ -127,8 +127,8 @@ export default class Chat extends React.Component {
         // Send the last message
         this.state.messages = GiftedChat.append(this.state.messages, message);
         Peerway.SendChatMessage({
-            for: this.chatId,
-            author: Database.active.getString("id"),
+            chat: this.chatId,
+            from: Database.active.getString("id"),
             mime: "text/plain",
             content: this.state.messages[0].text
         });

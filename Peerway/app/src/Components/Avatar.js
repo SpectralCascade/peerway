@@ -5,22 +5,27 @@ import { Image } from 'react-native';
 
 // Takes an object and size, then displays the avatar
 export default function Avatar(props) {
-
-    if (props.avatar != "") {
-        var avatar = JSON.parse(props.avatar);
+    
+    if (typeof(props.avatar) === "string") {
+        return props.avatar.length > 0 ? (
+            <Image
+                source={{uri: props.avatar}}
+                style={[StyleMain.avatar, {width: props.size, height: props.size}, props.style]}
+            />
+        ) : (
+            <Icon
+                name="account"
+                size={props.size}
+                color="white"
+                style={[{position: "absolute"}, props.style]}
+            />
+        );
+    } else {
         return (
             <Image
-                source={{uri: "data:" + avatar.mime + ";base64," + avatar.data}}
+                source={{uri: "data:" + props.avatar.mime + ";base64," + props.avatar.base64}}
                 style={[StyleMain.avatar, {width: props.size, height: props.size}, props.style]}
             />
         );
     }
-    return (
-        <Icon
-            name="account"
-            size={props.size}
-            color="white"
-            style={[{position: "absolute"}, props.style]}
-        />
-    );
 }

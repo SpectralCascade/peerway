@@ -229,7 +229,7 @@ export default class Database {
                 ["CREATE TABLE IF NOT EXISTS " + "Messages" + "(" +
                     "chat TEXT," + // Chat UUID
                     "id TEXT," + // Message UUID
-                    "peer TEXT," + // Sender UUID
+                    "'from' TEXT," + // Sender UUID
                     "created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
                     "content TEXT," + // Text content
                     "mime TEXT," + // MIME type of the content
@@ -244,7 +244,7 @@ export default class Database {
 
             let result = sqlite.executeSqlBatch(id, commands);
             if (result.status) {
-                Log.Error("Failed to setup database tables");
+                Log.Error("Failed to setup database tables. " + result.message);
             } else {
                 Log.Info("Setup database tables successfully.");
             }
@@ -276,7 +276,7 @@ export default class Database {
 
     // Execute some arbitrary SQL command (synchronous)
     static Execute(sql) {
-        Log.Debug("Executing SQL command:\n" + sql);
+        //Log.Debug("Executing SQL command:\n" + sql);
         let query = sqlite.executeSql(this.db, sql);
         if (query.status) {
             Log.Error("Failed to execute SQL command \"" + sql + "\":\n" + query.message);

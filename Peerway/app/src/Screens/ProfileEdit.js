@@ -11,6 +11,8 @@ import Database from '../Database';
 import Colors from '../Stylesheets/Colors';
 import { CommonActions } from '@react-navigation/native';
 import Avatar from '../Components/Avatar';
+import { Log } from '../Log';
+import RNFS from "react-native-fs";
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -25,7 +27,7 @@ export default class ProfileEdit extends React.Component {
             location: "",
             website: "",
             bio: "",
-            avatar: "", // Base-64 encoded string
+            avatar: {}
         };
     }
 
@@ -57,7 +59,7 @@ export default class ProfileEdit extends React.Component {
                     location: "",
                     website: "",
                     bio: "",
-                    avatar: ""
+                    avatar: {}
                 });
             }
         }
@@ -92,18 +94,25 @@ export default class ProfileEdit extends React.Component {
                                         width: 400,
                                         height: 400,
                                         cropping: true,
-                                        writeTempFile: false,
+                                        writeTempFile: true,
                                         includeBase64: true,
                                         avoidEmptySpaceAroundImage: true,
                                         cropperCircleOverlay: true
                                     }).then(image => {
-                                        this.setState({avatar: JSON.stringify(image)});
+                                        this.setState({
+                                            avatar: {
+                                                path: image.path,
+                                                // TODO don't actually save base64, convert from image when needed?
+                                                base64: image.data,
+                                                mime: image.mime
+                                            }
+                                        });
                                     }, () => {
                                         // Do nothing if cancelled
                                     });
                                 }}
                             >
-                                <Avatar avatar={this.state.avatar} size={avatarSize} />
+                                <Avatar avatar={"path" in this.state.avatar ? this.state.avatar.path : ""} size={avatarSize} />
                                 <Icon
                                     name="image-plus"
                                     size={avatarSize / 3}
@@ -164,6 +173,17 @@ export default class ProfileEdit extends React.Component {
                             if (Database.active == null) {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
+                            let id = Database.active.getString("id");
+
+                            // Copy profile image to app documents path
+                            this.state.avatar.ext = this.state.avatar.path.split('.').pop();
+                            let path = RNFS.DocumentDirectoryPath + "/" + id + "." + this.state.avatar.ext;
+                            RNFS.copyFile(this.state.avatar.path, path).then(() => {}).catch((e) => {
+                                Log.Error(e);
+                            });
+                            // Remove path as it can be obtained using the entity ID
+                            delete this.state.avatar.path;
+
                             // Extract state
                             let timeNow = (new Date()).toISOString();
                             var profile = {

@@ -98,7 +98,7 @@ export default class MessagingOverview extends Component {
                 query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
                 let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
                 // Get peer who sent last message
-                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.peer + "'");
+                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
                 let peer = query.data.length > 0 ? query.data[0] : {};
 
                 // Create a chat entry for the UI
@@ -106,7 +106,7 @@ export default class MessagingOverview extends Component {
                     id: id,
                     name: meta.name,
                     message: {
-                        from: lastMessage.peer === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
+                        from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
                         timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
                     },
