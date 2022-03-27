@@ -167,7 +167,7 @@ class PeerwayAPI {
                     // If it's still connecting, peer syncing should automagically happen on connection
                 } else {
                     Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
-                    this._SyncPeer(id, this._syncConfig, (new Date()).toISOString());
+                    this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
                 }
             } else {
                 Log.Debug("Syncing peer." + id);
@@ -205,7 +205,7 @@ class PeerwayAPI {
             let isoTime = timeNow.toISOString();
             let id = uuidv1();
             Database.Execute(
-                "INSERT INTO Messages (chat,id,'from',created,content,mime) VALUES ('" +
+                "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES ('" +
                     meta.id + "','" + // Chat id
                     id + "','" + // Generate an ID for this message
                     message.from + "','" +
@@ -278,23 +278,29 @@ class PeerwayAPI {
 
     // Actually sync data with a connected peer.
     // Returns true if syncing begins successfully (i.e. the other peer is connected).
-    _SyncPeer(id, config, timestamp) {
+    _SyncPeer(id, config, timestamp, force=false) {
         if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
             // Get local peer metadata
             let query = Database.Execute("SELECT sync FROM Peers WHERE id='" + id + "'");
             let meta = query.data.length > 0 ? query.data[0] : { sync: (new Date(0)).toISOString() };
 
-            let lastMessageTS = (new Date()).toISOString();
-            if ("chats" in config) {
-                // Get timestamp of the last message received before the connection was established
-                query = Database.Execute(
-                    "SELECT * FROM Messages " +
-                        "WHERE 'from'='" + id + "' AND created <= '" + this._peerConnectionTimestamps[id] + "'" +
-                        "ORDER BY created DESC LIMIT 1"
-                );
+            // Worst case, never received a message
+            let lastMessageTS = (new Date(0)).toISOString();
+            if ("chats" in config && config.chats.length > 0) {
+                for (let i in config.chats) {
+                    // Get timestamp of the last message received (before the connection was established)
+                    query = Database.Execute("SELECT * FROM Messages " +
+                        "WHERE chat='" + config.chats[i].id + "' " + 
+                            "AND [from]='" + id + "' " +
+                            "AND created < '" + this._peerConnectionTimestamps[id] + "' " +
+                        "ORDER BY created DESC"
+                    );
 
-                if (query.data.length > 0) {
-                    lastMessageTS = query.data[0].created;
+                    if (query.data.length > 0) {
+                        lastMessageTS = query.data[0].created > lastMessageTS ? query.data[0].created : lastMessageTS;
+                    } else {
+                        Log.Debug("Could not get last message TS! Query success: " + query.success);
+                    }
                 }
             }
 
@@ -306,7 +312,8 @@ class PeerwayAPI {
                 ts: timestamp,
                 sync: meta.sync,
                 lastMessageTS: lastMessageTS,
-                config: config
+                config: config,
+                force: force
             }));
             return true;
         }
@@ -364,7 +371,7 @@ class PeerwayAPI {
 
             // Automagically sync with the peer
             if (this._syncConfig) {
-                this._SyncPeer(id, this._syncConfig, (new Date()).toISOString());
+                this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
             }
         } else {
             Log.Warning("Peer acknowledged non-existent connection!");
@@ -510,7 +517,7 @@ class PeerwayAPI {
         Log.Debug("Remote last sync: " + data.sync + " | Local last sync: " + query.data[0].sync);
         // Send a sync request on the first ever sync between the peers,
         // or if there's a difference between last sync timestamps.
-        let syncRequired = (neverGotSyncRequest && neverSentSyncRequest) || 
+        let syncRequired = data.force || (neverGotSyncRequest && neverSentSyncRequest) || 
             (!neverGotSyncRequest && query.data[0].sync !== data.sync);
 
         // Track whether actual data syncing takes place
@@ -539,8 +546,9 @@ class PeerwayAPI {
 
         // Sync chats
         if ("chats" in data.config) {
-            for (i in data.config.chats) {
-                // Select chats in common
+            Log.Debug("Syncing chats, remote last received message(s) at " + data.lastMessageTS);
+            for (let i in data.config.chats) {
+                // Check if the chat exists
                 query = Database.Execute("SELECT * FROM Chats WHERE id='" + data.config.chats[i].id + "'");
                 if (query.data.length > 0) {
                     Log.Debug("Syncing chat." + data.config.chats[i].id);
@@ -551,8 +559,8 @@ class PeerwayAPI {
                     // Get all messages this entity has sent in the selected chat since 
                     query = Database.Execute(
                         "SELECT * FROM Messages " + 
-                        "WHERE chat='" + localChat.id + "' " +
-                        "AND 'from'='" + activeId + "' " +
+                        "WHERE chat = '" + localChat.id + "' " +
+                        "AND [from] = '" + activeId + "' " +
                         "AND created > '" + data.lastMessageTS + "'"
                     );
 
@@ -575,7 +583,7 @@ class PeerwayAPI {
             }
         }
 
-        if (didSync || neverGotSyncRequest) {
+        if ((!data.force && syncRequired) || didSync) {
             // Store time of this sync with the peer
             Database.Execute(
                 "UPDATE Peers SET sync='" + data.ts + "' " +
@@ -608,7 +616,7 @@ class PeerwayAPI {
 
         // Add the message to the database
         Database.Execute(
-            "INSERT INTO Messages (chat,id,'from',created,content,mime) VALUES ('" +
+            "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES ('" +
                 data.chat + "','" +
                 data.id + "','" +
                 data.from + "','" +

@@ -229,7 +229,7 @@ export default class Database {
                 ["CREATE TABLE IF NOT EXISTS " + "Messages" + "(" +
                     "chat TEXT," + // Chat UUID
                     "id TEXT," + // Message UUID
-                    "'from' TEXT," + // Sender UUID
+                    "[from] TEXT," + // Sender UUID
                     "created TEXT," + // When the message was created; UTC timestamp in ISO-8601 format
                     "content TEXT," + // Text content
                     "mime TEXT," + // MIME type of the content
