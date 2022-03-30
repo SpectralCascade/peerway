@@ -89,7 +89,7 @@ export default class Chat extends React.Component {
         if (this.onChatMessage) {
             this.onChatMessage.remove();
         }
-        this.onChatMessage = Peerway.addListener("chat.message", (message) => {
+        this.onChatMessage = Peerway.addListener("chat.message", (from, message) => {
             if (message.chat === this.chatId) {
                 // Automatically mark as read
                 Database.Execute("UPDATE Chats SET read=" + 1 + " WHERE id='" + this.chatId + "'");
@@ -101,9 +101,9 @@ export default class Chat extends React.Component {
                     text: message.content,//.startsWith("text") ? message.content : message.mime,
                     createdAt: message.created,
                     user: {
-                        _id: message.from,
+                        _id: from,
                         // TODO get peer name
-                        name: message.from,
+                        name: from,
                         // TODO get peer avatar
                         avatar: "https://placeimg.com/140/140/any"
                     }

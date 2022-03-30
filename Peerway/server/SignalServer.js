@@ -228,7 +228,7 @@ io.on('connection', socket => {
             let id = request.targets[i];
             if (id in entities && entities[id].length > 0) {
                 // Note: For time being, the first entity is used until digital signatures are supported.
-                io.to(entities[id][0].socketId).emit("PushNotification", request.notif);
+                io.to(entities[id][0].socketId).emit("PushNotification", { notif: request.notif, from: request.from });
             }
         }
     });

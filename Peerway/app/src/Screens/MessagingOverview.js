@@ -48,11 +48,11 @@ export default class MessagingOverview extends Component {
         // Handle all chat related events
         Peerway.removeAllListeners("chat.request");
         Peerway.removeAllListeners("chat.message");
-        this.onChatRequest = Peerway.addListener("chat.request", (data) => {
-            Log.Info("Received chat request from peer." + data.from);
+        this.onChatRequest = Peerway.addListener("chat.request", (from, data) => {
+            Log.Info("Received chat request from peer." + from);
             this.Refresh(false);
         });
-        this.onChatMessage = Peerway.addListener("chat.message", (data) => {
+        this.onChatMessage = Peerway.addListener("chat.message", (from, data) => {
             this.Refresh(false);
         });
     }

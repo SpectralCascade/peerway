@@ -95,15 +95,12 @@ export default class ProfileEdit extends React.Component {
                                         height: 400,
                                         cropping: true,
                                         writeTempFile: true,
-                                        includeBase64: true,
                                         avoidEmptySpaceAroundImage: true,
                                         cropperCircleOverlay: true
                                     }).then(image => {
                                         this.setState({
                                             avatar: {
                                                 path: image.path,
-                                                // TODO don't actually save base64, convert from image when needed?
-                                                base64: image.data,
                                                 mime: image.mime
                                             }
                                         });
@@ -175,14 +172,18 @@ export default class ProfileEdit extends React.Component {
                             }
                             let id = Database.active.getString("id");
 
-                            // Copy profile image to app documents path
-                            this.state.avatar.ext = this.state.avatar.path.split('.').pop();
-                            let path = RNFS.DocumentDirectoryPath + "/" + id + "." + this.state.avatar.ext;
-                            RNFS.copyFile(this.state.avatar.path, path).then(() => {}).catch((e) => {
-                                Log.Error(e);
-                            });
-                            // Remove path as it can be obtained using the entity ID
-                            delete this.state.avatar.path;
+                            if ("path" in this.state.avatar) {
+                                // Copy profile image to app documents path
+                                this.state.avatar.ext = this.state.avatar.path.split('.').pop();
+                                let path = RNFS.DocumentDirectoryPath + "/" + id + "." + this.state.avatar.ext;
+                                RNFS.moveFile(this.state.avatar.path, path).then(() => {
+                                    return RNFS.exists(path);
+                                }).then((exists) => { Log.Debug("path = " + path + " | exists = " + exists); }).catch((e) => {
+                                    Log.Error(e);
+                                });
+                                // Remove path as it can be obtained using the entity ID
+                                delete this.state.avatar.path;
+                            }
 
                             // Extract state
                             let timeNow = (new Date()).toISOString();
