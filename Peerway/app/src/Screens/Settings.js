@@ -1,6 +1,6 @@
 import { CommonActions } from "@react-navigation/native";
 import React from "react";
-import { ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, ScrollView, TextInput, TouchableOpacity, View } from "react-native";
 import ButtonText from "../Components/ButtonText";
 import HandleEffect from "../Components/HandleEffect";
 import Text from "../Components/Text";
@@ -15,23 +15,51 @@ export default class Settings extends React.Component {
         super(props);
 
         this.state = {
-            serverURL: "http://" + Constants.server_ip + ":" + Constants.port
+            SignalServerURL: "http://" + Constants.server_ip + ":" + Constants.port
         };
 
         this.Init();
     }
 
     Init() {
-        if (Database.userdata.contains("SignalServerURL")) {
-            this.state.serverURL = Database.userdata.getString("SignalServerURL");
-        } else {
-            Database.userdata.set("SignalServerURL", this.state.serverURL);
-        }
+        Object.keys(this.state).forEach((key) => {
+            if (Database.userdata.contains(key)) {
+                this.state[key] = Database.userdata.getString(key);
+            } else {
+                Database.userdata.set(key, this.state[key]);
+            }
+        });
     }
 
     OnOpen() {
         Log.Debug("OPENED SETTINGS SCREEN");
         this.Init();
+    }
+
+    // Settings text input widget
+    WidgetText(params) {
+        let change = {};
+        return (
+            <View {...params}>
+                <Text>{params.title}</Text>
+                <TextInput
+                    onChangeText={(text) => {
+                        change[params.name] = text;
+                        params.parent.setState(change);
+                    }}
+                    style={StyleMain.textInput}
+                    value={"default" in params ? params.default : params.parent.state[params.name]}
+                />
+            </View>
+        );
+    }
+
+    WidgetButton(params) {
+        return (
+            <TouchableOpacity {...params}>
+                <ButtonText>{params.title}</ButtonText>
+            </TouchableOpacity>
+        );
     }
 
     render() {
@@ -40,17 +68,31 @@ export default class Settings extends React.Component {
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
                 <ScrollView>
-                    <Text>Signal Server URL</Text>
-                    <TextInput
-                        onChangeText={(text) => this.setState({serverURL: text}) } 
-                        style={StyleMain.textInput}
-                        value={this.state.serverURL}
-                    ></TextInput>
+                    <this.WidgetText title="Signal Server URL" name="SignalServerURL" parent={this}/>
+                    <this.WidgetButton
+                        style={[StyleMain.button, styles.widgetButton]}
+                        title="Delete All Chats"
+                        onPress={() => {
+                            // TODO delete all chats
+                            Log.Debug("Deleted all chat entries");
+                        }}
+                    />
+                    <this.WidgetButton
+                        style={[StyleMain.button, styles.widgetButton]}
+                        title="Delete All Peers"
+                        onPress={() => {
+                            // TODO delete all peers
+                            Log.Debug("Deleted all peer entries");
+                        }}
+                    />
                 </ScrollView>
+
                 <TouchableOpacity
-                    style={[StyleMain.button, {backgroundColor: Colors.button, height: 40, marginTop: 12}]}
+                    style={[StyleMain.button, {}]}
                     onPress={() => {
-                        Database.userdata.set("SignalServerURL", this.state.serverURL);
+                        Object.keys(this.state).forEach((key) => {
+                            Database.userdata.set(key, this.state[key]);
+                        });
                         this.props.navigation.dispatch(
                             CommonActions.reset({
                                 index: 1,
@@ -65,3 +107,11 @@ export default class Settings extends React.Component {
         );
     }
 }
+
+const styles = StyleSheet.create({
+    widgetButton: {
+        backgroundColor: Colors.button,
+        height: 40,
+        marginTop: 12
+    }
+});

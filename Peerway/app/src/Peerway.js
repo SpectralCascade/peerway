@@ -633,8 +633,7 @@ class PeerwayAPI {
             Log.Debug("Profile desync detected, updating remote peer." + from);
 
             let sendUpdate = () => {
-                Peerway.NotifyEntities(
-                    [from],
+                Peerway.NotifyEntities([from],
                     {
                         ts: (new Date()).toISOString(),
                         type: "peer.update",
@@ -644,12 +643,11 @@ class PeerwayAPI {
                 );
             }
 
-            // TODO handle timeout or connection loss!
-
             // Send over avatar first
             // TODO check if avatar needs to be sent or not rather than just sending every time
             if ("ext" in profile.avatar) {
                 RNFS.readFile(this.GetAvatarPath(this._activeId, profile.avatar.ext), "base64").then((data) => {
+                    // TODO handle timeout or connection loss!
                     let listener = Peerway.addListener("data.ack", (from, data) => {
                         listener.remove();
                         Log.Debug("Received data ACK, proceeding to update remote peer." + from);
@@ -769,6 +767,7 @@ class PeerwayAPI {
             "UPDATE Peers SET name='" + data.profile.name + "' " +
             "WHERE id='" + from + "'"
         );
+        // TODO overwrite peer avatar
     }
 
     // Handle updated chat messages
