@@ -200,7 +200,8 @@ export default class Database {
                     "blocked INTEGER," + // Is this peer blocked?
                     "sync TEXT," + // Time of last sync; UTC timestamp in ISO-8601 format
                     "interaction TEXT," + // Time of last interaction; UTC timestamp in ISO-8601 format
-                    "verifier TEXT" + // Digital signature verification key
+                    "verifier TEXT," + // Digital signature verification key
+                    "updated TEXT" + // Last time the peer profile was updated
                 ")"],
                 // Table of chats
                 ["CREATE TABLE IF NOT EXISTS " + "Chats" + "(" +
@@ -376,21 +377,23 @@ export default class Database {
             // Add to the database
             Log.Debug("Adding peer." + id);
             let dateNow = (new Date()).toISOString();
+            let initialDate = (new Date(0)).toISOString();
             peer = {
                 id: id,
                 name: "name" in peer ? peer.name : "",
                 mutual: "mutual" in peer ? peer.mutual : 0,
                 blocked: "blocked" in peer ? peer.blocked : 0,
-                sync: "sync" in peer ? peer.sync : (new Date(0)).toISOString(),
+                sync: "sync" in peer ? peer.sync : initialDate,
                 interaction: "interaction" in peer ? peer.interaction : dateNow,
-                verifier: "verifier" in peer ? peer.verifier : ""
+                verifier: "verifier" in peer ? peer.verifier : "",
+                updated: "updated" in peer ? peer.updated : initialDate
             };
             // Insert blank peer entry
             this.Execute(
-                "INSERT INTO Peers (id,name,mutual,blocked,sync,interaction,verifier) VALUES (" +
+                "INSERT INTO Peers (id,name,mutual,blocked,sync,interaction,verifier,updated) VALUES (" +
                     ToCSV(
                         peer,
-                        ["id", "name", "mutual", "blocked", "sync", "interaction", "verifier"]
+                        ["id", "name", "mutual", "blocked", "sync", "interaction", "verifier", "updated"]
                     ) +
                 ")"
             );

@@ -299,7 +299,7 @@ class PeerwayAPI {
     _SyncPeer(id, config, timestamp, force=false) {
         if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
             // Get local peer metadata
-            let query = Database.Execute("SELECT sync FROM Peers WHERE id='" + id + "'");
+            let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
             let meta = query.data.length > 0 ? query.data[0] : { sync: (new Date(0)).toISOString() };
 
             // Worst case, never received a message
@@ -331,7 +331,8 @@ class PeerwayAPI {
                 sync: meta.sync,
                 lastMessageTS: lastMessageTS,
                 config: config,
-                force: force
+                force: force,
+                updated: { profile: meta.updated }
             }));
             return true;
         }
@@ -629,7 +630,7 @@ class PeerwayAPI {
         let profile = JSON.parse(Database.active.getString("profile"));
         
         // Compare ISO timestamps
-        if (data.sync < profile.updated) {
+        if (data.updated.profile !== profile.updated) {
             Log.Debug("Profile desync detected, updating remote peer." + from);
 
             let sendUpdate = () => {
@@ -764,7 +765,7 @@ class PeerwayAPI {
     // Handle updated peer data
     _OnUpdatePeer(from, data) {
         Database.Execute(
-            "UPDATE Peers SET name='" + data.profile.name + "' " +
+            "UPDATE Peers SET name='" + data.profile.name + "', updated='" + data.profile.updated + "' " +
             "WHERE id='" + from + "'"
         );
         // TODO overwrite peer avatar
