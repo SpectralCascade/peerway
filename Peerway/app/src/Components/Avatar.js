@@ -2,6 +2,7 @@ import React from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Image } from 'react-native';
+import { Log } from '../Log';
 
 // Takes an object and size, then displays the avatar
 export default function Avatar(props) {

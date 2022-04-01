@@ -8,87 +8,6 @@ import { Log } from './Log';
 import { Buffer } from 'buffer';
 import Constants from './Constants';
 
-// This entity example shows what the different key-value fields are used for.
-// Note that the actual storage stores non-primitive objects as JSON strings.
-// Also note that content data is not stored in the entity storage object itself.
-const ExampleEntity = {
-    // The unique id of this entity.
-    id: "<uuid-generated-id>",
-    // The storage encryption key for this entity.
-    encryptionKey: "<uuid-generated-key>",
-    // Information displayed on the entity profile.
-    profile: {
-        name: "Alex",
-        dob: "<serialised-date>",
-        location: "UK",
-        website: "https://example.com",
-        bio: "I enjoy reading and writing code."
-    },
-    // A digital signature, used to verify that messages etc. are genuinely from this entity.
-    signature: {
-        public: "<public-signature-key>",
-        private: "<private-signature-key>",
-        expires: "<serialised-date-timestamp>"
-    },
-    // Array of all peer entity IDs this entity has interactions with, ordered by most recent interaction.
-    peers: [],
-    // Metadata regarding other peers this entity has interacted with historically.
-    // Example peer with unique id
-    "peer.<peer-entity-id>": {
-        // Name of the peer
-        name: "Bob",
-        // Path to the peer avatar image file
-        avatar: "<path-to-avatar-image>",
-        // Is this peer a mutual?
-        mutual: "<boolean>",
-        // Is this peer blocked?
-        blocked: "<boolean>",
-        // The time at which this peer was last synced with
-        sync: "<serialised-date-timestamp>",
-        // A public verification key for checking digital signatures from this peer.
-        verifier: "<public-signature-key>"
-    },
-    // Array of all chats this entity is part of, ordered by most recent interaction.
-    chats: [],
-    // Metadata for direct messaging with other entities.
-    // Example chat with unique id
-    "chat.<uuid-generated-id>": {
-        // Name of the chat.
-        name: "John Smith",
-        // Which entities are part of the chat along with permission keys.
-        members: [
-            {
-                // ID of the listed entity.
-                id: "<entity-id>",
-                // Key chat permissions.
-                keys: {
-                    // Key for verifying identity, only shared with this member.
-                    id: "<generated-key>",
-                    // Key for reading messages in the chat.
-                    rx: "<generated-key>",
-                    // Key for sending messages in the chat.
-                    tx: "<generated-key>",
-                    // This key indicates whether the listed entity has administrator privileges.
-                    // Only a select few entities have this key.
-                    admin: "<generated-key>"
-                }
-            }
-        ],
-        // When was the last message received from this chat?
-        received: "<serialised-date>",
-        // When was the last update to this chat (considers last message received time)?
-        updated: "<serialised-date>",
-        // Is this chat flagged as read?
-        read: false,
-        // Is this chat muted?
-        muted: false,
-        // Is this chat blocked?
-        blocked: false,
-        // The image used as the chat icon.
-        icon: "<icon-image-base64-string>"
-    }
-};
-
 // Automagically converts string into an SQL escaped single quote wrapped string.
 // Non-strings are unaffected by this function.
 function wrapSQL(value) {
@@ -196,6 +115,7 @@ export default class Database {
                 ["CREATE TABLE IF NOT EXISTS " + "Peers" + "(" +
                     "id TEXT PRIMARY KEY," + // Peer UUID
                     "name TEXT," + // The name of this peer
+                    "avatar TEXT," + // The avatar file extension
                     "mutual INTEGER," + // Is this peer a mutual?
                     "blocked INTEGER," + // Is this peer blocked?
                     "sync TEXT," + // Time of last sync; UTC timestamp in ISO-8601 format
@@ -303,7 +223,7 @@ export default class Database {
         // Generate chat metadata
         let chatData = {
             id: meta.id,
-            name: "name" in meta ? meta.name : "Untitled Chat",
+            name: "name" in meta ? meta.name : "",
             read: "read" in meta ? meta.read : 0,
             muted: "muted" in meta ? meta.muted : 0,
             blocked: "blocked" in meta ? meta.blocked : 0,
@@ -381,6 +301,7 @@ export default class Database {
             peer = {
                 id: id,
                 name: "name" in peer ? peer.name : "",
+                avatar: "avatar" in peer && "ext" in peer.avatar ? peer.avatar.ext : "",
                 mutual: "mutual" in peer ? peer.mutual : 0,
                 blocked: "blocked" in peer ? peer.blocked : 0,
                 sync: "sync" in peer ? peer.sync : initialDate,
@@ -390,10 +311,10 @@ export default class Database {
             };
             // Insert blank peer entry
             this.Execute(
-                "INSERT INTO Peers (id,name,mutual,blocked,sync,interaction,verifier,updated) VALUES (" +
+                "INSERT INTO Peers (id,name,avatar,mutual,blocked,sync,interaction,verifier,updated) VALUES (" +
                     ToCSV(
                         peer,
-                        ["id", "name", "mutual", "blocked", "sync", "interaction", "verifier", "updated"]
+                        ["id", "name", "avatar", "mutual", "blocked", "sync", "interaction", "verifier", "updated"]
                     ) +
                 ")"
             );

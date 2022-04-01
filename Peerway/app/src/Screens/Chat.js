@@ -35,6 +35,9 @@ export default class Chat extends React.Component {
             this.state.loadedTS = (new Date(Date.now())).toISOString();
         }
 
+        // TODO get paths to all peer avatars
+        //query = Database.Execute("SELECT * FROM Peers WHERE id='" + "'")
+
         // Get the last N messages
         // TODO make this async
         let query = Database.Execute(
@@ -46,6 +49,7 @@ export default class Chat extends React.Component {
         if (query.data.length > 0) {
             for (let i in query.data) {
                 let message = query.data[i];
+
                 let fromActive = message.from === this.activeId;
                 this.state.messages.push({
                     _id: this.state.messages.length + 1,
@@ -54,7 +58,6 @@ export default class Chat extends React.Component {
                     createdAt: message.created,
                     user: {
                         _id: message.from,
-                        // TODO get actual author name
                         name: fromActive ? "You" : message.from,
                         // TODO use actual entity avatar
                         avatar: "https://placeimg.com/140/140/any"

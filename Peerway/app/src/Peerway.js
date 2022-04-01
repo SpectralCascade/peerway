@@ -98,6 +98,21 @@ class PeerwayAPI {
         return RNFS.DocumentDirectoryPath + "/" + id + "." + ext;
     }
 
+    // Get the path to a chat
+    GetChatPath(id) {
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/chat/" + id;
+    }
+
+    // Get the path to a peer
+    GetPeerPath(id) {
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/peer/" + id;
+    }
+
+    // Get the path to the downloads folder
+    GetDownloadPath() {
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Download";
+    }
+
     // Connect to a particular signal server.
     // overrideSocket determines what should happen if already connected to a signal server.
     // If already connected and overrideSocket == false, nothing happens. Otherwise simply disconnects.
@@ -486,16 +501,19 @@ class PeerwayAPI {
             filename: filename
         }));
 
+        // TODO check this sends large amounts of data correctly e.g. videos
+        this._channels[peer].send(data);
+
         // Slice up the data into chunks
         // Thankfully, it can be assumed that the data will be sent in order
         // https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/ordered
-        let start = 0;
+        /*let start = 0;
         let end = 0;
         for (let i = 0, counti = Math.ceil(data.byteLength / Constants.maxBytesPerDataSend); i < counti; i++) {
             start = i * Constants.maxBytesPerDataSend;
             end = Math.min(start + Constants.maxBytesPerDataSend, counti);
             this._channels[peer].send(data.slice(start, end));
-        }
+        }*/
 
         // Finished sending data, indicate this to the peer
         this._SendPeerData(peer, JSON.stringify({
@@ -518,6 +536,7 @@ class PeerwayAPI {
         if (typeof(event.data) === "string" && event.data.startsWith("{")) {
             this._OnReceivedJSON(JSON.parse(event.data), from);
         } else if (typeof(event.data) === "object" && from in this._pendingData) {
+            Log.Debug("Received binary from peer." + from + " = " + JSON.stringify(event));
             this._pendingData[from] = Buffer.concat([this._pendingData[from], Buffer.from(event.data)]);
         } else {
             Log.Warning("Received unknown data from peer." + from + ": " + JSON.stringify(event));
@@ -568,6 +587,11 @@ class PeerwayAPI {
 
     _OnDataEnd(from, data) {
         if (from in this._pendingData) {
+            // Acknowledge that the data was received
+            this._SendPeerData(from, JSON.stringify({
+                type: "data.ack"
+            }));
+
             // Disallow paths! Must be just a file name
             if (data.filename.includes("\\") || data.filename.includes("/")) {
                 Log.Error("data.end: filename \"" + data.filename + "\" must be end point, NOT a path.");
@@ -575,12 +599,14 @@ class PeerwayAPI {
                 // Save as binary file (base64 string)
                 // TODO avoid gross base64 conversion. Should just be able to save directly to binary.
                 let content = this._pendingData[from].toString("base64");
-                let dir = RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Download";
+                let dir = this.GetDownloadPath();
                 let path = dir + "/" + data.filename;
                 RNFS.mkdir(dir).then(() => {
                     return RNFS.writeFile(path, content, "base64");
                 }).then(() => {
-                    Log.Info("Saved file from peer." + from + " at " + path + " successfully.");
+                    return RNFS.stat(path);
+                }).then((res) => {
+                    Log.Info("Saved file from peer." + from + " at " + path + " successfully with size " + res.size);
                 }).catch((e) => { Log.Error("Failed to save data to " + path + " due to " + e); });
             } else if (data.mime === "text/json") {
                 // Convert to JSON and pass to regular handler
@@ -591,11 +617,6 @@ class PeerwayAPI {
             }
             delete this._pendingData[from];
             
-            // Acknowledge that the data was received
-            this._SendPeerData(from, JSON.stringify({
-                type: "data.ack"
-            }));
-
         } else {
             Log.Warning("data.end received but never got data.begin request from peer." + from);
         }
@@ -634,6 +655,7 @@ class PeerwayAPI {
             Log.Debug("Profile desync detected, updating remote peer." + from);
 
             let sendUpdate = () => {
+                Log.Debug("Sending peer.update to peer." + from);
                 Peerway.NotifyEntities([from],
                     {
                         ts: (new Date()).toISOString(),
@@ -764,11 +786,29 @@ class PeerwayAPI {
 
     // Handle updated peer data
     _OnUpdatePeer(from, data) {
+        Log.Debug("Received update for peer." + from);
+        let avatarExt = "avatar" in data.profile && "ext" in data.profile.avatar ? data.profile.avatar.ext : "";
         Database.Execute(
-            "UPDATE Peers SET name='" + data.profile.name + "', updated='" + data.profile.updated + "' " +
+            "UPDATE Peers SET name='" + data.profile.name + "', " + 
+            "avatar='" + avatarExt + "', " + 
+            "updated='" + data.profile.updated + "' " +
             "WHERE id='" + from + "'"
         );
-        // TODO overwrite peer avatar
+        let avatarPath = this.GetDownloadPath() + "/" + from + "." + avatarExt;
+        RNFS.exists(avatarPath).then((exists) => {
+            if (exists) {
+                let path = this.GetPeerPath(from) + "." + avatarExt;
+                RNFS.mkdir(this.GetPeerPath(from) + "/").then(() => RNFS.moveFile(avatarPath, path)).then(() => {
+                    Log.Debug("Updated avatar for peer." + from);
+                }).catch((e) => {
+                    Log.Error(e);
+                });
+            } else {
+                Log.Verbose("Cannot update avatar file for peer." + from + ", no such path " + avatarPath);
+            }
+        }).catch((e) => {
+            Log.Error(e);
+        });
     }
 
     // Handle updated chat messages

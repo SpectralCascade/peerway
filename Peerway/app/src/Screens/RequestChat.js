@@ -75,9 +75,10 @@ export default class RequestChat extends Component {
         }
         let allMembers = [activeId].concat(peerIds);
 
+        // Blank chat names are replaced by names of all the members
         let meta = Database.CreateChat(
             allMembers,
-            { name: peerIds.length > 1 ? "Group." + meta.id : selected[selected.length - 1].name, read: 1 }
+            { read: 1 }
         );
 
         Log.Debug("Sending chat request to peers: " + JSON.stringify(peerIds));

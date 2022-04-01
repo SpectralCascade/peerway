@@ -10,6 +10,8 @@ import HandleEffect from '../Components/HandleEffect';
 import Constants from '../Constants';
 import { Log } from "../Log";
 import Peerway from '../Peerway';
+import RNFS from "react-native-fs";
+import Avatar from '../Components/Avatar';
 
 const topbarHeight = 56;
 const iconSize = 56;
@@ -81,6 +83,7 @@ export default class MessagingOverview extends Component {
         this.state.chats = [];
         for (let i in chatIds) {
             let id = chatIds[i];
+
             let query = Database.Execute("SELECT * FROM Chats WHERE id='" + id + "'");
             if (query.data.length > 0) {
                 let meta = query.data[0];
@@ -98,13 +101,39 @@ export default class MessagingOverview extends Component {
                 query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
                 let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
                 // Get peer who sent last message
+                // TODO merge with above into single SQL query
                 query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
                 let peer = query.data.length > 0 ? query.data[0] : {};
 
+                // Generate chat name and grab the chat icon
+                let chatName = meta.name;
+                query = Database.Execute(
+                    "SELECT * FROM (" + 
+                    "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
+                    "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
+                    "WHERE id != '" + this.activeId + "' "
+                );
+
+                if (query.data.length == 0) {
+                    // CONSIDER: support/handle users messaging themselves?
+                } else {
+                    // Generate chat name if necessary
+                    if (meta.name.length == 0) {
+                        chatName = query.data[0].name;
+                        for (let j = 1, countj = query.data.length; j < countj; j++) {
+                            chatName += ", " + query.data[j].name;
+                        }
+                    }
+                }
+
                 // Create a chat entry for the UI
+                // TODO load correct icon extension
+                let icon = Peerway.GetChatPath(id) + ".png";
+                let chatIndex = this.state.chats.length;
                 this.state.chats.push({
                     id: id,
-                    name: meta.name,
+                    name: chatName,
+                    icon: icon,
                     message: {
                         from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
@@ -112,6 +141,18 @@ export default class MessagingOverview extends Component {
                     },
                     read: meta.read
                 });
+                
+                // Load up the chat icon if it exists
+                RNFS.exists(icon).then((exists) => {
+                    if (!exists && query.data.length == 1) {
+                        // Use peer avatar as chat icon
+                        icon = Peerway.GetPeerPath(query.data[0].id) + "." + query.data[0].avatar;
+                        this.state.chats[chatIndex].icon = icon;
+                        this.forceUpdate();
+                    }
+                }).catch((e) => {
+                });
+
             } else {
                 Log.Error("Chat " + id + " does not exist, but is listed!");
             }
@@ -172,7 +213,9 @@ export default class MessagingOverview extends Component {
                     renderItem={({ item }) => (
                         <View>
                         <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
-                            <View style={styles.chatIcon}></View>
+                            <View style={styles.chatIcon}>
+                                <Avatar avatar={"file://" + item.icon} size={iconSize} />
+                            </View>
                             <View style={styles.chatContent}>
                                 <Text
                                     numberOfLines={1}
