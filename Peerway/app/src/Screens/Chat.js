@@ -59,7 +59,7 @@ export default class Chat extends React.Component {
                         _id: message.from,
                         name: fromActive ? "You" : (peer ? peer.name : message.from),
                         avatar: peer && peer.avatar.length > 0 ?
-                            "file://" + Peerway.GetPeerPath(message.from) + "." + peer.avatar : ""
+                            "file://" + Peerway.GetAvatarPath(message.from, peer.avatar) : ""
                     }
                 });
             }
@@ -120,7 +120,7 @@ export default class Chat extends React.Component {
                         _id: from,
                         name: peer ? peer.name : message.from,
                         avatar: peer && peer.avatar.length > 0 ?
-                            "file://" + Peerway.GetPeerPath(message.from) + "." + peer.avatar : ""
+                            "file://" + Peerway.GetAvatarPath(message.from, peer.avatar) : ""
                     }
                 });
                 this.forceUpdate();
@@ -136,6 +136,10 @@ export default class Chat extends React.Component {
             this.onChatMessage.remove();
             this.onChatMessage = null;
         }
+    }
+
+    OnPressAvatar(user) {
+        this.props.navigation.navigate("Profile", { peerId: user._id });
     }
 
     SendMessage(message) {
@@ -184,6 +188,7 @@ export default class Chat extends React.Component {
                     infiniteScroll
                     onLoadEarlier={() => this.LoadMessages()}
                     textInputStyle={styles.inputToolbar}
+                    onPressAvatar={(user) => this.OnPressAvatar(user)}
                 />
             </View>
         );

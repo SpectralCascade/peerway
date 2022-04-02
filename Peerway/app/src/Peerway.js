@@ -95,7 +95,11 @@ class PeerwayAPI {
 
     // Get the path to an entity avatar image
     GetAvatarPath(id, ext) {
-        return RNFS.DocumentDirectoryPath + "/" + id + "." + ext;
+        if (id.length == 0) {
+            return "";
+        }
+        return RNFS.DocumentDirectoryPath + "/" + (id === this._activeId ?
+            id + "." + ext : this._activeId + "/peer/" + id + "." + ext);
     }
 
     // Get the path to a chat

@@ -8,6 +8,7 @@ import MessagingOverview from './app/src/Screens/MessagingOverview';
 import RequestChat from './app/src/Screens/RequestChat';
 import SplashScreen from './app/src/Screens/SplashScreen';
 import Settings from './app/src/Screens/Settings';
+import Profile from './app/src/Screens/Profile';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,11 @@ export default function App() {
             <Stack.Screen
               name="Setup"
               component={SetupScreen}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={Profile}
+              options={{title: "User Profile", headerShown: true,}}
             />
             <Stack.Screen
               name="EditProfile"
