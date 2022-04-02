@@ -20,6 +20,7 @@ export default class Chat extends React.Component {
         // Get the chat ID
         this.chatId = props.route.params.chatId;
         this.activeId = "";
+        this.peers = {};
     }
     
     GetChatDataPath() {
@@ -34,10 +35,7 @@ export default class Chat extends React.Component {
             Log.Debug("Initialising chat messages");
             this.state.loadedTS = (new Date(Date.now())).toISOString();
         }
-
-        // TODO get paths to all peer avatars
-        //query = Database.Execute("SELECT * FROM Peers WHERE id='" + "'")
-
+        
         // Get the last N messages
         // TODO make this async
         let query = Database.Execute(
@@ -51,16 +49,17 @@ export default class Chat extends React.Component {
                 let message = query.data[i];
 
                 let fromActive = message.from === this.activeId;
+                let peer = this.peers[message.from];
                 this.state.messages.push({
                     _id: this.state.messages.length + 1,
-                    // TODO show multimedia
+                    // TODO show multimedia content
                     text: message.mime.startsWith("text") ? message.content : message.mime,
                     createdAt: message.created,
                     user: {
                         _id: message.from,
-                        name: fromActive ? "You" : message.from,
-                        // TODO use actual entity avatar
-                        avatar: "https://placeimg.com/140/140/any"
+                        name: fromActive ? "You" : (peer ? peer.name : message.from),
+                        avatar: peer && peer.avatar.length > 0 ?
+                            "file://" + Peerway.GetPeerPath(message.from) + "." + peer.avatar : ""
                     }
                 });
             }
@@ -83,6 +82,18 @@ export default class Chat extends React.Component {
         this.state.began = Database.active.contains(key) ?
             JSON.parse(Database.active.getString(key)).began : Date.now();
 
+        // Load all peers for the chat
+        this.peers = {};
+        let query = Database.Execute(
+            "SELECT * FROM (" + 
+            "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
+            "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + this.chatId + "') " +
+            "WHERE id != '" + this.activeId + "' "
+        );
+        for (let i in query.data) {
+            this.peers[query.data[i].id] = query.data[i];
+        }
+
         // Find the most recent messages
         this.state.messages = [];
         this.state.loadedTS = "";
@@ -94,6 +105,8 @@ export default class Chat extends React.Component {
         }
         this.onChatMessage = Peerway.addListener("chat.message", (from, message) => {
             if (message.chat === this.chatId) {
+                let peer = this.peers[message.from];
+
                 // Automatically mark as read
                 Database.Execute("UPDATE Chats SET read=" + 1 + " WHERE id='" + this.chatId + "'");
 
@@ -105,10 +118,9 @@ export default class Chat extends React.Component {
                     createdAt: message.created,
                     user: {
                         _id: from,
-                        // TODO get peer name
-                        name: from,
-                        // TODO get peer avatar
-                        avatar: "https://placeimg.com/140/140/any"
+                        name: peer ? peer.name : message.from,
+                        avatar: peer && peer.avatar.length > 0 ?
+                            "file://" + Peerway.GetPeerPath(message.from) + "." + peer.avatar : ""
                     }
                 });
                 this.forceUpdate();
