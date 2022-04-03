@@ -41,7 +41,7 @@ export default class Settings extends React.Component {
         let change = {};
         return (
             <View {...params}>
-                <Text>{params.title}</Text>
+                <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
                 <TextInput
                     onChangeText={(text) => {
                         change[params.name] = text;
@@ -67,7 +67,7 @@ export default class Settings extends React.Component {
             <View style={[StyleMain.background]}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
-                <ScrollView>
+                <ScrollView style={{padding: 10}}>
                     <this.WidgetText title="Signal Server URL" name="SignalServerURL" parent={this}/>
                     <this.WidgetButton
                         style={[StyleMain.button, styles.widgetButton]}

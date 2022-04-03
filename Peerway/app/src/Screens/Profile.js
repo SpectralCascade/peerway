@@ -1,14 +1,15 @@
 import React from 'react';
 import HandleEffect from '../Components/HandleEffect';
-import { Image, View, ScrollView, StyleSheet } from 'react-native';
+import { TouchableOpacity, Image, View, ScrollView, StyleSheet } from 'react-native';
 import Database from '../Database';
 import StyleMain from '../Stylesheets/StyleMain';
 import Avatar from '../Components/Avatar';
 import Peerway from '../Peerway';
 import Text from '../Components/Text';
 import { Log } from '../Log';
+import Colors from '../Stylesheets/Colors';
 
-const avatarSize = 128;
+const avatarSize = 64;
 
 export default class Profile extends React.Component {
     constructor(props) {
@@ -24,7 +25,8 @@ export default class Profile extends React.Component {
             website: "",
             bio: "",
             avatar: "",
-            updated: initTime
+            updated: initTime,
+            bioLines: 3
         }
     }
 
@@ -38,6 +40,7 @@ export default class Profile extends React.Component {
 
         // Load up top profile bits
         if (this.peerId === this.activeId) {
+            // TODO load self data
         } else {
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
             if (query.data.length > 0) {
@@ -62,8 +65,12 @@ export default class Profile extends React.Component {
             <View style={StyleMain.background}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
+                {/*<Image source={""}/>*/}
+                <View style={[styles.banner]}>
+
+                </View>
+
                 <View style={[styles.header]}>
-                    {/*<Image source={""}/>*/}
                     <Avatar avatar={(() => {
                         let path = Peerway.GetAvatarPath(this.peerId, this.state.avatar);
                         if (path.length > 0) {
@@ -74,7 +81,19 @@ export default class Profile extends React.Component {
                     <Text style={[styles.nameText]}>{this.state.name}</Text>
                 </View>
 
-                <ScrollView>
+                <TouchableOpacity onPress={() => this.setState({bioLines: this.state.bioLines != 0 ? 0 : 3})}
+                    style={[styles.bio]}>
+                    <Text numberOfLines={this.state.bioLines}>{this.state.bio}</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.headerBottom]}>
+                    {/* TODO only show these to peers with permissions */}
+                    <Text>{this.state.location}</Text>
+                    <Text>{this.state.dob}</Text>
+                    <Text>{this.state.website}</Text>
+                </View>
+
+                <ScrollView style={[styles.content]}>
                     {/* TODO */}
                 </ScrollView>
             </View>
@@ -84,8 +103,29 @@ export default class Profile extends React.Component {
 }
 
 const styles = StyleSheet.create({
+    banner: {
+        height: 128,
+        backgroundColor: Colors.avatarBackground
+    },
+    bio: {
+        padding: 10
+    },
+    content: {
+        backgroundColor: Colors.avatarBackground
+    },
     header: {
+        alignItems: "center",
+        flexDirection: "row",
+        paddingTop: 10,
+        paddingLeft: 10
+    },
+    headerBottom: {
+        padding: 5,
+        flexDirection: "row"
     },
     nameText: {
+        marginLeft: 10,
+        fontSize: 18,
+        fontWeight: "bold"
     }
 });
