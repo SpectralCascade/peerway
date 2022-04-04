@@ -13,6 +13,7 @@ import { CommonActions } from '@react-navigation/native';
 import Avatar from '../Components/Avatar';
 import { Log } from '../Log';
 import RNFS from "react-native-fs";
+import Peerway from '../Peerway';
 
 const dimensions = Dimensions.get('window');
 const avatarSize = dimensions.width * 0.3;
@@ -36,7 +37,7 @@ export default class ProfileEdit extends React.Component {
     }
 
     onOpen() {
-        if (typeof this.state !== 'undefined')
+        if (this.state)
         {
             ImagePicker.clean();
             console.log("Opened profile edit screen");
@@ -49,7 +50,14 @@ export default class ProfileEdit extends React.Component {
                     location: profile.location,
                     website: profile.website,
                     bio: profile.bio,
-                    avatar: profile.avatar
+                    avatar: {
+                        path: "file://" + Peerway.GetAvatarPath(
+                            Database.active.getString("id"),
+                            profile.avatar.ext
+                        ),
+                        mime: profile.mime,
+                        ext: profile.ext
+                    }
                 });
             } else {
                 // No entity is loaded, must be part of entity creation flow.
@@ -202,7 +210,7 @@ export default class ProfileEdit extends React.Component {
                             this.props.navigation.dispatch(
                                 CommonActions.reset({
                                     index: 1,
-                                    routes: [{ name: 'MessagingOverview' }]
+                                    routes: [{ name: 'Overview' }]
                                 })
                             );
                         }}

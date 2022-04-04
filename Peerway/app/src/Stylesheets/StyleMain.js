@@ -66,6 +66,7 @@ const StyleMain = StyleSheet.create({
     textInputMultiline: {
         textAlignVertical: "top",
         backgroundColor: Colors.textInput,
+        color: Colors.text,
         minHeight: 40,
         borderWidth: 1,
         padding: 12,

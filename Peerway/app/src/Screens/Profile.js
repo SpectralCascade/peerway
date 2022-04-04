@@ -8,6 +8,7 @@ import Peerway from '../Peerway';
 import Text from '../Components/Text';
 import { Log } from '../Log';
 import Colors from '../Stylesheets/Colors';
+import ButtonText from '../Components/ButtonText';
 
 const avatarSize = 64;
 
@@ -70,7 +71,22 @@ export default class Profile extends React.Component {
         this.forceUpdate();
     }
 
+    OnGoEdit() {
+        this.props.navigation.navigate("EditProfile");
+    }
+
     render() {
+        const renderEditButton = () => {
+            if (this.peerId === this.activeId) {
+                return (
+                    <TouchableOpacity style={[StyleMain.button, styles.editButton]} onPress={() => this.OnGoEdit()}>
+                        <ButtonText>Edit Profile</ButtonText>
+                    </TouchableOpacity>
+                );
+            }
+            return (<></>);
+        }
+
         return (
             <View style={StyleMain.background}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
@@ -89,6 +105,7 @@ export default class Profile extends React.Component {
                         return path;
                     })()} size={avatarSize} />
                     <Text style={[styles.nameText]}>{this.state.name}</Text>
+                    {renderEditButton()}
                 </View>
 
                 <TouchableOpacity onPress={() => this.setState({bioLines: this.state.bioLines != 0 ? 0 : 3})}
@@ -122,6 +139,17 @@ const styles = StyleSheet.create({
     },
     content: {
         backgroundColor: Colors.avatarBackground
+    },
+    editButton: {
+        height: 32,
+        width: undefined,
+        position: "absolute",
+        right: 5,
+        top: -14,
+        padding: 5,
+        borderRadius: 50,
+        borderColor: Colors.avatarBackground,
+        borderWidth: 1
     },
     header: {
         alignItems: "center",
