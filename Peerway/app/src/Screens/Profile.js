@@ -31,16 +31,26 @@ export default class Profile extends React.Component {
     }
 
     init() {
-        this.peerId = this.props.route.params.peerId;
         this.activeId = Database.active.getString("id");
+        this.peerId = this.props.route.params && this.props.route.params.peerId ? 
+            this.props.route.params.peerId : this.activeId;
     }
 
     OnOpen() {
+        Log.Debug("OPENED USER PROFILE");
+
         this.init();
 
         // Load up top profile bits
         if (this.peerId === this.activeId) {
-            // TODO load self data
+            let profile = JSON.parse(Database.active.getString("profile"));
+            this.state.name = profile.name;
+            this.state.dob = profile.dob;
+            this.state.location = profile.location;
+            this.state.website = profile.website;
+            this.state.bio = profile.bio;
+            this.state.avatar = profile.avatar.ext;
+            this.state.updated = profile.updated;
         } else {
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
             if (query.data.length > 0) {

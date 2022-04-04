@@ -33,7 +33,7 @@ export default class SplashScreen extends React.Component {
             this.props.navigation.dispatch(
                 CommonActions.reset({
                     index: 1,
-                    routes: [{ name: 'MessagingOverview' }]
+                    routes: [{ name: 'Overview' }]
                 })
             );
         } else {
