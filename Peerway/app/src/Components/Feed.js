@@ -1,6 +1,7 @@
 import React from 'react';
 import HandleEffect from '../Components/HandleEffect';
-import { TouchableOpacity, Image, View, ScrollView, StyleSheet, FlatList } from 'react-native';
+import { TouchableHighlight, TouchableOpacity, Image, View, ScrollView, StyleSheet, FlatList } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Database from '../Database';
 import StyleMain from '../Stylesheets/StyleMain';
 import Avatar from '../Components/Avatar';
@@ -11,7 +12,8 @@ import Colors from '../Stylesheets/Colors';
 import ButtonText from '../Components/ButtonText';
 import Constants from '../Constants';
 
-const iconSize = Constants.avatarMedium;
+const avatarSize = Constants.avatarMedium;
+const footerButtonSize = 36;
 
 export default class Feed extends React.Component {
     constructor(props) {
@@ -22,7 +24,10 @@ export default class Feed extends React.Component {
             posts: [
                 {
                     author: this.activeId,
-                    created: (new Date()).toISOString()
+                    created: (new Date()).toISOString(),
+                    liked: 0,
+                    text: "bla bla bla",
+                    media: []
                 }
             ],
         };
@@ -41,19 +46,27 @@ export default class Feed extends React.Component {
         this.init();
     }
 
-    OnOpenPost(post) {
+    OpenPost(post) {
         // TODO
         Log.Debug("Opened post: " + JSON.stringify(post));
     }
 
     // Go to a specific peer profile
-    OnGoProfile(id) {
+    GoProfile(id) {
         // TODO
         Log.Debug("Go to profile of peer." + id);
         if (this.props.route.name === "Profile"
         && this.props.route.params && this.props.route.params.peerId !== id) {
             this.props.navigation.push("Profile", { peerId: id });
         }
+    }
+
+    GoReply(post) {
+    }
+
+    GoToggleLike(post) {
+        post.liked = post.liked == 0 ? 1 : 0;
+        this.setState({posts: this.state.posts})
     }
 
     render() {
@@ -85,16 +98,16 @@ export default class Feed extends React.Component {
                         {/* Post header */}
                         <View style={styles.postHeader}>
                             <TouchableOpacity
-                                style={[StyleMain.avatar, { width: iconSize, height: iconSize }]}
-                                onPress={() => this.OnGoProfile(item.author)}
+                                style={[StyleMain.avatar, { width: avatarSize, height: avatarSize }]}
+                                onPress={() => this.GoProfile(item.author)}
                             >
                                 <Avatar
                                     avatar={Peerway.GetAvatarPath(item.author, author.avatar, "file://")}
-                                    size={iconSize}
+                                    size={avatarSize}
                                 />
                             </TouchableOpacity>
                             <View style={{paddingHorizontal: 5, flexDirection: "column"}}>
-                                <TouchableOpacity onPress={() => this.OnGoProfile(item.author)}>
+                                <TouchableOpacity onPress={() => this.GoProfile(item.author)}>
                                     <Text style={styles.authorName}>{author.name}</Text>
                                 </TouchableOpacity>
                                 <Text style={styles.dateText}>{(new Date(item.created)).toLocaleDateString("en-GB")}</Text>
@@ -102,14 +115,33 @@ export default class Feed extends React.Component {
                         </View>
 
                         {/* TODO post content */}
-                        <TouchableOpacity onPress={() => this.OnOpenPost(item)} style={styles.postContent}>
-                        </TouchableOpacity>
+                        <TouchableHighlight underlayColor={"#fff4"} onPress={() => this.OpenPost(item)} style={styles.postContent}>
+                            <Text>{item.text}</Text>
+                        </TouchableHighlight>
 
-                        {/* TODO post footer */}
+                        {/* TODO add this back (after MVP)
                         <View style={styles.postFooter}>
-                            {/* TODO UI buttons */}
-                            <View style={{paddingBottom: 1, backgroundColor: "#999"}} />
+                            <TouchableOpacity onPress={() => this.GoReply(item)}>
+                                <Icon
+                                    name="comment-outline"
+                                    size={footerButtonSize}
+                                    color={Colors.button}
+                                />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => this.GoToggleLike(item)}>
+                                <Icon
+                                    name={item.liked ? "thumb-up" : "thumb-up-outline"}
+                                    size={footerButtonSize}
+                                    color={Colors.button}
+                                />
+                            </TouchableOpacity>
                         </View>
+                        */}
+
+                        <View style={{paddingBottom: 1, backgroundColor: "#999"}} />
+
+                        {/* TODO show relevant reply posts (after MVP) */}
 
                     </View>
                     <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
@@ -137,8 +169,8 @@ const styles = StyleSheet.create({
     },
     post: {},
     postContent: {
-        paddingVertical: innerPadding,
-        backgroundColor: Colors.avatarBackground
+        paddingHorizontal: edgePadding,
+        paddingVertical: innerPadding
     },
     postHeader: {
         flexDirection: "row",
@@ -148,5 +180,7 @@ const styles = StyleSheet.create({
         paddingBottom: innerPadding
     },
     postFooter: {
+        flexDirection: "row",
+        justifyContent: "space-evenly"
     }
 });

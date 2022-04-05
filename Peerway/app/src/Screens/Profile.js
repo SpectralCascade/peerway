@@ -94,38 +94,41 @@ export default class Profile extends React.Component {
         let dob = new Date(this.state.dob);
 
         const renderHeader = () => (
-            <ScrollView style={StyleMain.background}>
-                <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
+            <View style={StyleMain.background}>
+                <ScrollView>
+                    <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
-                {/*<Image source={""}/>*/}
-                <View style={[styles.banner]}>
+                    {/*<Image source={""}/>*/}
+                    <View style={[styles.banner]}>
 
-                </View>
+                    </View>
 
-                <View style={[styles.header]}>
-                    <TouchableOpacity style={[StyleMain.avatar, {width: Constants.avatarStandard, height: Constants.avatarStandard}]}>
-                        <Avatar
-                            avatar={Peerway.GetAvatarPath(this.peerId, this.state.avatar, "file://")}
-                            size={Constants.avatarStandard}
-                        />
+                    <View style={[styles.header]}>
+                        <TouchableOpacity style={[StyleMain.avatar, {width: Constants.avatarStandard, height: Constants.avatarStandard}]}>
+                            <Avatar
+                                avatar={Peerway.GetAvatarPath(this.peerId, this.state.avatar, "file://")}
+                                size={Constants.avatarStandard}
+                            />
+                        </TouchableOpacity>
+                        <Text style={[styles.nameText]}>{this.state.name}</Text>
+                        {renderEditButton()}
+                    </View>
+
+                    <TouchableOpacity onPress={() => this.setState({bioLines: this.state.bioLines != 0 ? 0 : 3})}
+                        style={[styles.bio]}>
+                        <Text numberOfLines={this.state.bioLines}>{this.state.bio}</Text>
                     </TouchableOpacity>
-                    <Text style={[styles.nameText]}>{this.state.name}</Text>
-                    {renderEditButton()}
-                </View>
 
-                <TouchableOpacity onPress={() => this.setState({bioLines: this.state.bioLines != 0 ? 0 : 3})}
-                    style={[styles.bio]}>
-                    <Text numberOfLines={this.state.bioLines}>{this.state.bio}</Text>
-                </TouchableOpacity>
+                    <View style={[styles.headerBottom]}>
+                        {/* TODO only show these to peers with permissions */}
+                        <Text>{this.state.location}</Text>
+                        <Text>{dob.toLocaleDateString("en-GB")}</Text>
+                        <Text>{this.state.website}</Text>
+                    </View>
 
-                <View style={[styles.headerBottom]}>
-                    {/* TODO only show these to peers with permissions */}
-                    <Text>{this.state.location}</Text>
-                    <Text>{dob.toLocaleDateString("en-GB")}</Text>
-                    <Text>{this.state.website}</Text>
-                </View>
-
-            </ScrollView>
+                </ScrollView>
+                <View style={{paddingBottom: 3, backgroundColor: Colors.avatarBackground}} />
+            </View>
         );
 
         return (
