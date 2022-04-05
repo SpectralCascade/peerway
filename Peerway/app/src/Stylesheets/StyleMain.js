@@ -22,7 +22,7 @@ const StyleMain = StyleSheet.create({
     },
     buttonText: {
         color: Colors.buttonText,
-        fontFamily: "monospace",
+        fontFamily: "monospace"
     },
     bottomContent: {
         justifyContent: "flex-end",

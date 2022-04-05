@@ -8,6 +8,7 @@ import SplashScreen from '../Screens/SplashScreen';
 import Settings from '../Screens/Settings';
 import Profile from '../Screens/Profile';
 import MainTabs from "./TabNavigators";
+import CreatePost from "../Screens/CreatePost";
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +52,11 @@ function MainStack(props) {
                 name="Settings"
                 component={Settings}
                 options={{title: "Settings", animation: 'slide_from_right', headerShown: true}}
+            />
+            <Stack.Screen
+                name="CreatePost"
+                component={CreatePost}
+                options={{title: "Create Post", animation: "slide_from_bottom", headerShown: true}}
             />
         </Stack.Navigator>
     );

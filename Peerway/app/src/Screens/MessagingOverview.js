@@ -15,7 +15,7 @@ import Avatar from '../Components/Avatar';
 
 const topbarHeight = 56;
 const iconSize = Constants.avatarMedium;
-const paddingAmount = 8;
+const paddingAmount = Constants.paddingGap;
 
 export default class MessagingOverview extends Component {
 
@@ -238,7 +238,7 @@ export default class MessagingOverview extends Component {
                 />
 
                 <TouchableOpacity onPress={() => onCreateChat()} style={styles.newChatButton}>
-                    <Icon name="chat" size={iconSize * 0.8} color="white" />
+                    <Icon name="chat" size={Constants.floatingButtonSize * 0.6} color="white" />
                 </TouchableOpacity>
 
             </SafeAreaView>
@@ -287,10 +287,10 @@ const styles = StyleSheet.create({
     },
     newChatButton: {
         position: "absolute",
-        right: paddingAmount * 5,
-        bottom: paddingAmount * 7,
-        width: iconSize * 1.2,
-        height: iconSize * 1.2,
+        right: paddingAmount * 2,
+        bottom: paddingAmount * 2,
+        width: Constants.floatingButtonSize,
+        height: Constants.floatingButtonSize,
         borderRadius: 10000,
         backgroundColor: Colors.button,
         justifyContent: "center",

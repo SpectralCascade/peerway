@@ -8,5 +8,7 @@ export default {
     avatarMedium: 56,
     avatarStandard: 64,
     avatarLarge: 128,
-    avatarFull: 400
+    avatarFull: 400,
+    floatingButtonSize: 64,
+    paddingGap: 8
 }

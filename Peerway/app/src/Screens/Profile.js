@@ -1,6 +1,7 @@
 import React from 'react';
 import HandleEffect from '../Components/HandleEffect';
 import { TouchableOpacity, Image, View, ScrollView, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Database from '../Database';
 import StyleMain from '../Stylesheets/StyleMain';
 import Avatar from '../Components/Avatar';
@@ -11,6 +12,7 @@ import Colors from '../Stylesheets/Colors';
 import ButtonText from '../Components/ButtonText';
 import Feed from '../Components/Feed';
 import Constants from '../Constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default class Profile extends React.Component {
     constructor(props) {
@@ -71,8 +73,14 @@ export default class Profile extends React.Component {
         this.forceUpdate();
     }
 
-    OnGoEdit() {
+    // Go to the profile editing screen
+    GoEditProfile() {
         this.props.navigation.navigate("EditProfile");
+    }
+
+    // Go to the post creation screen
+    GoCreatePost() {
+        this.props.navigation.navigate("CreatePost");
     }
 
     OnAvatarPress() {
@@ -83,7 +91,7 @@ export default class Profile extends React.Component {
         const renderEditButton = () => {
             if (this.peerId === this.activeId) {
                 return (
-                    <TouchableOpacity style={[StyleMain.button, styles.editButton]} onPress={() => this.OnGoEdit()}>
+                    <TouchableOpacity style={[StyleMain.button, styles.editButton]} onPress={() => this.GoEditProfile()}>
                         <ButtonText>Edit Profile</ButtonText>
                     </TouchableOpacity>
                 );
@@ -132,12 +140,18 @@ export default class Profile extends React.Component {
         );
 
         return (
-            <Feed
-                route={this.props.route}
-                navigation={this.props.navigation}
-                ListHeaderComponent={() => renderHeader()}
-                style={styles.content}
-            />
+            <SafeAreaView style={StyleMain.background}>
+                <Feed
+                    route={this.props.route}
+                    navigation={this.props.navigation}
+                    ListHeaderComponent={() => renderHeader()}
+                    style={styles.content}
+                />
+                
+                <TouchableOpacity onPress={() => this.GoCreatePost()} style={styles.newPostButton}>
+                    <Icon name="plus" size={Constants.floatingButtonSize * 0.6} color="white" />
+                </TouchableOpacity>
+            </SafeAreaView>
         );
     }
     
@@ -178,5 +192,16 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         fontSize: 18,
         fontWeight: "bold"
+    },
+    newPostButton: {
+        position: "absolute",
+        right: Constants.paddingGap * 2,
+        bottom: Constants.paddingGap * 2,
+        width: Constants.floatingButtonSize,
+        height: Constants.floatingButtonSize,
+        borderRadius: 10000,
+        backgroundColor: Colors.button,
+        justifyContent: "center",
+        alignItems: "center"
     }
 });
