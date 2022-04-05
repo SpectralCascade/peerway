@@ -9,8 +9,8 @@ import Text from '../Components/Text';
 import { Log } from '../Log';
 import Colors from '../Stylesheets/Colors';
 import ButtonText from '../Components/ButtonText';
-
-const avatarSize = 64;
+import Feed from '../Components/Feed';
+import Constants from '../Constants';
 
 export default class Profile extends React.Component {
     constructor(props) {
@@ -75,6 +75,10 @@ export default class Profile extends React.Component {
         this.props.navigation.navigate("EditProfile");
     }
 
+    OnAvatarPress() {
+        // TODO show modal with avatar image full size
+    }
+
     render() {
         const renderEditButton = () => {
             if (this.peerId === this.activeId) {
@@ -87,8 +91,10 @@ export default class Profile extends React.Component {
             return (<></>);
         }
 
-        return (
-            <View style={StyleMain.background}>
+        let dob = new Date(this.state.dob);
+
+        const renderHeader = () => (
+            <ScrollView style={StyleMain.background}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
                 {/*<Image source={""}/>*/}
@@ -97,13 +103,12 @@ export default class Profile extends React.Component {
                 </View>
 
                 <View style={[styles.header]}>
-                    <Avatar avatar={(() => {
-                        let path = Peerway.GetAvatarPath(this.peerId, this.state.avatar);
-                        if (path.length > 0) {
-                            path = "file://" + path;
-                        }
-                        return path;
-                    })()} size={avatarSize} />
+                    <TouchableOpacity style={[StyleMain.avatar, {width: Constants.avatarStandard, height: Constants.avatarStandard}]}>
+                        <Avatar
+                            avatar={Peerway.GetAvatarPath(this.peerId, this.state.avatar, "file://")}
+                            size={Constants.avatarStandard}
+                        />
+                    </TouchableOpacity>
                     <Text style={[styles.nameText]}>{this.state.name}</Text>
                     {renderEditButton()}
                 </View>
@@ -116,14 +121,20 @@ export default class Profile extends React.Component {
                 <View style={[styles.headerBottom]}>
                     {/* TODO only show these to peers with permissions */}
                     <Text>{this.state.location}</Text>
-                    <Text>{this.state.dob}</Text>
+                    <Text>{dob.toLocaleDateString("en-GB")}</Text>
                     <Text>{this.state.website}</Text>
                 </View>
 
-                <ScrollView style={[styles.content]}>
-                    {/* TODO */}
-                </ScrollView>
-            </View>
+            </ScrollView>
+        );
+
+        return (
+            <Feed
+                route={this.props.route}
+                navigation={this.props.navigation}
+                ListHeaderComponent={() => renderHeader()}
+                style={styles.content}
+            />
         );
     }
     
@@ -138,7 +149,6 @@ const styles = StyleSheet.create({
         padding: 10
     },
     content: {
-        backgroundColor: Colors.avatarBackground
     },
     editButton: {
         height: 32,

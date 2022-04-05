@@ -14,7 +14,7 @@ import RNFS from "react-native-fs";
 import Avatar from '../Components/Avatar';
 
 const topbarHeight = 56;
-const iconSize = 56;
+const iconSize = Constants.avatarMedium;
 const paddingAmount = 8;
 
 export default class MessagingOverview extends Component {
@@ -137,6 +137,7 @@ export default class MessagingOverview extends Component {
                     message: {
                         from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
+                        // TODO instead of en-GB use device locale
                         timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
                     },
                     read: meta.read

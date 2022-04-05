@@ -94,11 +94,13 @@ class PeerwayAPI {
     //
 
     // Get the path to an entity avatar image
-    GetAvatarPath(id, ext) {
-        if (id.length == 0) {
+    // Returns empty string if id or extension are empty
+    // TODO force all avatars to use the same image file format (PNG)
+    GetAvatarPath(id, ext, prepend="") {
+        if (id.length == 0 || ext.length == 0) {
             return "";
         }
-        return RNFS.DocumentDirectoryPath + "/" + (id === this._activeId ?
+        return prepend + RNFS.DocumentDirectoryPath + "/" + (id === this._activeId ?
             id + "." + ext : this._activeId + "/peer/" + id + "." + ext);
     }
 

@@ -14,9 +14,10 @@ import Avatar from '../Components/Avatar';
 import { Log } from '../Log';
 import RNFS from "react-native-fs";
 import Peerway from '../Peerway';
+import Constants from '../Constants';
 
 const dimensions = Dimensions.get('window');
-const avatarSize = dimensions.width * 0.3;
+const avatarSize = Constants.avatarLarge;
 
 export default class ProfileEdit extends React.Component {
     constructor(props) {
@@ -46,14 +47,15 @@ export default class ProfileEdit extends React.Component {
                 profile = JSON.parse(Database.active.getString("profile"));
                 this.setState({
                     name: profile.name,
-                    selectedDate: getFormatedDate(Date.parse(profile.dob)),
+                    selectedDate: getFormatedDate(new Date(profile.dob)),
                     location: profile.location,
                     website: profile.website,
                     bio: profile.bio,
                     avatar: {
-                        path: "file://" + Peerway.GetAvatarPath(
+                        path: Peerway.GetAvatarPath(
                             Database.active.getString("id"),
-                            profile.avatar.ext
+                            profile.avatar.ext,
+                            "file://"
                         ),
                         mime: profile.mime,
                         ext: profile.ext

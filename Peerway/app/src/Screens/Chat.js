@@ -59,7 +59,7 @@ export default class Chat extends React.Component {
                         _id: message.from,
                         name: fromActive ? "You" : (peer ? peer.name : message.from),
                         avatar: peer && peer.avatar.length > 0 ?
-                            "file://" + Peerway.GetAvatarPath(message.from, peer.avatar) : ""
+                            Peerway.GetAvatarPath(message.from, peer.avatar, "file://") : ""
                     }
                 });
             }
@@ -120,7 +120,7 @@ export default class Chat extends React.Component {
                         _id: from,
                         name: peer ? peer.name : message.from,
                         avatar: peer && peer.avatar.length > 0 ?
-                            "file://" + Peerway.GetAvatarPath(message.from, peer.avatar) : ""
+                            Peerway.GetAvatarPath(message.from, peer.avatar, "file://") : ""
                     }
                 });
                 this.forceUpdate();
