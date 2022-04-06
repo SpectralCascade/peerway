@@ -27,6 +27,8 @@ class PeerwayAPI {
     onSyncPeersComplete = () => { Log.Info("Peer syncing has finished."); };
     // Callback when all peers have been synced.
     onSyncPeersError = (error) => { Log.Error(error.message); };
+    // Callback when an avatar has been modified.
+    onAvatarChange = (id) => {};
 
     //
     // "Private" members
@@ -52,6 +54,8 @@ class PeerwayAPI {
     _activeId = "";
     // The current syncing configuration in use. Only to be used by the SyncPeers() method.
     _syncConfig = {};
+    // Cache of avatar "file://" paths; when an avatar is changed, this is wiped.
+    _avatarCache = {};
 
     // Setup properties
     constructor() {
@@ -93,6 +97,16 @@ class PeerwayAPI {
     // "Public" API methods
     //
 
+    // Rebuild the cached entry for the specified avatar.
+    MarkAvatarPathDirty(id) {
+        if (id in this._avatarCache) {
+            this._avatarCache[id]++;
+            this.onAvatarChange(id);
+        } else {
+            this._avatarCache[id] = 0;
+        }
+    }
+
     // Get the path to an entity avatar image
     // Returns empty string if id or extension are empty
     // TODO force all avatars to use the same image file format (PNG)
@@ -100,8 +114,17 @@ class PeerwayAPI {
         if (id.length == 0 || !ext || ext.length == 0) {
             return "";
         }
-        return prepend + RNFS.DocumentDirectoryPath + "/" + (id === this._activeId ?
-            id + "." + ext : this._activeId + "/peer/" + id + "." + ext) + (prepend === "file://" ? "?force=" + Math.random().toString() : "");
+        if (!(id in this._avatarCache)) {
+            this._avatarCache[id] = 0;
+        }
+        return (
+            prepend +
+            RNFS.DocumentDirectoryPath +
+            "/" +
+            (id === this._activeId ? id + "." + ext : this._activeId + "/peer/" + id + "." + ext) +
+            // Additional bit here forces the Image component using this to update
+            (prepend === "file://" ? "?version=" + this._avatarCache[id].toString() : "")
+        );
     }
 
     // Get the path to a chat
@@ -805,6 +828,7 @@ class PeerwayAPI {
             if (exists) {
                 let path = this.GetPeerPath(from) + "." + avatarExt;
                 RNFS.mkdir(this.GetPeerPath(from) + "/").then(() => RNFS.moveFile(avatarPath, path)).then(() => {
+                    Peerway.MarkAvatarPathDirty(from);
                     Log.Debug("Updated avatar for peer." + from);
                 }).catch((e) => {
                     Log.Error("Failed to mkdir or move file. " + e);

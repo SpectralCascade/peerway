@@ -226,6 +226,7 @@ export default class ProfileEdit extends React.Component {
                                     });
                                 }).then(() => RNFS.exists(path)).then((exists) => {
                                     Log.Debug("path = " + path + " | exists = " + exists);
+                                    Peerway.MarkAvatarPathDirty(id);
                                 }).catch((e) => {
                                     Log.Error("Avatar overwrite error. " + e);
                                 });
