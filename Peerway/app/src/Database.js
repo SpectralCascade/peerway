@@ -29,10 +29,11 @@ function wrapSQL(value) {
 // Get comma separated list of values from keys
 // Helper for SQL statements
 function ToCSV(obj, keys) {
-    let sql = keys[0] in obj ? wrapSQL(obj[keys[0]]) : "";
+    let sql = keys[0] in obj ?
+        (typeof(obj[keys[0]]) === "string" ? wrapSQL(obj[keys[0]]) : obj[keys[0]].toString()) : "";
     for (let i = 1, counti = keys.length; i < counti; i++) {
         if (keys[i] in obj) {
-            sql += ", " + wrapSQL(obj[keys[i]]);
+            sql += ", " + (typeof(obj[keys[i]]) === "string" ? wrapSQL(obj[keys[i]]) : obj[keys[i]].toString());
         }
     }
     return sql;
@@ -281,6 +282,7 @@ export default class Database {
             created: timeNow,
             edited: timeNow,
             updated: timeNow,
+            version: 0,
             content: content,
             media: JSON.stringify(media)
         }
@@ -291,6 +293,8 @@ export default class Database {
                 ToCSV(post, ["id","author","created","edited","updated","version","content","media"]) +
             ")"
         );
+
+        return post;
     }
 
     // Get the array index from the current year/month

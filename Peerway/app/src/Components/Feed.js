@@ -18,24 +18,15 @@ const footerButtonSize = 36;
 export default class Feed extends React.Component {
     constructor(props) {
         super(props);
-        this.Init();
 
         this.state = {
-            posts: [
-                {
-                    author: this.activeId,
-                    created: (new Date()).toISOString(),
-                    liked: 0,
-                    text: "bla bla bla",
-                    media: []
-                }
-            ],
+            posts: [],
             loading: false,
             syncing: false
         };
 
-        this.loadPosts = props.loadPosts ? props.loadPosts : (posts) => posts;
-        this.syncPosts = props.syncPosts ? props.syncPosts : () => {};
+        this.Init();
+
     }
 
     Init() {
@@ -43,27 +34,33 @@ export default class Feed extends React.Component {
         this.peers = {};
         this.peers[this.activeId] = JSON.parse(Database.active.getString("profile"));
         this.peers[this.activeId].avatar = this.peers[this.activeId].avatar.ext;
+        this.loadPosts = this.props.loadPosts ? this.props.loadPosts : (posts) => posts;
+        this.syncPosts = this.props.syncPosts ? this.props.syncPosts : (onComplete) => onComplete();
+        this.state.posts = this.loadPosts(this.state.posts);
+        this.syncPosts(() => {});
     }
 
     OnOpen() {
         Log.Debug("OPENED FEED");
-
         this.Init();
+        this.setState({posts: this.state.posts});
+    }
 
-        this.SyncPosts();
+    OnSyncDone() {
+        this.setState({syncing: false});
+        Log.Debug("Posts syncing complete.");
     }
 
     // Sync all posts
     SyncPosts() {
         this.setState({syncing: true});
         Log.Debug("Syncing posts...");
-        this.syncPosts();
-        this.setState({syncing: false});
+        this.syncPosts(() => this.OnSyncDone());
     }
 
     OpenPost(post) {
         // TODO
-        Log.Debug("Opened post: " + JSON.stringify(post));
+        Log.Debug("Opened post." + post.id);
     }
 
     // Go to a specific peer profile
@@ -85,13 +82,18 @@ export default class Feed extends React.Component {
     }
 
     render() {
+
+        if (this.props.forceReload) {
+            this.state.posts = this.loadPosts(this.state.posts);
+        }
+        
         return (
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
             onRefresh={() => this.SyncPosts()}
             refreshing={this.state.syncing}
             onEndReached={() => this.setState({posts: this.loadPosts(this.state.posts)})}
             data={this.state.posts}
-            keyExtractor={item => item.author}
+            keyExtractor={item => item.id}
             renderItem={({ item }) => {
                 let author = this.peers[item.author];
                 if (!author) {
@@ -134,7 +136,7 @@ export default class Feed extends React.Component {
 
                         {/* TODO post content */}
                         <TouchableHighlight underlayColor={"#fff4"} onPress={() => this.OpenPost(item)} style={styles.postContent}>
-                            <Text>{item.text}</Text>
+                            <Text>{item.content}</Text>
                         </TouchableHighlight>
 
                         {/* TODO add this back (after MVP)

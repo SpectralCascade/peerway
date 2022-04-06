@@ -30,7 +30,8 @@ export default class Profile extends React.Component {
             avatar: "",
             updated: initTime,
             bioLines: 3,
-            subscribed: 0
+            subscribed: 0,
+            forceReload: false
         }
     }
 
@@ -75,6 +76,8 @@ export default class Profile extends React.Component {
                 Log.Warning("No such peer." + this.peerId);
             }
         }
+
+        this.setState({forceReload: true});
     }
 
     // Go to the profile editing screen
@@ -166,6 +169,27 @@ export default class Profile extends React.Component {
                     route={this.props.route}
                     navigation={this.props.navigation}
                     ListHeaderComponent={() => renderHeader()}
+                    // TODO add syncPosts callback
+                    forceReload={this.state.forceReload}
+                    loadPosts={(posts) => {
+                        if (this.state.forceReload) {
+                            posts = [];
+                        }
+                        let query = Database.Execute(
+                            "SELECT * FROM Posts WHERE author='" + this.peerId + "' " +
+                            (posts.length > 0 ?
+                                ("AND created < '" + posts[posts.length - 1].created + "' ") :
+                                ""
+                            ) +
+                            "ORDER BY created DESC LIMIT 10"
+                        );
+                        if (query.data.length > 0) {
+                            for (let i in query.data) {
+                                posts.push(query.data[i]);
+                            }
+                        }                        
+                        return posts;
+                    }}
                     style={styles.content}
                 />
                 
