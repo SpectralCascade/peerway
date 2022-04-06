@@ -29,11 +29,13 @@ export default class CreatePost extends React.Component {
     OnOpen() {
         Log.Debug("OPENED POST CREATION SCREEN");
         this.Init();
-        // Auto-close when keyboard is hidden
+        // Auto-close when keyboard is hidden if no text input given
         this.sub = Keyboard.addListener("keyboardDidHide", () => {
-            this.sub.remove();
-            this.state = {};
-            this.props.navigation.goBack();
+            if (this.state.text.length == 0) {
+                this.sub.remove();
+                this.state = {};
+                this.props.navigation.goBack();
+            }
         });
     }
 
