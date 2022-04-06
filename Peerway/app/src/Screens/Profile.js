@@ -29,7 +29,8 @@ export default class Profile extends React.Component {
             bio: "",
             avatar: "",
             updated: initTime,
-            bioLines: 3
+            bioLines: 3,
+            subscribed: 0
         }
     }
 
@@ -78,6 +79,15 @@ export default class Profile extends React.Component {
         this.props.navigation.navigate("EditProfile");
     }
 
+    GoToggleSubscribe() {
+        if (this.state.subscribed) {
+            // TODO show confirmation popup
+            this.setState({subscribed: 0});
+        } else {
+            this.setState({subscribed: 1});
+        }
+    }
+
     // Go to the post creation screen
     GoCreatePost() {
         this.props.navigation.navigate("CreatePost");
@@ -88,15 +98,22 @@ export default class Profile extends React.Component {
     }
 
     render() {
-        const renderEditButton = () => {
+        const renderProfileButton = () => {
+            let buttonText = "";
+            let onPress = () => {};
+
             if (this.peerId === this.activeId) {
-                return (
-                    <TouchableOpacity style={[StyleMain.button, styles.editButton]} onPress={() => this.GoEditProfile()}>
-                        <ButtonText>Edit Profile</ButtonText>
-                    </TouchableOpacity>
-                );
+                buttonText = "Edit Profile";
+                onPress = () => this.GoEditProfile();
+            } else {
+                buttonText = this.state.subscribed ? "Unfollow" : "Follow";
+                onPress = () => this.GoToggleSubscribe();
             }
-            return (<></>);
+            return (
+                <TouchableOpacity style={[StyleMain.button, styles.editButton]} onPress={onPress}>
+                    <ButtonText>{buttonText}</ButtonText>
+                </TouchableOpacity>
+            );
         }
 
         let dob = new Date(this.state.dob);
@@ -119,7 +136,7 @@ export default class Profile extends React.Component {
                             />
                         </TouchableOpacity>
                         <Text style={[styles.nameText]}>{this.state.name}</Text>
-                        {renderEditButton()}
+                        {renderProfileButton()}
                     </View>
 
                     <TouchableOpacity onPress={() => this.setState({bioLines: this.state.bioLines != 0 ? 0 : 3})}

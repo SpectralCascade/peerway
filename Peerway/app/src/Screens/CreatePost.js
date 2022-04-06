@@ -49,7 +49,7 @@ export default class CreatePost extends React.Component {
 
     render() {
         return (
-            <View style={[StyleMain.background]}>
+            <View style={[StyleMain.background, {backgroundColor: "white"}]}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
                 <ScrollView style={{padding: 10}}>
