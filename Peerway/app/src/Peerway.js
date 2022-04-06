@@ -97,11 +97,11 @@ class PeerwayAPI {
     // Returns empty string if id or extension are empty
     // TODO force all avatars to use the same image file format (PNG)
     GetAvatarPath(id, ext, prepend="") {
-        if (id.length == 0 || ext.length == 0) {
+        if (id.length == 0 || !ext || ext.length == 0) {
             return "";
         }
         return prepend + RNFS.DocumentDirectoryPath + "/" + (id === this._activeId ?
-            id + "." + ext : this._activeId + "/peer/" + id + "." + ext);
+            id + "." + ext : this._activeId + "/peer/" + id + "." + ext) + (prepend === "file://" ? "?force=" + Math.random().toString() : "");
     }
 
     // Get the path to a chat
@@ -807,13 +807,13 @@ class PeerwayAPI {
                 RNFS.mkdir(this.GetPeerPath(from) + "/").then(() => RNFS.moveFile(avatarPath, path)).then(() => {
                     Log.Debug("Updated avatar for peer." + from);
                 }).catch((e) => {
-                    Log.Error(e);
+                    Log.Error("Failed to mkdir or move file. " + e);
                 });
             } else {
                 Log.Verbose("Cannot update avatar file for peer." + from + ", no such path " + avatarPath);
             }
         }).catch((e) => {
-            Log.Error(e);
+            Log.Error("Failed to determine if file exists. " + e);
         });
     }
 

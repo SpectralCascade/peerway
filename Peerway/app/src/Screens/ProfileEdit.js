@@ -29,8 +29,12 @@ export default class ProfileEdit extends React.Component {
             location: "",
             website: "",
             bio: "",
-            avatar: {}
+            avatar: {},
+            modified: false
         };
+        this.initialState = {
+        }
+        this.initialAvatarPath = "";
     }
 
     componentDidMount() {
@@ -45,21 +49,30 @@ export default class ProfileEdit extends React.Component {
             if (Database.active != null) {
                 // Load active entity data
                 profile = JSON.parse(Database.active.getString("profile"));
-                this.setState({
+                this.initialState = {
                     name: profile.name,
                     selectedDate: getFormatedDate(new Date(profile.dob)),
                     location: profile.location,
                     website: profile.website,
-                    bio: profile.bio,
+                    bio: profile.bio
+                };
+                this.initialAvatarPath = Peerway.GetAvatarPath(
+                    Database.active.getString("id"),
+                    profile.avatar.ext,
+                    "file://"
+                );
+                this.setState({
+                    name: this.initialState.name.slice(),
+                    selectedDate: this.initialState.selectedDate.slice(),
+                    location: this.initialState.location.slice(),
+                    website: this.initialState.website.slice(),
+                    bio: this.initialState.bio.slice(),
                     avatar: {
-                        path: Peerway.GetAvatarPath(
-                            Database.active.getString("id"),
-                            profile.avatar.ext,
-                            "file://"
-                        ),
+                        path: this.initialAvatarPath.slice(),
                         mime: profile.mime,
                         ext: profile.ext
-                    }
+                    },
+                    modified: false
                 });
             } else {
                 // No entity is loaded, must be part of entity creation flow.
@@ -75,6 +88,19 @@ export default class ProfileEdit extends React.Component {
         }
     }
 
+    OnChange(key, value) {
+        this.state[key] = value;
+        this.setState({modified: this.HasChanges()});
+    }
+
+    HasChanges() {
+        let changed = false;
+        Object.keys(this.initialState).forEach(key => {
+            changed = changed || this.state[key] !== this.initialState[key];
+        });
+        return changed || this.state.avatar.path !== this.initialAvatarPath;
+    }
+
     render() {
         return (
             <View style={StyleMain.background}>
@@ -82,7 +108,7 @@ export default class ProfileEdit extends React.Component {
                     <DatePicker
                         onSelectedChange={date => {
                             if (this.state.selectedDate != date) {
-                                this.setState({ selectedDate: date });
+                                this.OnChange("selectedDate", date);
                             }
                         }}
                         mode="calendar"
@@ -108,11 +134,9 @@ export default class ProfileEdit extends React.Component {
                                         avoidEmptySpaceAroundImage: true,
                                         cropperCircleOverlay: true
                                     }).then(image => {
-                                        this.setState({
-                                            avatar: {
-                                                path: image.path,
-                                                mime: image.mime
-                                            }
+                                        this.OnChange("avatar", {
+                                            path: image.path,
+                                            mime: image.mime
                                         });
                                     }, () => {
                                         // Do nothing if cancelled
@@ -130,7 +154,7 @@ export default class ProfileEdit extends React.Component {
                         </View>
                         <Text style={styles.text}>Name:</Text>
                         <TextInput
-                            onChangeText={(text) => this.setState({name: text}) } 
+                            onChangeText={(text) => this.OnChange("name", text) } 
                             style={StyleMain.textInput}
                             value={this.state.name}
                             placeholder="Required field..."
@@ -138,7 +162,7 @@ export default class ProfileEdit extends React.Component {
 
                         <Text style={styles.text}>Date of birth:</Text>
                         <TouchableOpacity style={StyleMain.textInput} onPress={() => {
-                            this.setState({selectedDate: ""});
+                            this.OnChange("selectedDate", "");
                             this.datePickerModalRef.current.open();
                         }}>
                             <Text>{(() => {
@@ -151,21 +175,21 @@ export default class ProfileEdit extends React.Component {
 
                         <Text style={styles.text}>Location:</Text>
                         <TextInput
-                            onChangeText={(text) => this.setState({location: text}) }
+                            onChangeText={(text) => this.OnChange("location", text)}
                             style={StyleMain.textInput}
                             value={this.state.location}
                         />
 
                         <Text style={styles.text}>Website:</Text>
                         <TextInput
-                            onChangeText={(text) => this.setState({website: text})}
+                            onChangeText={(text) => this.OnChange("website", text)}
                             style={StyleMain.textInput}
                             value={this.state.website}
                         />
 
                         <Text style={styles.text}>About you:</Text>
                         <TextInput
-                            onChangeText={(text) => this.setState({bio: text})}
+                            onChangeText={(text) => this.OnChange("bio", text)}
                             multiline={true}
                             numberOfLines={3}
                             style={[StyleMain.textInputMultiline, {height: 80}]}
@@ -174,22 +198,36 @@ export default class ProfileEdit extends React.Component {
                     </ScrollView>
                     
                     <TouchableOpacity
-                        disabled={this.state.name == ""}
-                        style={[StyleMain.button, {backgroundColor: (this.state.name != "" ? Colors.button : Colors.buttonDisabled), height: 40, marginTop: 12}]}
+                        disabled={this.state.name.length == 0 || !this.state.modified}
+                        style={[StyleMain.button, {
+                            backgroundColor: (this.state.name.length == 0 || !this.state.modified ?
+                                Colors.buttonDisabled : Colors.button),
+                            height: 40,
+                            marginTop: 12
+                        }]}
                         onPress={() => {
                             if (Database.active == null) {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
                             }
                             let id = Database.active.getString("id");
 
-                            if ("path" in this.state.avatar) {
+                            let srcPath = this.state.avatar.path.slice();
+                            if (srcPath) {
                                 // Copy profile image to app documents path
-                                this.state.avatar.ext = this.state.avatar.path.split('.').pop();
+                                this.state.avatar.ext = srcPath.split('.').pop();
                                 let path = RNFS.DocumentDirectoryPath + "/" + id + "." + this.state.avatar.ext;
-                                RNFS.moveFile(this.state.avatar.path, path).then(() => {
-                                    return RNFS.exists(path);
-                                }).then((exists) => { Log.Debug("path = " + path + " | exists = " + exists); }).catch((e) => {
-                                    Log.Error(e);
+                                // Overwrite existing file
+                                RNFS.exists(path).then((exists) => {
+                                    if (!exists) {
+                                        return RNFS.moveFile(srcPath, path);
+                                    }
+                                    return RNFS.unlink(path).then(() => {
+                                        return RNFS.moveFile(srcPath, path);
+                                    });
+                                }).then(() => RNFS.exists(path)).then((exists) => {
+                                    Log.Debug("path = " + path + " | exists = " + exists);
+                                }).catch((e) => {
+                                    Log.Error("Avatar overwrite error. " + e);
                                 });
                                 // Remove path as it can be obtained using the entity ID
                                 delete this.state.avatar.path;
@@ -217,7 +255,7 @@ export default class ProfileEdit extends React.Component {
                             );
                         }}
                     >
-                        <ButtonText style={{color: (this.state.name != "" ? Colors.buttonText : Colors.buttonTextDisabled)}}>Save Profile</ButtonText>
+                        <ButtonText style={{color: (this.state.name.length == 0 || !this.state.modified ? Colors.buttonTextDisabled : Colors.buttonText)}}>Save Profile</ButtonText>
                     </TouchableOpacity>
 
                 </View>

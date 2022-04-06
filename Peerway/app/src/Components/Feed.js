@@ -18,7 +18,7 @@ const footerButtonSize = 36;
 export default class Feed extends React.Component {
     constructor(props) {
         super(props);
-        this.init();
+        this.Init();
 
         this.state = {
             posts: [
@@ -30,10 +30,15 @@ export default class Feed extends React.Component {
                     media: []
                 }
             ],
+            loading: false,
+            syncing: false
         };
+
+        this.loadPosts = props.loadPosts ? props.loadPosts : (posts) => posts;
+        this.syncPosts = props.syncPosts ? props.syncPosts : () => {};
     }
 
-    init() {
+    Init() {
         this.activeId = Database.active.getString("id");
         this.peers = {};
         this.peers[this.activeId] = JSON.parse(Database.active.getString("profile"));
@@ -43,7 +48,17 @@ export default class Feed extends React.Component {
     OnOpen() {
         Log.Debug("OPENED FEED");
 
-        this.init();
+        this.Init();
+
+        this.SyncPosts();
+    }
+
+    // Sync all posts
+    SyncPosts() {
+        this.setState({syncing: true});
+        Log.Debug("Syncing posts...");
+        this.syncPosts();
+        this.setState({syncing: false});
     }
 
     OpenPost(post) {
@@ -72,6 +87,9 @@ export default class Feed extends React.Component {
     render() {
         return (
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
+            onRefresh={() => this.SyncPosts()}
+            refreshing={this.state.syncing}
+            onEndReached={() => this.setState({posts: this.loadPosts(this.state.posts)})}
             data={this.state.posts}
             keyExtractor={item => item.author}
             renderItem={({ item }) => {

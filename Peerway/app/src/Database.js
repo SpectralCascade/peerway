@@ -159,8 +159,19 @@ export default class Database {
                         "REFERENCES Chats (id) " +
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION" +
+                ")"],
+                // Table of posts
+                ["CREATE TABLE IF NOT EXISTS " + "Posts" + "(" +
+                    "id TEXT," + // Post UUID
+                    "author TEXT," + // Author UUID
+                    "created TEXT," + // When the post was created; UTC ISO-8601 format
+                    "edited TEXT," + // When the post was last edited by the author; UTC ISO-8601 format
+                    "updated TEXT," + // When the post was last updated from the author; UTC ISO-8601 format
+                    "version INTEGER," + // Which version of the post is this? Increments on each edit
+                    "content TEXT," + // Text content
+                    "media TEXT," + // JSON array of all media content (e.g. images, videos etc.)
+                    "PRIMARY KEY (id, author)" + // Composite primary key
                 ")"]
-                // TODO table of posts
             ];
 
             let result = sqlite.executeSqlBatch(id, commands);

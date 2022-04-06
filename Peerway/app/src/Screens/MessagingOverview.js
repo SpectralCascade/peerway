@@ -133,7 +133,7 @@ export default class MessagingOverview extends Component {
                 this.state.chats.push({
                     id: id,
                     name: chatName,
-                    icon: icon,
+                    icon: "file://" + icon,
                     message: {
                         from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                         content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
@@ -147,9 +147,10 @@ export default class MessagingOverview extends Component {
                 RNFS.exists(icon).then((exists) => {
                     if (!exists && query.data.length == 1) {
                         // Use peer avatar as chat icon
-                        icon = Peerway.GetPeerPath(query.data[0].id) + "." + query.data[0].avatar;
+                        icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
+                        Log.Debug("Loading chat icon " + icon);
                         this.state.chats[chatIndex].icon = icon;
-                        this.forceUpdate();
+                        this.setState({chats: this.state.chats});
                     }
                 }).catch((e) => {
                 });
@@ -215,7 +216,7 @@ export default class MessagingOverview extends Component {
                         <View>
                         <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
                             <View style={styles.chatIcon}>
-                                <Avatar avatar={"file://" + item.icon} size={iconSize} />
+                                <Avatar avatar={item.icon} size={iconSize} />
                             </View>
                             <View style={styles.chatContent}>
                                 <Text

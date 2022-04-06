@@ -48,30 +48,33 @@ export default class Profile extends React.Component {
         // Load up top profile bits
         if (this.peerId === this.activeId) {
             let profile = JSON.parse(Database.active.getString("profile"));
-            this.state.name = profile.name;
-            this.state.dob = profile.dob;
-            this.state.location = profile.location;
-            this.state.website = profile.website;
-            this.state.bio = profile.bio;
-            this.state.avatar = profile.avatar.ext;
-            this.state.updated = profile.updated;
+            this.setState({
+                name: profile.name,
+                dob: profile.dob,
+                location: profile.location,
+                website: profile.website,
+                bio: profile.bio,
+                avatar: profile.avatar.ext,
+                updated: profile.updated,
+            });
         } else {
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
             if (query.data.length > 0) {
                 let peer = query.data[0];
-                this.state.name = peer.name;
-                this.state.dob = peer.dob;
-                this.state.location = peer.location;
-                this.state.website = peer.website;
-                this.state.bio = peer.bio;
-                this.state.avatar = peer.avatar;
-                this.state.updated = peer.updated;
+                this.setState({
+                    name: peer.name,
+                    dob: peer.dob,
+                    location: peer.location,
+                    website: peer.website,
+                    bio: peer.bio,
+                    avatar: peer.avatar,
+                    updated: peer.updated,
+                });
             } else {
                 // TODO request info via server (and/or other peers)
                 Log.Warning("No such peer." + this.peerId);
             }
         }
-        this.forceUpdate();
     }
 
     // Go to the profile editing screen
@@ -79,6 +82,7 @@ export default class Profile extends React.Component {
         this.props.navigation.navigate("EditProfile");
     }
 
+    // Toggle follow/unfollow of the entity
     GoToggleSubscribe() {
         if (this.state.subscribed) {
             // TODO show confirmation popup
