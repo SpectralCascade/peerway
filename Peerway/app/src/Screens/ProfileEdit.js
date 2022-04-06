@@ -206,8 +206,10 @@ export default class ProfileEdit extends React.Component {
                             marginTop: 12
                         }]}
                         onPress={() => {
+                            let goBack = true;
                             if (Database.active == null) {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
+                                goBack = false;
                             }
                             let id = Database.active.getString("id");
 
@@ -250,12 +252,17 @@ export default class ProfileEdit extends React.Component {
                             };
                             // Save profile in database
                             Database.active.set("profile", JSON.stringify(profile));
-                            this.props.navigation.dispatch(
-                                CommonActions.reset({
-                                    index: 1,
-                                    routes: [{ name: 'Overview' }]
-                                })
-                            );
+
+                            if (goBack) {
+                                this.props.navigation.goBack();
+                            } else {
+                                this.props.navigation.dispatch(
+                                    CommonActions.reset({
+                                        index: 1,
+                                        routes: [{ name: "Overview" }]
+                                    })
+                                );
+                            }
                         }}
                     >
                         <ButtonText style={{color: (this.state.name.length == 0 || !this.state.modified ? Colors.buttonTextDisabled : Colors.buttonText)}}>Save Profile</ButtonText>

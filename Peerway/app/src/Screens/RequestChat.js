@@ -95,7 +95,7 @@ export default class RequestChat extends Component {
         this.props.navigation.dispatch(
             CommonActions.reset({
                 index: 2,
-                routes: [{ name: 'MessagingOverview' }, { name: 'Chat', params: { chatId: meta.id } }]
+                routes: [{ name: 'Overview' }, { name: 'Chat', params: { chatId: meta.id } }]
             })
         );
     }

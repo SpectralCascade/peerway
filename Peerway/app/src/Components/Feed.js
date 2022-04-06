@@ -51,16 +51,23 @@ export default class Feed extends React.Component {
         Log.Debug("Posts syncing complete.");
     }
 
-    // Sync all posts
+    // Get the latest posts
     SyncPosts() {
         this.setState({syncing: true});
         Log.Debug("Syncing posts...");
         this.syncPosts(() => this.OnSyncDone());
     }
 
+    // View the post by itself
     OpenPost(post) {
         // TODO
         Log.Debug("Opened post." + post.id);
+    }
+
+    // Open the post options menu
+    OpenContextMenu(post) {
+        // TODO
+        Log.Debug("Opened post context menu options");
     }
 
     // Go to a specific peer profile
@@ -132,11 +139,18 @@ export default class Feed extends React.Component {
                                 </TouchableOpacity>
                                 <Text style={styles.dateText}>{(new Date(item.created)).toLocaleDateString("en-GB")}</Text>
                             </View>
+                            <TouchableOpacity style={{position: 'absolute', right: 10}} onPress={() => this.OpenContextMenu(item)}>
+                                <Icon
+                                    name="dots-vertical"
+                                    size={avatarSize / 2}
+                                    color="black"
+                                />
+                            </TouchableOpacity>
                         </View>
 
                         {/* TODO post content */}
                         <TouchableHighlight underlayColor={"#fff4"} onPress={() => this.OpenPost(item)} style={styles.postContent}>
-                            <Text>{item.content}</Text>
+                            <Text style={styles.postContentText}>{item.content}</Text>
                         </TouchableHighlight>
 
                         {/* TODO add this back (after MVP)
@@ -190,14 +204,18 @@ const styles = StyleSheet.create({
     post: {},
     postContent: {
         paddingHorizontal: edgePadding,
-        paddingVertical: innerPadding
+        paddingVertical: innerPadding,
+        backgroundColor: "white"
+    },
+    postContentText: {
     },
     postHeader: {
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: edgePadding,
         paddingTop: edgePadding,
-        paddingBottom: innerPadding
+        paddingBottom: innerPadding,
+        backgroundColor: "#eee"
     },
     postFooter: {
         flexDirection: "row",
