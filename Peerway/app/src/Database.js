@@ -7,6 +7,7 @@ import RNFS from "react-native-fs";
 import { Log } from './Log';
 import { Buffer } from 'buffer';
 import Constants from './Constants';
+import DefaultSettings from './DefaultSettings';
 
 // Automagically converts string into an SQL escaped single quote wrapped string.
 // Non-strings are unaffected by this function.
@@ -102,6 +103,10 @@ export default class Database {
 
         // Add entity to userdata.
         this.userdata.set(id, key);
+        
+        Object.keys(DefaultSettings).forEach((key) => {
+            this.userdata.set(key, DefaultSettings[key].toString());
+        });
 
         // Setup SQLite database tables
         let location = RNFS.DocumentDirectoryPath;
@@ -268,6 +273,25 @@ export default class Database {
         return chatData;
     }
 
+    static CreatePost(content, media) {
+        let timeNow = (new Date()).toISOString();
+        let post = {
+            id: uuidv1(),
+            author: this.active.getString("id"),
+            created: timeNow,
+            edited: timeNow,
+            updated: timeNow,
+            content: content,
+            media: JSON.stringify(media)
+        }
+
+        // Create a post entry in the database
+        this.Execute(
+            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media) VALUES (" +
+                ToCSV(post, ["id","author","created","edited","updated","version","content","media"]) +
+            ")"
+        );
+    }
 
     // Get the array index from the current year/month
     static GetLookupMonthIndex(start, current) {

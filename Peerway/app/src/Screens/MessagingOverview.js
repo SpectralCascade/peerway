@@ -148,7 +148,6 @@ export default class MessagingOverview extends Component {
                     if (!exists && query.data.length == 1) {
                         // Use peer avatar as chat icon
                         icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
-                        Log.Debug("Loading chat icon " + icon);
                         this.state.chats[chatIndex].icon = icon;
                         this.setState({chats: this.state.chats});
                     }

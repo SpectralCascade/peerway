@@ -41,8 +41,8 @@ export default class CreatePost extends React.Component {
 
     // Create the post in the database and publish it
     PublishPost() {
-        // TODO
         Log.Debug("PUBLISHING POST...");
+        Database.CreatePost(this.state.text, this.state.media);
         this.sub.remove();
         this.props.navigation.goBack();
     }
@@ -69,10 +69,16 @@ export default class CreatePost extends React.Component {
                 </ScrollView>
 
                 <TouchableOpacity
-                    style={[StyleMain.button, {}]}
+                    disabled={this.state.text.length == 0}
+                    style={[StyleMain.button, {
+                        backgroundColor: this.state.text.length == 0 ? Colors.buttonDisabled : Colors.button
+                    }]}
                     onPress={() => this.PublishPost()}
                 >
-                    <ButtonText style={{color: Colors.buttonText, fontSize: 18}}>Publish</ButtonText>
+                    <ButtonText style={{
+                        color: this.state.text.length == 0 ? Colors.buttonTextDisabled : Colors.buttonText,
+                        fontSize: 18
+                    }}>Publish</ButtonText>
                 </TouchableOpacity>
             </View>
         );

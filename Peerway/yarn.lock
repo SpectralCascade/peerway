@@ -5561,7 +5561,7 @@
     "kleur" "^3.0.3"
     "sisteransi" "^1.0.5"
 
-"prop-types@*", "prop-types@^15.5.10", "prop-types@^15.7.2", "prop-types@^15.7.x", "prop-types@^15.8.1":
+"prop-types@*", "prop-types@^15.5.10", "prop-types@^15.6.1", "prop-types@^15.7.2", "prop-types@^15.7.x", "prop-types@^15.8.1":
   "integrity" "sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg=="
   "resolved" "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz"
   "version" "15.8.1"
@@ -5717,12 +5717,25 @@
     "moment-jalaali" "^0.9.2"
     "prop-types" "^15.7.2"
 
+"react-native-numeric-input@^1.9.1":
+  "integrity" "sha512-uJiMjundXHiBcBLHgSqbfSjLdBM+4OBgLJLSsYG5/+XST5XWufsU8eZaEsn1miOkhjj2B7WgshjNX2Qm+4n3kw=="
+  "resolved" "https://registry.npmjs.org/react-native-numeric-input/-/react-native-numeric-input-1.9.1.tgz"
+  "version" "1.9.1"
+  dependencies:
+    "prop-types" "^15.6.1"
+    "react-native-pixel-perfect" "^1.0.1"
+
 "react-native-parsed-text@0.0.22":
   "integrity" "sha512-hfD83RDXZf9Fvth3DowR7j65fMnlqM9PpxZBGWkzVcUTFtqe6/yPcIoIAgrJbKn6YmtzkivmhWE2MCE4JKBXrQ=="
   "resolved" "https://registry.npmjs.org/react-native-parsed-text/-/react-native-parsed-text-0.0.22.tgz"
   "version" "0.0.22"
   dependencies:
     "prop-types" "^15.7.x"
+
+"react-native-pixel-perfect@^1.0.1":
+  "integrity" "sha512-0IvYCNkxuQbQC9q4tI+C3i6o38nbx916p7gBRBWuPxDhKBCuTkVV3VukcfW6vtjRlwQm6kwQcF9OtI+yUBt+YA=="
+  "resolved" "https://registry.npmjs.org/react-native-pixel-perfect/-/react-native-pixel-perfect-1.0.2.tgz"
+  "version" "1.0.2"
 
 "react-native-quick-sqlite@^3.0.2":
   "integrity" "sha512-m48kRGGfZPU5SonxbX++xBIh2d7ATcG7U3W9Ck/MkscHqx+0B0oXubHrK33Qe/4Dv/dGW/KI4ubaz+nJvfHFQw=="
@@ -5747,7 +5760,7 @@
   "resolved" "https://registry.npmjs.org/react-native-typing-animation/-/react-native-typing-animation-0.1.7.tgz"
   "version" "0.1.7"
 
-"react-native-vector-icons@^9.1.0":
+"react-native-vector-icons@^9.*", "react-native-vector-icons@^9.1.0":
   "integrity" "sha512-2AHZ/h9d/+rC0odz+OwbGNlc1Lik/pHhSixn4HfC8RtQ8CxfSBZ6gg7bTLcZhdSvZN+ZEGi30Fj+ZnOSQy+smg=="
   "resolved" "https://registry.npmjs.org/react-native-vector-icons/-/react-native-vector-icons-9.1.0.tgz"
   "version" "9.1.0"

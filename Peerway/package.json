@@ -24,6 +24,7 @@
     "react-native-mmkv": "^2.1.0",
     "react-native-modalbox": "latest",
     "react-native-modern-datepicker": "^1.0.0-beta.91",
+    "react-native-numeric-input": "^1.9.1",
     "react-native-quick-sqlite": "^3.0.2",
     "react-native-safe-area-context": "3.3.2",
     "react-native-screens": "^3.13.0",
