@@ -211,25 +211,27 @@ export default class ProfileEdit extends React.Component {
                             }
                             let id = Database.active.getString("id");
 
-                            let srcPath = this.state.avatar.path.slice();
+                            let srcPath = this.state.avatar.path.split("file://").pop().split("?").shift();
                             if (srcPath) {
                                 // Copy profile image to app documents path
                                 this.state.avatar.ext = srcPath.split('.').pop();
                                 let path = RNFS.DocumentDirectoryPath + "/" + id + "." + this.state.avatar.ext;
-                                // Overwrite existing file
-                                RNFS.exists(path).then((exists) => {
-                                    if (!exists) {
-                                        return RNFS.moveFile(srcPath, path);
-                                    }
-                                    return RNFS.unlink(path).then(() => {
-                                        return RNFS.moveFile(srcPath, path);
+                                if (srcPath !== path) {
+                                    // Overwrite existing file
+                                    RNFS.exists(path).then((exists) => {
+                                        if (!exists) {
+                                            return RNFS.moveFile(srcPath, path);
+                                        }
+                                        return RNFS.unlink(path).then(() => {
+                                            return RNFS.moveFile(srcPath, path);
+                                        });
+                                    }).then(() => RNFS.exists(path)).then((exists) => {
+                                        Log.Debug("path = " + path + " | exists = " + exists);
+                                        Peerway.MarkAvatarPathDirty(id);
+                                    }).catch((e) => {
+                                        Log.Error("Avatar overwrite error. " + e);
                                     });
-                                }).then(() => RNFS.exists(path)).then((exists) => {
-                                    Log.Debug("path = " + path + " | exists = " + exists);
-                                    Peerway.MarkAvatarPathDirty(id);
-                                }).catch((e) => {
-                                    Log.Error("Avatar overwrite error. " + e);
-                                });
+                                }
                                 // Remove path as it can be obtained using the entity ID
                                 delete this.state.avatar.path;
                             }
