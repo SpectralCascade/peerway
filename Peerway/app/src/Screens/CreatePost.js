@@ -7,6 +7,7 @@ import Text from "../Components/Text";
 import Constants from "../Constants";
 import Database from "../Database";
 import { Log } from "../Log";
+import Peerway from "../Peerway";
 import Colors from "../Stylesheets/Colors";
 import StyleMain from "../Stylesheets/StyleMain";
 
@@ -23,7 +24,7 @@ export default class CreatePost extends React.Component {
     }
 
     Init() {
-        // TODO
+        this.activeId = Database.active.getString("id");
     }
 
     OnOpen() {
@@ -42,7 +43,17 @@ export default class CreatePost extends React.Component {
     // Create the post in the database and publish it
     PublishPost() {
         Log.Debug("PUBLISHING POST...");
-        Database.CreatePost(this.state.text, this.state.media);
+        let post = Database.CreatePost(this.state.text, this.state.media);
+        
+        // Notify subscribers
+        let query = Database.Execute("SELECT sub FROM Subscriptions WHERE pub='" + this.activeId + "'");
+        let subs = query.data.map(x => x.sub);
+        Peerway.NotifyEntities(subs, {
+            type: "post.publish",
+            id: post.id,
+            created: post.created
+        });
+
         this.sub.remove();
         this.props.navigation.goBack();
     }

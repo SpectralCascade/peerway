@@ -100,12 +100,18 @@ export default class Profile extends React.Component {
                     "DELETE FROM Subscriptions WHERE " + 
                         "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
                 );
+                Peerway.NotifyEntities([this.peerId], {
+                    type: "peer.unsub"
+                });
                 Log.Debug("Unsubscribed from peer." + this.peerId);
             } else {
                 this.setState({subscribed: 1});
                 Database.Execute(
                     "INSERT INTO Subscriptions (pub,sub) VALUES ('" + this.peerId + "','" + this.activeId + "')"
                 );
+                Peerway.NotifyEntities([this.peerId], {
+                    type: "peer.sub"
+                });
                 Log.Debug("Subscribed to peer." + this.peerId);
             }
         } else {
@@ -191,6 +197,7 @@ export default class Profile extends React.Component {
                     syncPosts={() => {
                         if (this.peerId !== this.activeId) {
                             let config = Peerway.GetSyncConfigPosts(this.peerId);
+                            config.sub = this.state.subscribed;
                             config.selectedPeers = [this.peerId];
                             Peerway.SyncPeers(config);
                         }

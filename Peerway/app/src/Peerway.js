@@ -615,6 +615,12 @@ class PeerwayAPI {
             case "peer.update":
                 this._OnUpdatePeer(from, data);
                 break;
+            case "peer.sub":
+                this._OnPeerSubToggle(from, true);
+                break;
+            case "peer.unsub":
+                this._OnPeerSubToggle(from, false);
+                break;
             case "chat.request":
                 this._OnChatRequest(from, data);
                 break;
@@ -694,7 +700,7 @@ class PeerwayAPI {
         // Track whether actual data syncing takes place
         let didSync = false;
         
-        // Always sync entity
+        // Always sync entity profile
         let profile = JSON.parse(Database.active.getString("profile"));
         
         // Compare ISO timestamps
@@ -741,6 +747,26 @@ class PeerwayAPI {
             didSync = true;
         }
 
+        // Synchronise subscriptions
+        if ("sub" in data.config) {
+            Log.Debug("Syncing subscriptions...");
+            // Register subscription to this entity
+            this._OnPeerSubToggle(from, data.config.sub);
+
+            /*
+            // Check if there is a mismatch between registered subscriptions remotely
+            query = Database.Execute(
+                "SELECT * FROM Subscriptions WHERE pub='" + from + "' AND sub='" + this._activeId + "'"
+            );
+            let subbed = query.data.length > 0;
+            if (subbed != data.config.subscription.pub) {
+                this.NotifyEntities([from], {
+                    type: subbed ? "peer.sub" : "peer.unsub"
+                });
+            }
+            */
+        }
+
         // Sync chats
         if ("chats" in data.config) {
             Log.Debug("Syncing chats, remote last received message(s) at " + data.lastMessageTS);
@@ -783,7 +809,7 @@ class PeerwayAPI {
         // Sync posts
         if ("posts" in data.config) {
             Log.Debug("Syncing posts...");
-            
+
         }
 
         if ((!data.force && syncRequired) || didSync) {
@@ -886,6 +912,20 @@ class PeerwayAPI {
                 // Unbeforeseen, treat as a new message
                 this._OnChatMessage(from, data.messages[i]);
             }
+        }
+    }
+
+    // Handle peer subscribing or unsubscribing
+    _OnPeerSubToggle(from, sub) {
+        if (sub) {
+            Database.Execute(
+                "INSERT OR IGNORE INTO Subscriptions (pub,sub) VALUES (" +
+                    "'" + this._activeId + "','" + from + "')"
+            );
+        } else {
+            Database.Execute(
+                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "', sub='" + from + "'"
+            );
         }
     }
 
