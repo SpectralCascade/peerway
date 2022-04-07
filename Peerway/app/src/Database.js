@@ -177,7 +177,21 @@ export default class Database {
                     "content TEXT," + // Text content
                     "media TEXT," + // JSON array of all media content (e.g. images, videos etc.)
                     "PRIMARY KEY (id, author)" + // Composite primary key
-                ")"]
+                ")"],
+                // Table linking subscribers to post publishers.
+                ["CREATE TABLE IF NOT EXISTS " + "Subscriptions" + "(" +
+                    "pub TEXT," + // Publisher UUID
+                    "sub TEXT," + // Subscriber UUID
+                    "PRIMARY KEY (pub, sub)," + // Composite primary key
+                    "FOREIGN KEY (pub) " +
+                        "REFERENCES Peers (id) " +
+                            "ON DELETE CASCADE " +
+                            "ON UPDATE NO ACTION," +
+                    "FOREIGN KEY (sub) " + 
+                        "REFERENCES Peers (id) " +
+                            "ON DELETE CASCADE " +
+                            "ON UPDATE NO ACTION" +
+                ")"],
             ];
 
             let result = sqlite.executeSqlBatch(id, commands);

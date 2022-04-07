@@ -209,6 +209,20 @@ class PeerwayAPI {
         }
     }
 
+    GetSyncConfigPosts(peerId) {
+        let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
+        // First get all cached posts and send info about them to check they're up to date
+        let posts = [];
+        let query = Database.Execute("SELECT id,version FROM Posts WHERE author='" + peerId + "'");
+        for (let i in query.data) {
+            posts.push({
+                id: query.data[i].id,
+                version: query.data[i].version
+            });
+        }
+        return { peerId: peerId, posts: posts, cachePostLimitPerUser: cachePostLimitPerUser };
+    }
+
     // Establishes a temporary connection to all known peers and attempts to sync data.
     // Additional options can be specified to configure how the sync will work.
     // See README.md for details on these options.
@@ -364,6 +378,10 @@ class PeerwayAPI {
                         Log.Debug("Could not get last message TS! Query success: " + query.success);
                     }
                 }
+            }
+
+            if ("posts" in config) {
+                
             }
 
             // Send sync request to the peer with the configuration data
@@ -760,6 +778,12 @@ class PeerwayAPI {
                     Log.Debug("No such chat." + data.config.chats[i].id);
                 }
             }
+        }
+
+        // Sync posts
+        if ("posts" in data.config) {
+            Log.Debug("Syncing posts...");
+            
         }
 
         if ((!data.force && syncRequired) || didSync) {

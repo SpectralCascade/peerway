@@ -62,6 +62,10 @@ export default class Profile extends React.Component {
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
             if (query.data.length > 0) {
                 let peer = query.data[0];
+                query = Database.Execute(
+                    "SELECT * FROM Subscriptions WHERE " +
+                        "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
+                );
                 this.setState({
                     name: peer.name,
                     dob: peer.dob,
@@ -70,6 +74,7 @@ export default class Profile extends React.Component {
                     bio: peer.bio,
                     avatar: peer.avatar,
                     updated: peer.updated,
+                    subscribed: query.data.length > 0 ? 1 : 0
                 });
             } else {
                 // TODO request info via server (and/or other peers)
@@ -87,11 +92,24 @@ export default class Profile extends React.Component {
 
     // Toggle follow/unfollow of the entity
     GoToggleSubscribe() {
-        if (this.state.subscribed) {
-            // TODO show confirmation popup
-            this.setState({subscribed: 0});
+        if (this.peerId !== this.activeId) {
+            if (this.state.subscribed) {
+                // TODO show confirmation popup
+                this.setState({subscribed: 0});
+                Database.Execute(
+                    "DELETE FROM Subscriptions WHERE " + 
+                        "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
+                );
+                Log.Debug("Unsubscribed from peer." + this.peerId);
+            } else {
+                this.setState({subscribed: 1});
+                Database.Execute(
+                    "INSERT INTO Subscriptions (pub,sub) VALUES ('" + this.peerId + "','" + this.activeId + "')"
+                );
+                Log.Debug("Subscribed to peer." + this.peerId);
+            }
         } else {
-            this.setState({subscribed: 1});
+            Log.Warning("Unexpected behaviour, cannot toggle subscription to self.");
         }
     }
 
@@ -169,8 +187,14 @@ export default class Profile extends React.Component {
                     route={this.props.route}
                     navigation={this.props.navigation}
                     ListHeaderComponent={() => renderHeader()}
-                    // TODO add syncPosts callback
                     forceReload={this.state.forceReload}
+                    syncPosts={() => {
+                        if (this.peerId !== this.activeId) {
+                            let config = Peerway.GetSyncConfigPosts(this.peerId);
+                            config.selectedPeers = [this.peerId];
+                            Peerway.SyncPeers(config);
+                        }
+                    }}
                     loadPosts={(posts) => {
                         if (this.state.forceReload) {
                             posts = [];
