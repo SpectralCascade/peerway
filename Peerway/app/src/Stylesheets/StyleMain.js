@@ -52,6 +52,20 @@ const StyleMain = StyleSheet.create({
         flex: 1,
         padding: 12,
     },
+    popup: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: "#fff",
+        margin: 50,
+        padding: 16,
+        borderRadius: 10
+    },
+    popupBackground: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: "#000a",
+        height: "100%"
+    },
     text: {
         color: Colors.text,
     },

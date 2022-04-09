@@ -11,23 +11,33 @@ import { Log } from "../Log";
 import Colors from "../Stylesheets/Colors";
 import StyleMain from "../Stylesheets/StyleMain";
 import DefaultSettings from "../DefaultSettings";
+import Popup from "../Components/Popup";
 
 export default class Settings extends React.Component {
     constructor(props) {
         super(props);
 
-        this.state = JSON.parse(JSON.stringify(DefaultSettings));
+        this.state = {
+            settings: JSON.parse(JSON.stringify(DefaultSettings)),
+            popup: {
+                title: "",
+                content: ""
+            },
+        }
+
+        this.popup = React.createRef();
 
         this.Init();
     }
 
     Init() {
-        Object.keys(this.state).forEach((key) => {
+        Object.keys(this.state.settings).forEach((key) => {
             if (Database.userdata.contains(key)) {
                 let value = Database.userdata.getString(key);
-                this.state[key] = typeof(this.state[key]) === "number" ? parseFloat(value) : value;
+                this.state.settings[key] = typeof(this.state.settings[key]) === "number" ? 
+                    parseFloat(value) : value;
             } else {
-                Database.userdata.set(key, this.state[key]);
+                Database.userdata.set(key, this.state.settings[key]);
             }
         });
     }
@@ -39,24 +49,23 @@ export default class Settings extends React.Component {
 
     // Settings text input widget
     WidgetText(params) {
-        let change = {};
         return (
             <View {...params}>
                 <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
                 <TextInput
                     onChangeText={(text) => {
+                        let change = params.parent.state.settings;
                         change[params.name] = text;
-                        params.parent.setState(change);
+                        params.parent.setState({settings: change});
                     }}
                     style={StyleMain.textInput}
-                    value={"default" in params ? params.default : params.parent.state[params.name]}
+                    value={"default" in params ? params.default : params.parent.state.settings[params.name]}
                 />
             </View>
         );
     }
 
     WidgetNumeric(params) {
-        let change = {};
         return (
             <View {...params}>
                 <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
@@ -66,10 +75,11 @@ export default class Settings extends React.Component {
                     step={1}
                     minValue={0}
                     onChange={(value) => {
+                        let change = params.parent.state.settings;
                         change[params.name] = value;
-                        params.parent.setState(change);
+                        params.parent.setState({settings: change});
                     }}
-                    value={"default" in params ? params.default : params.parent.state[params.name]}
+                    value={"default" in params ? params.default : params.parent.state.settings[params.name]}
                     textColor="black"
                     iconStyle={{ color: "white" }}
                     rightButtonBackgroundColor={Colors.button}
@@ -92,6 +102,12 @@ export default class Settings extends React.Component {
             <View style={[StyleMain.background]}>
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
 
+                <Popup
+                    title={this.state.popup.title}
+                    content={this.state.popup.content}
+                    ref={this.popup}
+                />
+
                 <ScrollView style={{padding: 10}}>
                     <this.WidgetText title="Signal Server URL" name="SignalServerURL" parent={this}/>
                     <this.WidgetNumeric title="Maximum posts cached per user" name="CachePostLimitPerUser" parent={this}/>
@@ -99,8 +115,11 @@ export default class Settings extends React.Component {
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Chats"
                         onPress={() => {
-                            // TODO delete all chats
-                            Log.Debug("Deleted all chat entries");
+                            let confirmPopup = this.state.popup;
+                            confirmPopup.title = "Delete All Chats";
+                            confirmPopup.content = "Are you sure you wish to delete all chats? This will remove you from all associated chats and delete the history from your device.";
+                            this.popup.current.Show();
+                            this.setState({popup: confirmPopup});
                         }}
                     />
                     <this.WidgetButton
@@ -108,7 +127,11 @@ export default class Settings extends React.Component {
                         title="Delete All Peers"
                         onPress={() => {
                             // TODO delete all peers
-                            Log.Debug("Deleted all peer entries");
+                            let confirmPopup = this.state.popup;
+                            confirmPopup.title = "Delete All Peers";
+                            confirmPopup.content = "Are you sure you wish to delete all peers? This will remove all data associated with other peers, including chat messages and cached posts.";
+                            this.popup.current.Show();
+                            this.setState({popup: confirmPopup});
                         }}
                     />
                 </ScrollView>
@@ -116,8 +139,8 @@ export default class Settings extends React.Component {
                 <TouchableOpacity
                     style={[StyleMain.button, {}]}
                     onPress={() => {
-                        Object.keys(this.state).forEach((key) => {
-                            Database.userdata.set(key, this.state[key].toString());
+                        Object.keys(this.state.settings).forEach((key) => {
+                            Database.userdata.set(key, this.state.settings[key].toString());
                         });
                         this.props.navigation.goBack();
                     }}
