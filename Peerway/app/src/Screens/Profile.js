@@ -100,7 +100,7 @@ export default class Profile extends React.Component {
 
     OnPostResponse(from, data) {
         if (from === this.peerId) {
-            this.setState({forceReload: false});
+            this.setState({forceReload: true});
             if (this.onSyncComplete) {
                 this.onSyncComplete();
             }
