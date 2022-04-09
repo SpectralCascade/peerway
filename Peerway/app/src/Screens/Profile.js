@@ -59,6 +59,10 @@ export default class Profile extends React.Component {
                 updated: profile.updated,
             });
         } else {
+            this.OnPostReceived = Peerway.addListener(
+                "post.response.end",
+                (from, data) => this.OnPostResponse(from, data)
+            );
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
             if (query.data.length > 0) {
                 let peer = query.data[0];
@@ -83,6 +87,24 @@ export default class Profile extends React.Component {
         }
 
         this.setState({forceReload: true});
+    }
+
+    OnClose() {
+        Log.Debug("CLOSED USER PROFILE");
+
+        if (this.OnPostReceived) {
+            this.OnPostReceived.remove();
+            this.OnPostReceived = undefined;
+        }
+    }
+
+    OnPostResponse(from, data) {
+        if (from === this.peerId) {
+            this.setState({forceReload: false});
+            if (this.onSyncComplete) {
+                this.onSyncComplete();
+            }
+        }
     }
 
     // Go to the profile editing screen
@@ -153,6 +175,7 @@ export default class Profile extends React.Component {
             <View style={StyleMain.background}>
                 <ScrollView>
                     <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
+                    <HandleEffect navigation={this.props.navigation} effect="blur" callback={() => { this.OnClose() }}/>
 
                     {/*<Image source={""}/>*/}
                     <View style={[styles.banner]}>
@@ -194,12 +217,16 @@ export default class Profile extends React.Component {
                     navigation={this.props.navigation}
                     ListHeaderComponent={() => renderHeader()}
                     forceReload={this.state.forceReload}
-                    syncPosts={() => {
+                    syncPosts={(onComplete) => {
+                        this.onSyncComplete = onComplete;
                         if (this.peerId !== this.activeId) {
                             let config = Peerway.GetSyncConfigPosts(this.peerId);
                             config.sub = this.state.subscribed;
                             config.selectedPeers = [this.peerId];
                             Peerway.SyncPeers(config);
+                        }
+                        if (this.onSyncComplete) {
+                            this.onSyncComplete();
                         }
                     }}
                     loadPosts={(posts) => {

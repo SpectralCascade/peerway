@@ -37,24 +37,23 @@ export default class Feed extends React.Component {
         this.loadPosts = this.props.loadPosts ? this.props.loadPosts : (posts) => posts;
         this.syncPosts = this.props.syncPosts ? this.props.syncPosts : (onComplete) => onComplete();
         this.state.posts = this.loadPosts(this.state.posts);
-        this.syncPosts(() => {});
     }
 
     OnOpen() {
         Log.Debug("OPENED FEED");
         this.Init();
-        this.setState({posts: this.state.posts});
+        this.SyncPosts();
     }
 
     OnSyncDone() {
         this.setState({syncing: false});
-        Log.Debug("Posts syncing complete.");
+        Log.Debug("Feed syncing complete.");
     }
 
     // Get the latest posts
     SyncPosts() {
         this.setState({syncing: true});
-        Log.Debug("Syncing posts...");
+        Log.Debug("Syncing feed...");
         this.syncPosts(() => this.OnSyncDone());
     }
 
@@ -95,6 +94,8 @@ export default class Feed extends React.Component {
         }
         
         return (
+        <>
+        <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
             onRefresh={() => this.SyncPosts()}
             refreshing={this.state.syncing}
@@ -184,6 +185,7 @@ export default class Feed extends React.Component {
             }
         }
         />
+        </>
         );
     }
 

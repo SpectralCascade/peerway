@@ -311,6 +311,39 @@ export default class Database {
         return post;
     }
 
+    // Cache a post from a remote peer
+    static CachePost(post) {
+        if (post.author === this.activeId) {
+            Log.Warning("Attempt was made to cache post created by this entity, which is disallowed.");
+            return;
+        }
+
+        let query = this.Execute("SELECT version FROM Posts WHERE id='" + post.id + "' AND author='" + post.author + "'");
+        
+        if (query.data.length == 0) {
+            Log.Debug("Caching post." + post.id);
+            this.Execute(
+                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media) VALUES (" +
+                    ToCSV(post, ["id","author","created","edited","updated","version","content","media"]) +
+                ")"
+            );
+
+            // TODO delete older posts (and associated media files) outside of the cache limit
+        } else if (query.data[0].version != post.version) {
+            Log.Debug("Updating cached post." + post.id);
+            this.Execute(
+                "UPDATE Posts SET " + 
+                    "edited='" + post.edited + "', " + 
+                    "version=" + post.version + ", " + 
+                    "content='" + post.content + "', " +
+                    "media='" + post.media + "' " +
+                "WHERE id='" + post.id + "' AND author='" + post.author + "'"
+            );
+        } else {
+            Log.Debug("No version change detected in received post, no need to recache.");
+        }
+    }
+
     // Get the array index from the current year/month
     static GetLookupMonthIndex(start, current) {
         let split = start.split('/');

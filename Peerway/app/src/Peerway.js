@@ -380,10 +380,6 @@ class PeerwayAPI {
                 }
             }
 
-            if ("posts" in config) {
-                
-            }
-
             // Send sync request to the peer with the configuration data
             this._SendPeerData(id, JSON.stringify({
                 type: "sync",
@@ -572,6 +568,41 @@ class PeerwayAPI {
         }));
     }
 
+    // Sends a file to the specified peer.
+    SendFile(peer, path, onDelivered=null) {
+        return RNFS.readFile(path, "base64").then((data) => {
+            // TODO handle connection loss!
+            if (onDelivered != null) {
+                let listener = Peerway.addListener("data.ack", (from, data) => {
+                    if (from === peer) {
+                        listener.remove();
+                        if (onDelivered != null) {
+                            onDelivered(path);
+                        }
+                    }
+                });
+            }
+            let bin = Buffer.from(data, "base64");
+            Peerway.SendBytes(
+                peer,
+                new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
+                "application/octet-stream",
+                path.split("/").pop()
+            );
+        });
+    }
+
+    // Send several files to the specified peer.
+    SendFiles(peer, paths, onDelivered=null) {
+        const nextPath = paths.shift();
+        if (nextPath) {
+            return this.SendFile(peer, nextPath, onDelivered).then(
+                () => this.SendFiles(peer, paths, onDelivered)
+            );
+        }
+        return Promise.resolve();
+    }
+
     // Send data to a specified peer.
     _SendPeerData(id, data) {
         Log.Debug("Sending data to peer." + id);
@@ -596,6 +627,18 @@ class PeerwayAPI {
         switch (data.type) {
             case "chat.message":
                 this._OnChatMessage(from, data);
+                break;
+            case "post.publish":
+                this._OnPostPublished(from, data);
+                break;
+            case "post.request":
+                this._OnPostRequest(from, data);
+                break;
+            case "post.response.begin":
+                this._OnPostResponse(from, data);
+                break;
+            case "post.response.error":
+                Log.Error(data.error);
                 break;
             case "connected":
                 this._OnPeerConnected(from, data.ts);
@@ -646,7 +689,7 @@ class PeerwayAPI {
             }));
 
             // Disallow paths! Must be just a file name
-            if (data.filename.includes("\\") || data.filename.includes("/")) {
+            if (data.filename.includes("/") || data.filename.includes("\\")) {
                 Log.Error("data.end: filename \"" + data.filename + "\" must be end point, NOT a path.");
             } else if (data.filename.length > 0) {
                 // Save as binary file (base64 string)
@@ -666,10 +709,9 @@ class PeerwayAPI {
                 let content = JSON.parse(this._pendingData[from].toString());
                 this._OnReceivedJSON(content, from);
             } else {
-                Log.Error("data.end: Mime type must be text/json or have a valid filename specified.");
+                Log.Error("data.end: Mime type must be text/json or have a valid filename specified. Received: " + data.mime);
             }
             delete this._pendingData[from];
-            
         } else {
             Log.Warning("data.end received but never got data.begin request from peer." + from);
         }
@@ -723,7 +765,7 @@ class PeerwayAPI {
             // TODO check if avatar needs to be sent or not rather than just sending every time
             if ("ext" in profile.avatar) {
                 RNFS.readFile(this.GetAvatarPath(this._activeId, profile.avatar.ext), "base64").then((data) => {
-                    // TODO handle timeout or connection loss!
+                    // TODO handle connection loss!
                     let listener = Peerway.addListener("data.ack", (from, data) => {
                         listener.remove();
                         Log.Debug("Received data ACK, proceeding to update remote peer." + from);
@@ -754,7 +796,7 @@ class PeerwayAPI {
             this._OnPeerSubToggle(from, data.config.sub);
 
             /*
-            // Check if there is a mismatch between registered subscriptions remotely
+            // TODO check if there is a mismatch between registered subscriptions remotely
             query = Database.Execute(
                 "SELECT * FROM Subscriptions WHERE pub='" + from + "' AND sub='" + this._activeId + "'"
             );
@@ -807,9 +849,29 @@ class PeerwayAPI {
         }
 
         // Sync posts
-        if ("posts" in data.config) {
+        if ("posts" in data.config && data.config.cachePostLimitPerUser) {
             Log.Debug("Syncing posts...");
-
+            // Get the latest posts, up to the limit
+            query = Database.Execute(
+                "SELECT id,version FROM Posts WHERE " + 
+                    "author='" + this._activeId + "' " + 
+                    "ORDER BY created DESC LIMIT " + data.config.cachePostLimitPerUser
+            );
+            let posts = data.config.posts.map(x => x.id);
+            for (let i in query.data) {
+                let post = query.data[i];
+                Log.Debug("Post = " + JSON.stringify(post));
+                let index = posts.indexOf(post.id);
+                // Check if remote peer has the post and the post is up to date
+                if (index < 0 || data.config.posts[index].version != post.version) {
+                    // Notify remote peer about the post so it can be requested
+                    this.NotifyEntities([from], {
+                        type: "post.publish",
+                        id: post.id,
+                        created: post.created
+                    })
+                }
+            }
         }
 
         if ((!data.force && syncRequired) || didSync) {
@@ -861,6 +923,59 @@ class PeerwayAPI {
         );
 
         this.emit("chat.message", from, data);
+    }
+
+    // Handle a post being published
+    _OnPostPublished(from, data) {
+        Log.Debug("Received notification of post being published by peer." + from);
+        if (from in this._peers) {
+            this.NotifyEntities([from], {
+                type: "post.request",
+                id: data.id
+            });
+        }
+    }
+
+    // Handle a request to send a particular post
+    _OnPostRequest(from, data) {
+        Log.Debug("Received request for post." + data.id);
+        // TODO check sharing permissions before sending
+        let query = Database.Execute(
+            "SELECT * FROM Posts WHERE id='" + data.id + "' AND author='" + this._activeId + "'"
+        );
+        if (query.data.length == 0) {
+            this.NotifyEntities([from], {
+                type: "post.response.error",
+                error: "No such post with id " + data.id
+            });
+        } else {
+            // Send the post and associated files
+            let response = {
+                type: "post.response.begin",
+                post: query.data[0]
+            };
+            let bin = Buffer.from(JSON.stringify(response), "utf8");
+            this.SendBytes(from, new Uint8Array(bin.buffer, bin.byteOffset, bin.length));
+            let media = JSON.parse(query.data[0].media);
+            let delivered = 0;
+            this.SendFiles(from, media, (path) => {
+                delivered++;
+                if (delivered >= media.length) {
+                    Log.Debug("All files delivered for post." + data.id);
+                }
+            }).then(() => {
+                // All files should have been sent at least by this point
+                this._SendPeerData(from, JSON.stringify({
+                    type: "post.response.end",
+                    id: data.id
+                }));
+            }).catch((e) => Log.Error("Could not deliver files to peer." + from + " due to: " + e));
+        }
+    }
+
+    // Handle initial post response (before the files arrive)
+    _OnPostResponse(from, data) {
+        Database.CachePost(data.post);
     }
 
     // Handle updated peer data
@@ -917,6 +1032,7 @@ class PeerwayAPI {
 
     // Handle peer subscribing or unsubscribing
     _OnPeerSubToggle(from, sub) {
+        Log.Debug("Received " + (sub ? "subscription" : "unsubscription") + " from peer." + from);
         if (sub) {
             Database.Execute(
                 "INSERT OR IGNORE INTO Subscriptions (pub,sub) VALUES (" +
@@ -924,7 +1040,7 @@ class PeerwayAPI {
             );
         } else {
             Database.Execute(
-                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "', sub='" + from + "'"
+                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "' AND sub='" + from + "'"
             );
         }
     }
