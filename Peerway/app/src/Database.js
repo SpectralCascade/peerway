@@ -408,4 +408,17 @@ export default class Database {
         return peer;
     }
 
+    // Delete a particular peer, along with all associated cached data (including messages & posts)
+    static DeletePeer(id) {
+        Log.Debug("Attempting to delete peer." + id);
+        Database.Execute("DELETE FROM Messages WHERE [from]='" + id + "'");
+        Database.Execute("DELETE FROM Posts WHERE author='" + id + "'");
+        Database.Execute("DELETE FROM Peers WHERE id='" + id + "'");
+    }
+
+    static DeleteChat(id) {
+        Log.Debug("Attempting to delete chat." + id);
+        Database.Execute("DELETE FROM Chats WHERE id='" + id + "'");
+    }
+
 }

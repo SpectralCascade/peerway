@@ -104,7 +104,15 @@ export default class Settings extends React.Component {
 
     DeleteAllPeers() {
         Log.Debug("DELETING ALL PEERS...");
+        let activeId = Database.active.getString("id");
+        Database.Execute("DELETE FROM Messages WHERE [from] != '" + activeId + "'");
+        Database.Execute("DELETE FROM Posts WHERE author != '" + activeId + "'");
         Database.Execute("DELETE FROM Peers");
+    }
+
+    DeleteAllPosts() {
+        Log.Debug("DELETING ALL POSTS...");
+        Database.Execute("DELETE FROM Posts");
     }
 
     render() {
@@ -149,6 +157,21 @@ export default class Settings extends React.Component {
                                 content: "Are you sure you wish to delete all peers? This will remove all data associated with other peers, including chat messages and cached posts.",
                                 positiveText: "Yes",
                                 positiveOnPress: () => this.DeleteAllPeers(),
+                                negativeText: "No"
+                            }
+                            this.popup.current.Show();
+                            this.setState({popup: confirmPopup});
+                        }}
+                    />
+                    <this.WidgetButton
+                        style={[StyleMain.button, styles.widgetButton]}
+                        title="Delete All Posts"
+                        onPress={() => {
+                            let confirmPopup = {
+                                title: "Delete All Posts",
+                                content: "Are you sure you wish to delete all posts? This will remove all posts you have created as well as cached posts from other users.",
+                                positiveText: "Yes",
+                                positiveOnPress: () => this.DeleteAllPosts(),
                                 negativeText: "No"
                             }
                             this.popup.current.Show();
