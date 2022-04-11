@@ -99,12 +99,12 @@ export default class Settings extends React.Component {
 
     DeleteAllChats() {
         Log.Debug("DELETING ALL CHATS...");
-        // TODO
+        Database.Execute("DELETE FROM Chats");
     }
 
     DeleteAllPeers() {
         Log.Debug("DELETING ALL PEERS...");
-        // TODO
+        Database.Execute("DELETE FROM Peers");
     }
 
     render() {
