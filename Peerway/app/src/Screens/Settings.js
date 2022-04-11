@@ -97,6 +97,16 @@ export default class Settings extends React.Component {
         );
     }
 
+    DeleteAllChats() {
+        Log.Debug("DELETING ALL CHATS...");
+        // TODO
+    }
+
+    DeleteAllPeers() {
+        Log.Debug("DELETING ALL PEERS...");
+        // TODO
+    }
+
     render() {
         return (
             <View style={[StyleMain.background]}>
@@ -105,6 +115,10 @@ export default class Settings extends React.Component {
                 <Popup
                     title={this.state.popup.title}
                     content={this.state.popup.content}
+                    positiveText={this.state.popup.positiveText}
+                    positiveOnPress={this.state.popup.positiveOnPress}
+                    negativeText={this.state.popup.negativeText}
+                    negativeOnPress={this.state.popup.negativeOnPress}
                     ref={this.popup}
                 />
 
@@ -115,9 +129,13 @@ export default class Settings extends React.Component {
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Chats"
                         onPress={() => {
-                            let confirmPopup = this.state.popup;
-                            confirmPopup.title = "Delete All Chats";
-                            confirmPopup.content = "Are you sure you wish to delete all chats? This will remove you from all associated chats and delete the history from your device.";
+                            let confirmPopup = {
+                                title: "Delete All Chats",
+                                content: "Are you sure you wish to delete all chats? This will remove you from all associated chats and delete the history from your device.",
+                                positiveText: "Yes",
+                                positiveOnPress: () => this.DeleteAllChats(),
+                                negativeText: "No"
+                            }
                             this.popup.current.Show();
                             this.setState({popup: confirmPopup});
                         }}
@@ -126,10 +144,13 @@ export default class Settings extends React.Component {
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Peers"
                         onPress={() => {
-                            // TODO delete all peers
-                            let confirmPopup = this.state.popup;
-                            confirmPopup.title = "Delete All Peers";
-                            confirmPopup.content = "Are you sure you wish to delete all peers? This will remove all data associated with other peers, including chat messages and cached posts.";
+                            let confirmPopup = {
+                                title: "Delete All Peers",
+                                content: "Are you sure you wish to delete all peers? This will remove all data associated with other peers, including chat messages and cached posts.",
+                                positiveText: "Yes",
+                                positiveOnPress: () => this.DeleteAllPeers(),
+                                negativeText: "No"
+                            }
                             this.popup.current.Show();
                             this.setState({popup: confirmPopup});
                         }}

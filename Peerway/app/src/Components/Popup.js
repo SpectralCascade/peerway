@@ -30,7 +30,7 @@ export default class Popup extends Component {
     render() {
         const getButton = (text, onPress) => {
             return (
-                <TouchableOpacity onPress={onPress} style={[StyleMain.button]}>
+                <TouchableOpacity onPress={onPress} style={[StyleMain.button, styles.button]}>
                     <ButtonText>{text}</ButtonText>
                 </TouchableOpacity>
             );
@@ -73,6 +73,12 @@ export default class Popup extends Component {
             ) : (<></>);
         };
 
+        const getTitleText = () => {
+            return this.props.title && this.props.title.length != 0 ? (
+                <Text style={{fontSize: 24}}>{this.props.title}</Text>
+            ) : (<></>);
+        };
+
         return (
             <Modal
                 transparent={true}
@@ -82,9 +88,9 @@ export default class Popup extends Component {
                 <View style={[StyleMain.popupBackground, this.props.style]}>
                     <View style={StyleMain.popup}>
                         {getCloseButton()}
-                        <Text style={{fontSize: 24}}>{this.props.title ? this.props.title : ""}</Text>
-                        <Text>{this.props.content ? this.props.content : ""}</Text>
-                        <View style={{flexDirection: "row"}}>
+                        {getTitleText()}
+                        <Text style={{marginTop: 5}}>{this.props.content ? this.props.content : ""}</Text>
+                        <View style={{flexDirection: "row", justifyContent: "space-evenly"}}>
                             {getPosButton()}
                             {getNegButton()}
                         </View>
@@ -100,5 +106,11 @@ const styles = StyleSheet.create({
         position: "absolute",
         right: 10,
         top: 10
+    },
+    button: {
+        width: "45%",
+        height: 48,
+        padding: 10,
+        margin: "2.5%"
     }
 });

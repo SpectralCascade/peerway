@@ -56,7 +56,7 @@ const StyleMain = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: "#fff",
-        margin: 50,
+        margin: 30,
         padding: 16,
         borderRadius: 10
     },
