@@ -121,8 +121,10 @@ export default class Feed extends React.Component {
     GoProfile(id) {
         // TODO
         Log.Debug("Go to profile of peer." + id);
-        if (this.props.route.name === "Profile"
-        && this.props.route.params && this.props.route.params.peerId !== id) {
+        let profileCanGo = this.props.route.name === "Profile"
+            && this.props.route.params && this.props.route.params.peerId !== id;
+
+        if (profileCanGo || this.props.route.name === "Feeds") {
             this.props.navigation.push("Profile", { peerId: id });
         }
     }
@@ -135,12 +137,11 @@ export default class Feed extends React.Component {
         this.setState({posts: this.state.posts})
     }
 
+    LoadNewPosts() {
+        this.setState({ posts: this.loadPosts([]) });
+    }
+
     render() {
-
-        if (this.props.forceReload) {
-            this.state.posts = this.loadPosts(this.state.posts);
-        }
-
         return (
         <>
         <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
@@ -164,7 +165,9 @@ export default class Feed extends React.Component {
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
             onRefresh={() => this.SyncPosts()}
             refreshing={this.state.syncing}
-            onEndReached={() => this.setState({posts: this.loadPosts(this.state.posts)})}
+            onEndReached={() => {
+                this.setState({posts: this.loadPosts(this.state.posts)});
+            }}
             data={this.state.posts}
             keyExtractor={item => item.id}
             renderItem={({ item }) => {

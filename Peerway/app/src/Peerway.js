@@ -214,14 +214,17 @@ class PeerwayAPI {
         let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
         // First get all cached posts and send info about them to check they're up to date
         let posts = [];
-        let query = Database.Execute("SELECT id,version FROM Posts WHERE author='" + peerId + "'");
+        let query = Database.Execute(
+            "SELECT id,version FROM Posts " + 
+                "WHERE author='" + peerId + "' ORDER BY created DESC LIMIT " + cachePostLimitPerUser
+        );
         for (let i in query.data) {
             posts.push({
                 id: query.data[i].id,
                 version: query.data[i].version
             });
         }
-        return { peerId: peerId, posts: posts, cachePostLimitPerUser: cachePostLimitPerUser };
+        return { posts: posts, cachePostLimitPerUser: cachePostLimitPerUser };
     }
 
     // Establishes a temporary connection to all known peers and attempts to sync data.
@@ -852,6 +855,8 @@ class PeerwayAPI {
                     })
                 }
             }
+            delete data.config.posts;
+            delete data.config.cachePostLimitPerUser;
         }
 
         if ((!data.force && syncRequired) || didSync) {

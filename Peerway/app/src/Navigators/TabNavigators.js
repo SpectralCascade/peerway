@@ -1,6 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import MessagingOverview from "../Screens/MessagingOverview";
+import CombinedFeed from "../Screens/CombinedFeed";
 import Profile from "../Screens/Profile";
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Colors from "../Stylesheets/Colors";
@@ -34,6 +35,21 @@ export default function MainTabs() {
                     tabBarIcon: (params) => (
                         <Icon
                             name={"chat"}
+                            size={iconSize}
+                            color={params.color}
+                        />
+                    )
+                }}
+            />
+            <Tab.Screen
+                name="Feeds"
+                component={CombinedFeed}
+                options={{
+                    title: "Activity",
+                    headerShown: false,
+                    tabBarIcon: (params) => (
+                        <Icon
+                            name={"account-group"}
                             size={iconSize}
                             color={params.color}
                         />
