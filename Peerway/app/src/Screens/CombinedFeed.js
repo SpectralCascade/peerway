@@ -51,14 +51,18 @@ export default class CombinedFeed extends React.Component {
     }
 
     OnPostResponse(from, data) {
-        this.setState({hasNewPosts: true});
+        if (this.feed.current.state.syncing || this.feed.current.state.scrollPos <= 0) {
+            this.LoadNewPosts(false);
+        } else {
+            this.setState({hasNewPosts: true});
+        }
         if (this.onSyncComplete) {
             this.onSyncComplete();
         }
     }
 
-    LoadNewPosts() {
-        this.feed.current.LoadNewPosts();
+    LoadNewPosts(autoScroll = true) {
+        this.feed.current.LoadNewPosts(autoScroll);
         this.setState({hasNewPosts: false});
     }
 
@@ -167,6 +171,9 @@ export default class CombinedFeed extends React.Component {
                             }
                         }
                         return posts;
+                    }}
+                    onLoadComplete={() => {
+                        this.setState({hasNewPosts: false});
                     }}
                     style={styles.content}
                 />

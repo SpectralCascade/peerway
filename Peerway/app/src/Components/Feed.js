@@ -29,14 +29,15 @@ export default class Feed extends React.Component {
             popup: {
                 title: "",
                 content: ""
-            }
+            },
+            scrollPos: 0
         };
 
         this.contextMenu = React.createRef();
         this.popup = React.createRef();
+        this.list = React.createRef();
 
         this.Init();
-
     }
 
     Init() {
@@ -44,9 +45,10 @@ export default class Feed extends React.Component {
         this.peers = {};
         this.peers[this.activeId] = JSON.parse(Database.active.getString("profile"));
         this.peers[this.activeId].avatar = this.peers[this.activeId].avatar.ext;
+        this.onLoadComplete = this.props.onLoadComplete ? this.props.onLoadComplete : () => {};
         this.loadPosts = this.props.loadPosts ? this.props.loadPosts : (posts) => posts;
         this.syncPosts = this.props.syncPosts ? this.props.syncPosts : (onComplete) => onComplete();
-        this.state.posts = this.loadPosts(this.state.posts);
+        this.state.posts = this.Load(this.state.posts);
     }
 
     OnOpen() {
@@ -58,6 +60,12 @@ export default class Feed extends React.Component {
     OnSyncDone() {
         this.setState({syncing: false});
         Log.Debug("Feed syncing complete.");
+    }
+
+    Load(posts) {
+        posts = this.loadPosts(posts);
+        this.onLoadComplete();
+        return posts;
     }
 
     // Get the latest posts
@@ -137,8 +145,11 @@ export default class Feed extends React.Component {
         this.setState({posts: this.state.posts})
     }
 
-    LoadNewPosts() {
-        this.setState({ posts: this.loadPosts([]) });
+    LoadNewPosts(autoScroll = true) {
+        this.setState({ posts: this.Load([]) });
+        if (autoScroll) {
+            this.list.current.scrollToOffset({animated: true, offset: 0});
+        }
     }
 
     render() {
@@ -163,10 +174,17 @@ export default class Feed extends React.Component {
         />
 
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
-            onRefresh={() => this.SyncPosts()}
+            ref={this.list}
+            onScroll={(event) => {
+                this.setState({scrollPos: event.nativeEvent.contentOffset.y });
+            }}
+            onRefresh={() => {
+                this.SyncPosts();
+                this.LoadNewPosts();
+            }}
             refreshing={this.state.syncing}
             onEndReached={() => {
-                this.setState({posts: this.loadPosts(this.state.posts)});
+                this.setState({posts: this.Load(this.state.posts)});
             }}
             data={this.state.posts}
             keyExtractor={item => item.id}
