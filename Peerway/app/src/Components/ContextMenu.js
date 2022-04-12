@@ -4,9 +4,8 @@ import StyleMain from "../Stylesheets/StyleMain";
 import Text from "./Text";
 import ButtonText from "./ButtonText";
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Log } from "../Log";
 
-export default class Popup extends Component {
+export default class ContextMenu extends Component {
     constructor(props) {
         super(props);
 
@@ -28,41 +27,20 @@ export default class Popup extends Component {
     }
 
     render() {
-        const getButton = (text, onPress) => {
+        const getButton = (key, text, onPress) => {
             return (
-                <TouchableOpacity onPress={onPress} style={[StyleMain.button, styles.button]}>
+                <TouchableOpacity
+                    key={key}
+                    onPress={onPress}
+                    style={[StyleMain.button, styles.button]}
+                >
                     <ButtonText>{text}</ButtonText>
                 </TouchableOpacity>
             );
         };
 
-        let hasPosButton = this.props.positiveText && this.props.positiveText.length > 0;
-        let hasNegButton = this.props.negativeText && this.props.negativeText.length > 0;
-
-        const getPosButton = () => {
-            return hasPosButton ?
-                getButton(
-                    this.props.positiveText,
-                    this.props.positiveOnPress ? () => {
-                        this.props.positiveOnPress();
-                        this.Hide();
-                    } : () => this.Hide()
-                ) : (<></>);
-        };
-
-        const getNegButton = () => {
-            return hasNegButton ?
-            getButton(
-                this.props.negativeText,
-                this.props.negativeOnPress ? () => {
-                    this.props.negativeOnPress();
-                    this.Hide();
-                } : () => this.Hide()
-            ) : (<></>);
-        };
-
         const getCloseButton = () => {
-            return this.props.onClose || (!hasPosButton && !hasNegButton) ? (
+            return (
                 <TouchableOpacity onPress={() => this.Hide()} style={styles.closeButton}>
                     <Icon
                         name="close"
@@ -70,7 +48,7 @@ export default class Popup extends Component {
                         color="black"
                     />
                 </TouchableOpacity>
-            ) : (<></>);
+            );
         };
 
         const getTitleText = () => {
@@ -78,6 +56,22 @@ export default class Popup extends Component {
                 <Text style={{fontSize: 24}}>{this.props.title}</Text>
             ) : (<></>);
         };
+
+        const getOptions = () => {
+            options = [];
+            if ("options" in this.props) {
+                for (let i in this.props.options) {
+                    options.push(
+                        getButton(
+                            i,
+                            this.props.options[i].name,
+                            this.props.options[i].onPress
+                        )
+                    );
+                }
+            }
+            return options;
+        }
 
         return (
             <Modal
@@ -90,9 +84,8 @@ export default class Popup extends Component {
                         {getTitleText()}
                         {getCloseButton()}
                         <Text style={{marginTop: 5}}>{this.props.content ? this.props.content : ""}</Text>
-                        <View style={{flexDirection: "row", justifyContent: "space-evenly"}}>
-                            {getPosButton()}
-                            {getNegButton()}
+                        <View style={{justifyContent: "space-evenly", width: "100%"}}>
+                            {getOptions()}
                         </View>
                     </View>
                 </View>
@@ -108,9 +101,8 @@ const styles = StyleSheet.create({
         top: 10
     },
     button: {
-        width: "45%",
+        width: "100%",
         height: 48,
-        padding: 10,
-        margin: "2.5%"
+        padding: 10
     }
 });

@@ -12,6 +12,8 @@ import { Log } from "../Log";
 import Peerway from '../Peerway';
 import RNFS from "react-native-fs";
 import Avatar from '../Components/Avatar';
+import ContextMenu from '../Components/ContextMenu';
+import Popup from '../Components/Popup';
 
 const topbarHeight = 56;
 const iconSize = Constants.avatarMedium;
@@ -30,9 +32,16 @@ export default class MessagingOverview extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            chats: []
+            chats: [],
+            contextOptions: [],
+            popup: {
+                title: "",
+                content: ""
+            }
         }
         this.activeId = "";
+        this.contextMenu = React.createRef();
+        this.popup = React.createRef();
     }
 
     // Callback on navigating to this screen.
@@ -190,13 +199,51 @@ export default class MessagingOverview extends Component {
 
         const onOpenSettings = () => {
             this.props.navigation.navigate("Settings");
-        }
+        };
+
+        const onContextMenu = (chat) => {
+            this.setState({contextOptions: [
+                {
+                    name: "Delete chat",
+                    onPress: () => {
+                        this.setState({popup: {
+                            title: "Delete chat",
+                            content: "Are you sure you wish to delete this chat? You will lose all messages and will be unable to use the chat unless you are invited again.",
+                            positiveText: "Yes",
+                            negativeText: "No",
+                            positiveOnPress: () => {
+                                Database.DeleteChat(chat.id);
+                                this.contextMenu.current.Hide();
+                                this.Refresh();
+                            }
+                        }});
+                        this.popup.current.Show();
+                    }
+                }
+            ]});
+            this.contextMenu.current.Show();
+        };
 
         return (
-            <SafeAreaView style={StyleMain.background}>
-                
+            <SafeAreaView style={StyleMain.background}>                
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
                 <HandleEffect navigation={this.props.navigation} effect="blur" callback={() => { this.OnClose() }}/>
+
+                <ContextMenu
+                    title="Chat Options"
+                    options={this.state.contextOptions}
+                    ref={this.contextMenu}
+                />
+
+                <Popup
+                    title={this.state.popup.title}
+                    content={this.state.popup.content}
+                    positiveText={this.state.popup.positiveText}
+                    positiveOnPress={this.state.popup.positiveOnPress}
+                    negativeText={this.state.popup.negativeText}
+                    negativeOnPress={this.state.popup.negativeOnPress}
+                    ref={this.popup}
+                />
 
                 <View style={styles.topbar}>
                     <TouchableOpacity style={[styles.menuButton]}>
@@ -213,7 +260,11 @@ export default class MessagingOverview extends Component {
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => (
                         <View>
-                        <TouchableOpacity onPress={() => onOpenChat(item)} style={styles.chatContainer}>
+                        <TouchableOpacity
+                            onPress={() => onOpenChat(item)}
+                            onLongPress={() => onContextMenu(item)}
+                            style={styles.chatContainer}
+                        >
                             <View style={styles.chatIcon}>
                                 <Avatar avatar={item.icon} size={iconSize} />
                             </View>

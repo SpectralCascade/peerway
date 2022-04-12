@@ -58,7 +58,8 @@ const StyleMain = StyleSheet.create({
         backgroundColor: "#fff",
         margin: 30,
         padding: 16,
-        borderRadius: 10
+        borderRadius: 10,
+        width: "80%"
     },
     popupBackground: {
         justifyContent: 'center',
