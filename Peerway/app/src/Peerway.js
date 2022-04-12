@@ -361,26 +361,6 @@ class PeerwayAPI {
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
             let meta = query.data.length > 0 ? query.data[0] : { sync: (new Date(0)).toISOString() };
 
-            // Worst case, never received a message
-            let lastMessageTS = (new Date(0)).toISOString();
-            if ("chats" in config && config.chats.length > 0) {
-                for (let i in config.chats) {
-                    // Get timestamp of the last message received (before the connection was established)
-                    query = Database.Execute("SELECT * FROM Messages " +
-                        "WHERE chat='" + config.chats[i].id + "' " + 
-                            "AND [from]='" + id + "' " +
-                            "AND created < '" + this._peerConnectionTimestamps[id] + "' " +
-                        "ORDER BY created DESC"
-                    );
-
-                    if (query.data.length > 0) {
-                        lastMessageTS = query.data[0].created > lastMessageTS ? query.data[0].created : lastMessageTS;
-                    } else {
-                        Log.Debug("Could not get last message TS! Query success: " + query.success);
-                    }
-                }
-            }
-
             // Send sync request to the peer with the configuration data
             this._SendPeerData(id, JSON.stringify({
                 type: "sync",
@@ -388,7 +368,6 @@ class PeerwayAPI {
                 to: id,
                 ts: timestamp,
                 sync: meta.sync,
-                lastMessageTS: lastMessageTS,
                 config: config,
                 force: force,
                 updated: { profile: meta.updated }
@@ -812,7 +791,7 @@ class PeerwayAPI {
 
         // Sync chats
         if ("chats" in data.config) {
-            Log.Debug("Syncing chats, remote last received message(s) at " + data.lastMessageTS);
+            Log.Debug("Syncing chats...");
             for (let i in data.config.chats) {
                 // Check if the chat exists
                 query = Database.Execute("SELECT * FROM Chats WHERE id='" + data.config.chats[i].id + "'");
@@ -822,12 +801,12 @@ class PeerwayAPI {
 
                     // TODO verify the other peer is actually part of this chat before collecting messages
 
-                    // Get all messages this entity has sent in the selected chat since 
+                    // Get all messages this entity has sent in the selected chat since last message
                     query = Database.Execute(
                         "SELECT * FROM Messages " + 
                         "WHERE chat = '" + localChat.id + "' " +
                         "AND [from] = '" + this._activeId + "' " +
-                        "AND created > '" + data.lastMessageTS + "'"
+                        "AND created > '" + data.config.chats[i].lastMessageTS + "'"
                     );
 
                     if (query.data.length > 0) {

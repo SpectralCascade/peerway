@@ -81,91 +81,87 @@ export default class MessagingOverview extends Component {
     }
 
     Refresh(doSync = true) {
-        // Load up cached chats
-        let chatIds = [];
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
-        let query = Database.Execute("SELECT id FROM Chats");
-        if (query.data.length > 0) {
-            chatIds = query.data.map(x => x.id);
-        }
         this.state.chats = [];
-        for (let i in chatIds) {
-            let id = chatIds[i];
 
-            let query = Database.Execute("SELECT * FROM Chats WHERE id='" + id + "'");
-            if (query.data.length > 0) {
-                let meta = query.data[0];
+        // Get all chats ordered by time of last message
+        let chatsQuery = Database.Execute(
+            "SELECT * FROM (" +
+                "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Messages.created " +
+                "FROM Chats INNER JOIN Messages " + 
+                    "ON Messages.id=Chats.lastMessage AND Messages.chat=Chats.id" +
+            ")"
+        );
+        for (let i = 0, counti = chatsQuery.data.length; i < counti; i++) {
+            let id = chatsQuery.data[i].id;
+            let meta = chatsQuery.data[i];
 
-                // Add relevant data required for syncing
-                if (doSync) {
-                    chatSyncMeta.push({
-                        id: id,
-                        received: meta.received,
-                        updated: meta.updated
-                    });
-                }
-
-                // Get last message
-                query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
-                let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
-                // Get peer who sent last message
-                // TODO merge with above into single SQL query
-                query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
-                let peer = query.data.length > 0 ? query.data[0] : {};
-
-                // Generate chat name and grab the chat icon
-                let chatName = meta.name;
-                query = Database.Execute(
-                    "SELECT * FROM (" + 
-                    "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
-                    "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
-                    "WHERE id != '" + this.activeId + "' "
-                );
-
-                if (query.data.length == 0) {
-                    // CONSIDER: support/handle users messaging themselves?
-                } else {
-                    // Generate chat name if necessary
-                    if (meta.name.length == 0) {
-                        chatName = query.data[0].name;
-                        for (let j = 1, countj = query.data.length; j < countj; j++) {
-                            chatName += ", " + query.data[j].name;
-                        }
-                    }
-                }
-
-                // Create a chat entry for the UI
-                // TODO load correct icon extension
-                let icon = Peerway.GetChatPath(id) + ".png";
-                let chatIndex = this.state.chats.length;
-                this.state.chats.push({
+            // Add relevant data required for syncing
+            if (doSync) {
+                chatSyncMeta.push({
                     id: id,
-                    name: chatName,
-                    icon: "file://" + icon,
-                    message: {
-                        from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
-                        content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
-                        // TODO instead of en-GB use device locale
-                        timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
-                    },
-                    read: meta.read
+                    lastMessageTS: meta.created
                 });
-                
-                // Load up the chat icon if it exists
-                RNFS.exists(icon).then((exists) => {
-                    if (!exists && query.data.length == 1) {
-                        // Use peer avatar as chat icon
-                        icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
-                        this.state.chats[chatIndex].icon = icon;
-                        this.setState({chats: this.state.chats});
-                    }
-                }).catch((e) => {
-                });
-
-            } else {
-                Log.Error("Chat " + id + " does not exist, but is listed!");
             }
+
+            // Get last message
+            let query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
+            let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
+
+            // Get peer who sent last message
+            // TODO merge with above into single SQL query
+            query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
+            let peer = query.data.length > 0 ? query.data[0] : {};
+
+            // Generate chat name and grab the chat icon
+            let chatName = meta.name;
+            query = Database.Execute(
+                "SELECT * FROM (" + 
+                "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
+                "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
+                "WHERE id != '" + this.activeId + "' "
+            );
+
+            if (query.data.length == 0) {
+                // CONSIDER: support/handle users messaging themselves?
+            } else {
+                // Generate chat name if necessary
+                if (meta.name.length == 0) {
+                    chatName = query.data[0].name;
+                    for (let j = 1, countj = query.data.length; j < countj; j++) {
+                        chatName += ", " + query.data[j].name;
+                    }
+                }
+            }
+
+            // Create a chat entry for the UI
+            // TODO load correct icon extension
+            let icon = Peerway.GetChatPath(id) + ".png";
+            let chatIndex = this.state.chats.length;
+            this.state.chats.unshift({
+                id: id,
+                name: chatName,
+                icon: "file://" + icon,
+                message: {
+                    from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
+                    content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
+                    // TODO instead of en-GB use device locale
+                    timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
+                },
+                read: meta.read
+            });
+            
+            // Load up the chat icon if it exists
+            RNFS.exists(icon).then((exists) => {
+                if (!exists && query.data.length == 1) {
+                    // Use peer avatar as chat icon
+                    icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
+                    this.state.chats[chatIndex].icon = icon;
+                    this.setState({chats: this.state.chats});
+                }
+            }).catch((e) => {
+            });
         }
 
         if (doSync) {

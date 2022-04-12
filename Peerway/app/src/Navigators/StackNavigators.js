@@ -56,7 +56,7 @@ function MainStack(props) {
             <Stack.Screen
                 name="CreatePost"
                 component={CreatePost}
-                options={{title: "Create Post", animation: "slide_from_bottom", headerShown: true}}
+                options={{title: "Publish Post", animation: "slide_from_bottom", headerShown: true}}
             />
         </Stack.Navigator>
     );
