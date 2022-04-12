@@ -11,6 +11,8 @@ import { Log } from '../Log';
 import Colors from '../Stylesheets/Colors';
 import ButtonText from '../Components/ButtonText';
 import Constants from '../Constants';
+import ContextMenu from './ContextMenu';
+import Popup from './Popup';
 
 const avatarSize = Constants.avatarMedium;
 const footerButtonSize = 36;
@@ -22,8 +24,16 @@ export default class Feed extends React.Component {
         this.state = {
             posts: [],
             loading: false,
-            syncing: false
+            syncing: false,
+            contextOptions: [],
+            popup: {
+                title: "",
+                content: ""
+            }
         };
+
+        this.contextMenu = React.createRef();
+        this.popup = React.createRef();
 
         this.Init();
 
@@ -67,6 +77,43 @@ export default class Feed extends React.Component {
     OpenContextMenu(post) {
         // TODO
         Log.Debug("Opened post context menu options");
+        if (post.author === this.activeId) {
+            this.setState({contextOptions: [
+                {
+                    name: "Delete post",
+                    onPress: () => {
+                        this.setState({popup: {
+                            title: "Delete post",
+                            content: "Are you sure you wish to delete this post? Doing so is only guaranteed to delete the post on your own device.",
+                            positiveText: "Yes",
+                            negativeText: "No",
+                            positiveOnPress: () => {
+                                Database.DeletePost(post.id);
+                                this.contextMenu.current.Hide();
+                                this.SyncPosts();
+                            }
+                        }});
+                        this.popup.current.Show();
+                    }
+                },
+                {
+                    name: "Edit post",
+                    onPress: () => {
+                        Log.Debug("TODO edit post");
+                    }
+                }
+            ]});
+        } else {
+            this.setState({contextOptions: [
+                {
+                    name: "Save post",
+                    onPress: () => {
+                        Log.Debug("TODO save/unsave post");
+                    }
+                }
+            ]});
+        }
+        this.contextMenu.current.Show();
     }
 
     // Go to a specific peer profile
@@ -92,10 +139,27 @@ export default class Feed extends React.Component {
         if (this.props.forceReload) {
             this.state.posts = this.loadPosts(this.state.posts);
         }
-        
+
         return (
         <>
         <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
+
+        <ContextMenu
+            title="Post Options"
+            options={this.state.contextOptions}
+            ref={this.contextMenu}
+        />
+
+        <Popup
+            title={this.state.popup.title}
+            content={this.state.popup.content}
+            positiveText={this.state.popup.positiveText}
+            positiveOnPress={this.state.popup.positiveOnPress}
+            negativeText={this.state.popup.negativeText}
+            negativeOnPress={this.state.popup.negativeOnPress}
+            ref={this.popup}
+        />
+
         <FlatList {...this.props} style={[StyleMain.background, this.props.style]}
             onRefresh={() => this.SyncPosts()}
             refreshing={this.state.syncing}

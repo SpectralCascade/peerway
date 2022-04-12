@@ -4,7 +4,7 @@ import React, { Component } from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
 import Text from '../Components/Text';
 import Database from '../Database';
-import Icon from 'react-native-vector-icons/MaterialIcons'; 
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; 
 import Colors from '../Stylesheets/Colors';
 import HandleEffect from '../Components/HandleEffect';
 import Constants from '../Constants';
@@ -224,6 +224,69 @@ export default class MessagingOverview extends Component {
             this.contextMenu.current.Show();
         };
 
+        const renderChat = (item) => (
+            <View>
+            <TouchableOpacity
+                onPress={() => onOpenChat(item)}
+                onLongPress={() => onContextMenu(item)}
+                style={styles.chatContainer}
+            >
+                <View style={styles.chatIcon}>
+                    <Avatar avatar={item.icon} size={iconSize} />
+                </View>
+                <View style={styles.chatContent}>
+                    <Text
+                        numberOfLines={1}
+                        style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>
+                        {item.name}
+                    </Text>
+                    <Text
+                        numberOfLines={1}
+                        style={[styles.chatContentMessage, {
+                            color: item.read ? "#999" : "#000",
+                            fontWeight: item.read ? "normal" : "bold"
+                        }]}
+                    >
+                        {item.message.from + item.message.content}
+                    </Text>
+                </View>
+                <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
+            </TouchableOpacity>
+            <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+            </View>
+        );
+
+        const renderChatRequests = (item) => (
+            <View>
+            <TouchableOpacity
+                onPress={() => GoChatRequests(item)}
+                style={styles.chatContainer}
+            >
+                <View style={styles.chatIcon}>
+                    <Icon name="chat-alert" size={iconSize} color="red"/>
+                </View>
+                <View style={styles.chatContent}>
+                    <Text
+                        numberOfLines={1}
+                        style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>
+                        {"Chat requests"}
+                    </Text>
+                    <Text
+                        numberOfLines={1}
+                        style={[styles.chatContentMessage, {
+                            color: item.read ? "#999" : "#000",
+                            fontWeight: item.read ? "normal" : "bold"
+                        }]}
+                    >
+                        {item.message.from + item.message.content}
+                    </Text>
+                </View>
+                <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
+            </TouchableOpacity>
+            <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+            </View>
+        );
+
         return (
             <SafeAreaView style={StyleMain.background}>                
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
@@ -250,7 +313,7 @@ export default class MessagingOverview extends Component {
                         <Icon name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => onOpenSettings()} style={[styles.settingsButton]}>
-                        <Icon name="settings" size={topbarHeight * 0.9} color="black" style={[]} />
+                        <Icon name="cog" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.edge}></View>
@@ -258,38 +321,13 @@ export default class MessagingOverview extends Component {
                 <FlatList
                     data={this.state.chats}
                     keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                        <View>
-                        <TouchableOpacity
-                            onPress={() => onOpenChat(item)}
-                            onLongPress={() => onContextMenu(item)}
-                            style={styles.chatContainer}
-                        >
-                            <View style={styles.chatIcon}>
-                                <Avatar avatar={item.icon} size={iconSize} />
-                            </View>
-                            <View style={styles.chatContent}>
-                                <Text
-                                    numberOfLines={1}
-                                    style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>
-                                    {item.name}
-                                </Text>
-                                <Text
-                                    numberOfLines={1}
-                                    style={[styles.chatContentMessage, {color: item.read ? "#999" : "#000", fontWeight: item.read ? "normal" : "bold"}]}
-                                >
-                                    {item.message.from + item.message.content}
-                                </Text>
-                            </View>
-                            <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
-                        </TouchableOpacity>
-                        <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
-                        </View>
-                    )}
+                    renderItem={({ item }) => {
+                        return item.id === "requests" ? renderChatRequests(item) : renderChat(item);
+                    }}
                 />
 
                 <TouchableOpacity onPress={() => onCreateChat()} style={styles.newChatButton}>
-                    <Icon name="chat" size={Constants.floatingButtonSize * 0.6} color="white" />
+                    <Icon name="chat-plus" size={Constants.floatingButtonSize * 0.6} color="white" />
                 </TouchableOpacity>
 
             </SafeAreaView>

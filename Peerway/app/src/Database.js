@@ -421,4 +421,9 @@ export default class Database {
         Database.Execute("DELETE FROM Chats WHERE id='" + id + "'");
     }
 
+    static DeletePost(id) {
+        Log.Debug("Attempting to delete post." + id);
+        Database.Execute("DELETE FROM Posts WHERE id='" + id + "'");
+    }
+
 }
