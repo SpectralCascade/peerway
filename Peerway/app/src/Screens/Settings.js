@@ -54,9 +54,12 @@ export default class Settings extends React.Component {
                 <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
                 <TextInput
                     onChangeText={(text) => {
-                        let change = params.parent.state.settings;
-                        change[params.name] = text;
-                        params.parent.setState({settings: change});
+                        params.parent.state.settings[params.name] = text;
+                        params.parent.setState({settings: params.parent.state.settings});
+                        Database.userdata.set(
+                            params.name,
+                            params.parent.state.settings[params.name].toString()
+                        );
                     }}
                     style={StyleMain.textInput}
                     value={"default" in params ? params.default : params.parent.state.settings[params.name]}
@@ -75,9 +78,12 @@ export default class Settings extends React.Component {
                     step={1}
                     minValue={0}
                     onChange={(value) => {
-                        let change = params.parent.state.settings;
-                        change[params.name] = value;
-                        params.parent.setState({settings: change});
+                        params.parent.state.settings[params.name] = value;
+                        params.parent.setState({settings: params.parent.state.settings});
+                        Database.userdata.set(
+                            params.name,
+                            params.parent.state.settings[params.name].toString()
+                        );
                     }}
                     value={"default" in params ? params.default : params.parent.state.settings[params.name]}
                     textColor="black"
@@ -179,18 +185,6 @@ export default class Settings extends React.Component {
                         }}
                     />
                 </ScrollView>
-
-                <TouchableOpacity
-                    style={[StyleMain.button, {}]}
-                    onPress={() => {
-                        Object.keys(this.state.settings).forEach((key) => {
-                            Database.userdata.set(key, this.state.settings[key].toString());
-                        });
-                        this.props.navigation.goBack();
-                    }}
-                >
-                    <ButtonText style={{color: Colors.buttonText}}>Save</ButtonText>
-                </TouchableOpacity>
             </View>
         );
     }
