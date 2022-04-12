@@ -9,6 +9,7 @@ import { EventListener } from "./Components/EventListener";
 import { v1 as uuidv1 } from "uuid";
 import QuickReplies from "react-native-gifted-chat/lib/QuickReplies";
 import { Buffer } from 'buffer';
+import Notif from "./Notif";
 
 // This class forms the primary API for communicating with peers
 class PeerwayAPI {
@@ -921,6 +922,17 @@ class PeerwayAPI {
         Database.Execute(
             "UPDATE Chats SET lastMessage='" + data.id + "', read=" + 0 + " WHERE id='" + data.chat + "'"
         );
+
+        let query = Database.Execute("SELECT * FROM Chats WHERE id='" + data.chat + "'");
+
+        let chat = query.data.length != 0 ? query.data[0] : {};
+
+        query = Database.Execute("SELECT * FROM Peers WHERE id='" + from + "'");
+        let peer = query.data.length != 0 ? query.data[0] : {};
+
+        let avatar = peer.id && peer.avatar ? Peerway.GetAvatarPath(peer.id, peer.avatar, "file://") : "";
+        // TODO only show when not in messaging overview or chat itself
+        Notif.Message(chat, data, peer, avatar);
 
         this.emit("chat.message", from, data);
     }
