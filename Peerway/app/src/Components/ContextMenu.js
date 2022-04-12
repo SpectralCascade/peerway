@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
     button: {
         width: "100%",
         height: 48,
-        padding: 10
+        padding: 10,
+        marginTop: 5
     }
 });
