@@ -99,7 +99,8 @@ export default class Feed extends React.Component {
                 {
                     name: "Edit post",
                     onPress: () => {
-                        Log.Debug("TODO edit post");
+                        this.props.navigation.navigate("CreatePost", { post: post });
+                        this.contextMenu.current.Hide();
                     }
                 }
             ]});

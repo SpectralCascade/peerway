@@ -311,13 +311,15 @@ export default class Database {
         return post;
     }
 
+    static EditPost(id, post) {
+        post.version = post.version + 1;
+        this.Execute(
+            "UPDATE Posts SET "
+        );
+    }
+
     // Cache a post from a remote peer
     static CachePost(post) {
-        if (post.author === this.activeId) {
-            Log.Warning("Attempt was made to cache post created by this entity, which is disallowed.");
-            return;
-        }
-
         let query = this.Execute("SELECT version FROM Posts WHERE id='" + post.id + "' AND author='" + post.author + "'");
         
         if (query.data.length == 0) {

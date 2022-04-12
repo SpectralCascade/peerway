@@ -243,6 +243,7 @@ export default class Profile extends React.Component {
                         );
                         if (query.data.length > 0) {
                             for (let i in query.data) {
+                                query.data[i].media = JSON.parse(query.data[i].media);
                                 posts.push(query.data[i]);
                             }
                         }                        
