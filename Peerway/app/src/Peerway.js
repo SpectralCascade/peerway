@@ -557,7 +557,7 @@ class PeerwayAPI {
     }
 
     // Sends a file to the specified peer.
-    SendFile(peer, path, onDelivered=null) {
+    SendFile(peer, path, onDelivered=null, mime="application/octet-stream") {
         return RNFS.readFile(path, "base64").then((data) => {
             // TODO handle connection loss!
             if (onDelivered != null) {
@@ -574,18 +574,18 @@ class PeerwayAPI {
             Peerway.SendBytes(
                 peer,
                 new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
-                "application/octet-stream",
+                mime,
                 path.split("/").pop()
             );
         });
     }
 
     // Send several files to the specified peer.
-    SendFiles(peer, paths, onDelivered=null) {
+    SendFiles(peer, paths, onDelivered=null, mime="application/octet-stream") {
         const nextPath = paths.shift();
         if (nextPath) {
-            return this.SendFile(peer, nextPath, onDelivered).then(
-                () => this.SendFiles(peer, paths, onDelivered)
+            return this.SendFile(peer, nextPath, onDelivered, mime).then(
+                () => this.SendFiles(peer, paths, onDelivered, mime)
             );
         }
         return Promise.resolve();
@@ -627,6 +627,9 @@ class PeerwayAPI {
                 break;
             case "post.response.error":
                 Log.Error(data.error);
+                break;
+            case "media.request":
+                this._OnMediaRequest(from, data);
                 break;
             case "connected":
                 this._OnPeerConnected(from, data.ts);
@@ -683,8 +686,11 @@ class PeerwayAPI {
                 // Save as binary file (base64 string)
                 // TODO avoid gross base64 conversion. Should just be able to save directly to binary.
                 let content = this._pendingData[from].toString("base64");
-                let dir = this.GetDownloadPath();
+                // Save media types in media, other files in generic download directory
+                let dir = data.mime.startsWith("image/") || data.mime.startsWith("video/") ? 
+                    this.GetMediaPath() : this.GetDownloadPath();
                 let path = dir + "/" + data.filename;
+
                 RNFS.mkdir(dir).then(() => {
                     return RNFS.writeFile(path, content, "base64");
                 }).then(() => {
@@ -923,7 +929,16 @@ class PeerwayAPI {
         // TODO only show when not in messaging overview or chat itself
         Notif.Message(chat, data, peer, avatar);
 
-        this.emit("chat.message", from, data);
+        if (!data.mime.startsWith("text/") && from in this._channels) {
+            // Request the media automagically
+            this.NotifyEntities([from], {
+                type: "media.request",
+                filename: data.content,
+                mime: data.mime
+            });
+        } else {
+            this.emit("chat.message", from, data);
+        }
     }
 
     // Handle a post being published
@@ -977,6 +992,13 @@ class PeerwayAPI {
     // Handle initial post response (before the files arrive)
     _OnPostResponse(from, data) {
         Database.CachePost(data.post);
+    }
+
+    _OnMediaRequest(from, data) {
+        // TODO check if peer is allowed the file
+        this.SendFile(from, this.GetMediaPath() + "/" + data.filename, null, data.mime).catch((e) => 
+            Log.Error("Could not send file: " + e)
+        );
     }
 
     // Handle updated peer data
