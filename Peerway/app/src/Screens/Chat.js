@@ -347,12 +347,21 @@ export default class Chat extends React.Component {
             />
         );
     };
-    
-    RenderSend(props) {
+
+    RenderSend({onSend, text, sendButtonProps, ...props}) {
         return (
             <Send
                 {...props}
-                image="media"
+                text={text}
+                onSend={onSend}
+                sendButtonProps={{
+                    ...sendButtonProps,
+                    onPress: () => {
+                        let toSend = text ? text.trim() : "";
+                        onSend({text: toSend}, true);
+                        return this.state.media.length != 0 || toSend.length != 0;
+                    },
+                }}
                 containerStyle={{alignItems: "center", justifyContent: "center", padding: 5}}
             >
                 <View style={styles.sendButton}>
