@@ -192,6 +192,14 @@ export default class Database {
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION" +
                 ")"],
+                ["CREATE TABLE IF NOT EXISTS " + "MediaCache" + "(" +
+                    "id TEXT," + // ID given to the file
+                    "hash TEXT," + // MD5 hash of the file
+                    "ext TEXT," + // File extension
+                    "author TEXT," + // Who originally uploaded/generated this file?
+                    "mime TEXT," + // MIME type
+                    "PRIMARY KEY (id)" +
+                ")"]
             ];
 
             let result = sqlite.executeSqlBatch(id, commands);

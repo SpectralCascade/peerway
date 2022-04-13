@@ -143,6 +143,11 @@ class PeerwayAPI {
         return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Download";
     }
 
+    // Path to the folder where media is stored for the active entity.
+    GetMediaPath() {
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Media";
+    }
+
     // Connect to a particular signal server.
     // overrideSocket determines what should happen if already connected to a signal server.
     // If already connected and overrideSocket == false, nothing happens. Otherwise simply disconnects.
@@ -897,7 +902,7 @@ class PeerwayAPI {
                 data.id + "','" +
                 from + "','" +
                 data.created + "','" +
-                data.content + "','" + // TODO only insert text content; link to non-text content
+                data.content + "','" +
                 data.mime + "'" + 
             ")"
         );

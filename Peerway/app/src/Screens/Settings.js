@@ -12,6 +12,8 @@ import Colors from "../Stylesheets/Colors";
 import StyleMain from "../Stylesheets/StyleMain";
 import DefaultSettings from "../DefaultSettings";
 import Popup from "../Components/Popup";
+import RNFS from "react-native-fs";
+import Peerway from "../Peerway";
 
 export default class Settings extends React.Component {
     constructor(props) {
@@ -121,6 +123,14 @@ export default class Settings extends React.Component {
         Database.Execute("DELETE FROM Posts");
     }
 
+    DeleteAllMedia() {
+        Log.Debug("DELETING ALL MEDIA...");
+        Database.Execute("DELETE FROM MediaCache");
+        RNFS.unlink(Peerway.GetMediaPath()).catch((e) => {
+            // Do nothing
+        });
+    }
+
     render() {
         return (
             <View style={[StyleMain.background]}>
@@ -178,6 +188,21 @@ export default class Settings extends React.Component {
                                 content: "Are you sure you wish to delete all posts? This will remove all posts you have created as well as cached posts from other users.",
                                 positiveText: "Yes",
                                 positiveOnPress: () => this.DeleteAllPosts(),
+                                negativeText: "No"
+                            }
+                            this.popup.current.Show();
+                            this.setState({popup: confirmPopup});
+                        }}
+                    />
+                    <this.WidgetButton
+                        style={[StyleMain.button, styles.widgetButton]}
+                        title="Delete All Media"
+                        onPress={() => {
+                            let confirmPopup = {
+                                title: "Delete All Media",
+                                content: "Are you sure you wish to delete all media? Messages and posts you have created will not be able to load associated media.",
+                                positiveText: "Yes",
+                                positiveOnPress: () => this.DeleteAllMedia(),
                                 negativeText: "No"
                             }
                             this.popup.current.Show();
