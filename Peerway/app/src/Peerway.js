@@ -250,6 +250,7 @@ class PeerwayAPI {
             if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
                 if (this._peers[id].connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
+                    Log.Debug("Still connecting to peer." + id);
                 } else {
                     Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
                     this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
