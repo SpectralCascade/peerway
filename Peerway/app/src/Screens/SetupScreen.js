@@ -1,4 +1,4 @@
-import { StyleSheet, View, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import StyleMain from '../Stylesheets/StyleMain';
@@ -6,6 +6,8 @@ import ButtonText from '../Components/ButtonText';
 import Text from '../Components/Text';
 import AppVersion from '../AppVersion';
 import Database from '../Database';
+import Constants from "../Constants";
+import { Log } from '../Log';
 
 export default function SetupScreen(props) {
     React.useEffect(() => {
@@ -28,9 +30,11 @@ export default function SetupScreen(props) {
                     <ButtonText>Create Account</ButtonText>
                 </TouchableOpacity>
 
-                <View style={[StyleMain.button, styles.aboutButton]}>
+                <TouchableOpacity style={[StyleMain.button, styles.aboutButton]} onPress={() => {
+                    Linking.openURL(Constants.website).catch((e) => Log.Error(e));
+                }}>
                     <ButtonText>About</ButtonText>
-                </View>
+                </TouchableOpacity>
             </View>
 
             <View style={{marginTop: 30}}>
