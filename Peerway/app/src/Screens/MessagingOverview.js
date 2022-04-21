@@ -304,7 +304,7 @@ export default class MessagingOverview extends Component {
                     ref={this.popup}
                 />
 
-                <View style={styles.topbar}>
+                {/*<View style={styles.topbar}>
                     <TouchableOpacity style={[styles.menuButton]}>
                         <Icon name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
@@ -312,7 +312,7 @@ export default class MessagingOverview extends Component {
                         <Icon name="cog" size={topbarHeight * 0.9} color="black" style={[]} />
                     </TouchableOpacity>
                 </View>
-                <View style={styles.edge}></View>
+                <View style={styles.edge}></View>*/}
 
                 <FlatList
                     data={this.state.chats}

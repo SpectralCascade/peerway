@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import MessagingOverview from "../Screens/MessagingOverview";
 import CombinedFeed from "../Screens/CombinedFeed";
 import Profile from "../Screens/Profile";
+import Settings from "../Screens/Settings";
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Colors from "../Stylesheets/Colors";
 import { Log } from "../Log";
@@ -65,6 +66,21 @@ export default function MainTabs() {
                     tabBarIcon: (params) => (
                         <Icon
                             name={"account-circle"}
+                            size={iconSize}
+                            color={params.color}
+                        />
+                    )
+                }}
+            />
+            <Tab.Screen
+                name="Settings"
+                component={Settings}
+                options={{
+                    title: "Settings",
+                    headerShown: false,
+                    tabBarIcon: (params) => (
+                        <Icon
+                            name={"cog"}
                             size={iconSize}
                             color={params.color}
                         />
