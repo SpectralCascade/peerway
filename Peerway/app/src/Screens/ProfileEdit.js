@@ -198,9 +198,9 @@ export default class ProfileEdit extends React.Component {
                     </ScrollView>
                     
                     <TouchableOpacity
-                        disabled={this.state.name.length == 0 || !this.state.modified}
+                        disabled={this.state.name.trim().length == 0 || !this.state.modified}
                         style={[StyleMain.button, {
-                            backgroundColor: (this.state.name.length == 0 || !this.state.modified ?
+                            backgroundColor: (this.state.name.trim().length == 0 || !this.state.modified ?
                                 Colors.buttonDisabled : Colors.button),
                             height: 40,
                             marginTop: 12
