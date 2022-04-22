@@ -143,6 +143,7 @@ export default class Settings extends React.Component {
                     positiveOnPress={this.state.popup.positiveOnPress}
                     negativeText={this.state.popup.negativeText}
                     negativeOnPress={this.state.popup.negativeOnPress}
+                    onClose={this.state.popup.onClose}
                     ref={this.popup}
                 />
 

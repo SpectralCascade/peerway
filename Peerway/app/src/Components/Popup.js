@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { StyleSheet, Modal, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Modal, TouchableOpacity, View, BackHandler } from "react-native";
 import StyleMain from "../Stylesheets/StyleMain";
 import Text from "./Text";
 import ButtonText from "./ButtonText";
@@ -15,6 +15,12 @@ export default class Popup extends Component {
         }
     }
 
+    UpdateButtonStates() {
+        this.hasPosButton = this.props.positiveText && this.props.positiveText.length > 0;
+        this.hasNegButton = this.props.negativeText && this.props.negativeText.length > 0;
+        this.showCloseButton = this.props.onClose || (!this.hasPosButton && !this.hasNegButton);
+    }
+    
     Show() {
         this.setState({shown: true});
         this.forceUpdate();
@@ -28,6 +34,8 @@ export default class Popup extends Component {
     }
 
     render() {
+        this.UpdateButtonStates();
+
         const getButton = (text, onPress) => {
             return (
                 <TouchableOpacity onPress={onPress} style={[StyleMain.button, styles.button]}>
@@ -36,11 +44,8 @@ export default class Popup extends Component {
             );
         };
 
-        let hasPosButton = this.props.positiveText && this.props.positiveText.length > 0;
-        let hasNegButton = this.props.negativeText && this.props.negativeText.length > 0;
-
         const getPosButton = () => {
-            return hasPosButton ?
+            return this.hasPosButton ?
                 getButton(
                     this.props.positiveText,
                     this.props.positiveOnPress ? () => {
@@ -51,7 +56,7 @@ export default class Popup extends Component {
         };
 
         const getNegButton = () => {
-            return hasNegButton ?
+            return this.hasNegButton ?
             getButton(
                 this.props.negativeText,
                 this.props.negativeOnPress ? () => {
@@ -62,7 +67,7 @@ export default class Popup extends Component {
         };
 
         const getCloseButton = () => {
-            return this.props.onClose || (!hasPosButton && !hasNegButton) ? (
+            return this.showCloseButton ? (
                 <TouchableOpacity onPress={() => this.Hide()} style={styles.closeButton}>
                     <Icon
                         name="close"
@@ -84,6 +89,11 @@ export default class Popup extends Component {
                 transparent={true}
                 visible={this.state.shown}
                 position={"center"}
+                onRequestClose={() => {
+                    if (this.showCloseButton) {
+                        this.Hide();
+                    }
+                }}
             >
                 <View style={[StyleMain.popupBackground, this.props.style]}>
                     <View style={StyleMain.popup}>

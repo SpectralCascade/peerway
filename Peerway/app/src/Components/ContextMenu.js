@@ -78,6 +78,7 @@ export default class ContextMenu extends Component {
                 transparent={true}
                 visible={this.state.shown}
                 position={"center"}
+                onRequestClose={() => this.Hide()}
             >
                 <View style={[StyleMain.popupBackground, this.props.style]}>
                     <View style={StyleMain.popup}>
