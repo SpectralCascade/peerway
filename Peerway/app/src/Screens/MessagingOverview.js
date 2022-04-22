@@ -198,6 +198,7 @@ export default class MessagingOverview extends Component {
         };
 
         const onContextMenu = (chat) => {
+            const markRead = !chat.read;
             this.setState({contextOptions: [
                 {
                     name: "Delete chat",
@@ -214,6 +215,19 @@ export default class MessagingOverview extends Component {
                             }
                         }});
                         this.popup.current.Show();
+                    }
+                },
+                {
+                    name: "Mark as " + (markRead ? "read" : "unread"),
+                    onPress: () => {
+                        if (chat.read != markRead) {
+                            chat.read = markRead ? 1 : 0;
+                            Database.Execute(
+                                "UPDATE Chats SET read=" + chat.read + " WHERE id='" + chat.id + "'"
+                            );
+                        }
+                        this.contextMenu.current.Hide();
+                        this.forceUpdate();
                     }
                 }
             ]});
