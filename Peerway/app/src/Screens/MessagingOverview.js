@@ -304,16 +304,6 @@ export default class MessagingOverview extends Component {
                     ref={this.popup}
                 />
 
-                {/*<View style={styles.topbar}>
-                    <TouchableOpacity style={[styles.menuButton]}>
-                        <Icon name="menu" size={topbarHeight * 0.9} color="black" style={[]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => onOpenSettings()} style={[styles.settingsButton]}>
-                        <Icon name="cog" size={topbarHeight * 0.9} color="black" style={[]} />
-                    </TouchableOpacity>
-                </View>
-                <View style={styles.edge}></View>*/}
-
                 <FlatList
                     data={this.state.chats}
                     keyExtractor={item => item.id}

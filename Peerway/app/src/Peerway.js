@@ -506,16 +506,16 @@ class PeerwayAPI {
 
     // Creates a WebRTC connection object.
     _CreatePeerConnection() {
-        // TODO: Run local STUN and TURN servers if possible, instead of using these?
+        // TODO: Run local STUN and TURN servers, instead of using these
         return new RTCPeerConnection({
             iceServers: [
                 {
-                    urls: "stun:openrelay.metered.ca:80"
+                    urls: "stun:" + Constants.server_ip + ":3478"
                 },
                 {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: "openrelayproject",
-                    credential: "openrelayproject"
+                    urls: "turn:" + Constants.server_ip + ":3478",
+                    username: "peerway",
+                    credential: "peerway"
                 },
             ]
         });
