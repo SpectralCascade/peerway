@@ -140,12 +140,12 @@ class PeerwayAPI {
 
     // Get the path to the downloads folder
     GetDownloadPath() {
-        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Download";
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/download";
     }
 
     // Path to the folder where media is stored for the active entity.
     GetMediaPath() {
-        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/Media";
+        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/media";
     }
 
     // Connect to a particular signal server.
@@ -1012,7 +1012,7 @@ class PeerwayAPI {
             "updated='" + data.profile.updated + "' " +
             "WHERE id='" + from + "'"
         );
-        let avatarPath = this.GetDownloadPath() + "/" + from + "." + avatarExt;
+        let avatarPath = this.GetMediaPath() + "/" + from + "." + avatarExt;
         RNFS.exists(avatarPath).then((exists) => {
             if (exists) {
                 let path = this.GetPeerPath(from) + "." + avatarExt;
@@ -1023,7 +1023,7 @@ class PeerwayAPI {
                     Log.Error("Failed to mkdir or move file. " + e);
                 });
             } else {
-                Log.Verbose("Cannot update avatar file for peer." + from + ", no such path " + avatarPath);
+                Log.Warning("Cannot update avatar file for peer." + from + ", no such path " + avatarPath);
             }
         }).catch((e) => {
             Log.Error("Failed to determine if file exists. " + e);
