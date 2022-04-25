@@ -5754,6 +5754,11 @@
   "resolved" "https://registry.npmjs.org/react-native-quick-sqlite/-/react-native-quick-sqlite-3.0.2.tgz"
   "version" "3.0.2"
 
+"react-native-rsa-native@^2.0.5":
+  "integrity" "sha512-gwwvFSwGW5WKrpDyBQ/eTf1UrVABeAvMcT4YWemzPSUo6aHZs1kbBm2rXmwN5okhUzJsry5zjjz/qdx5GXRugQ=="
+  "resolved" "https://registry.npmjs.org/react-native-rsa-native/-/react-native-rsa-native-2.0.5.tgz"
+  "version" "2.0.5"
+
 "react-native-safe-area-context@>= 3.0.0", "react-native-safe-area-context@3.3.2":
   "integrity" "sha512-yOwiiPJ1rk+/nfK13eafbpW6sKW0jOnsRem2C1LPJjM3tfTof6hlvV5eWHATye3XOpu2cJ7N+HdkUvUDGwFD2Q=="
   "resolved" "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-3.3.2.tgz"

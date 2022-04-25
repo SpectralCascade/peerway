@@ -7,7 +7,7 @@ import Constants from "./Constants";
 import { EventEmitter } from "react-native";
 import { EventListener } from "./Components/EventListener";
 import { v1 as uuidv1 } from "uuid";
-import QuickReplies from "react-native-gifted-chat/lib/QuickReplies";
+import { RSA } from "react-native-rsa-native";
 import { Buffer } from 'buffer';
 import Notif from "./Notif";
 
@@ -146,6 +146,23 @@ class PeerwayAPI {
     // Path to the folder where media is stored for the active entity.
     GetMediaPath() {
         return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/media";
+    }
+
+    // Create a certificate to use for comms authentication (returns a promise).
+    IssueCertificate() {
+        return RSA.generateKeys(4096).then(keys => {
+            let data = {
+                private: keys.private, // Private key
+                certificate: {
+                    public: keys.public, // Public key
+                    issuer: this._activeId, // Who issued this certificate?
+                    created: (new Date()).toISOString(), // The time when this certificate was issued
+                    version: Constants.authVersion // What version is this certificate?
+                }
+            };
+
+            return data;
+        });
     }
 
     // Connect to a particular signal server.

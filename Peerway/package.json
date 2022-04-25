@@ -27,6 +27,7 @@
     "react-native-numeric-input": "^1.9.1",
     "react-native-push-notification": "^8.1.1",
     "react-native-quick-sqlite": "^3.0.2",
+    "react-native-rsa-native": "^2.0.5",
     "react-native-safe-area-context": "3.3.2",
     "react-native-screens": "^3.13.0",
     "react-native-vector-icons": "^9.1.0",
