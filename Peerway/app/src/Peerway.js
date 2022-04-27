@@ -43,6 +43,8 @@ class PeerwayAPI {
     _pendingCandidates = {};
     // Connections to other peers, keyed by entity ID.    
     _peers = {};
+    // Connected peers that are verified, keyed by entity ID.
+    _verified = {};
     // Data send channels to connected peers
     _channels = {};
     // Binary data that is being received
@@ -149,7 +151,7 @@ class PeerwayAPI {
     }
 
     // Create a certificate to use for comms authentication (returns a promise).
-    IssueCertificate() {
+    CreateCertificate() {
         return RSA.generateKeys(4096).then(keys => {
             let data = {
                 private: keys.private, // Private key
@@ -162,6 +164,28 @@ class PeerwayAPI {
             };
 
             return data;
+        });
+    }
+
+    IssueCertificate(id, clientId) {
+        // Issue certificate
+        return this.CreateCertificate().then((cert) => {
+            // Save the private key
+            Database.Execute(
+                "UPDATE Peers SET " + 
+                    "verifier='" + cert.private + "', " + 
+                    "issued='" + JSON.stringify(cert.certificate) + "' " +
+                        "WHERE id='" + id + "'"
+            );
+
+            // Issue the certificate
+            // TODO send only to the specific client!
+            this.NotifyEntities([id], {
+                type: "cert.issue",
+                cert: cert.certificate
+            });
+        }).catch((e) => {
+            Log.Error("Failed to create certificate. " + e);
         });
     }
 
@@ -232,6 +256,22 @@ class PeerwayAPI {
         }
     }
 
+    // TODO handle receiving a certificate
+    _OnCertificateIssued(from, data) {
+        let query = Database.Execute(
+            "SELECT verifier,certificate FROM Peers WHERE id='" + from + "'"
+        );
+        if (query.data.length == 0) {
+            // Never interacted with the peer before, treat as a new trust request
+        } else {
+            // TODO verify the peer first
+            if (query.data[0].certificate.length == 0) {
+                // 
+            } else {
+            }
+        }
+    }
+
     GetSyncConfigPosts(peerId) {
         let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
         // First get all cached posts and send info about them to check they're up to date
@@ -249,22 +289,37 @@ class PeerwayAPI {
         return { posts: posts, cachePostLimitPerUser: cachePostLimitPerUser };
     }
 
+    // Attempt to connect to a specified peer
+    // Returns false if connectionState is "connected" or "connecting".
+    ConnectToPeer(id) {
+        if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
+            Log.Debug("Already " + this._peers[id].connectionState + " to peer." + id);            
+        } else {
+            this._peersToConnect.push(id);
+            Log.Debug("Requesting entity meta for peer." + id);
+            this.server.emit("GetEntityMeta", { id: id });
+            return true;
+        }
+        return false;
+    }
+
     // Establishes a temporary connection to all known peers and attempts to sync data.
     // Additional options can be specified to configure how the sync will work.
     // See README.md for details on these options.
     SyncPeers(options = {}) {
         this._syncConfig = options;
-        this._peersToConnect = "selectedPeers" in options ? options.selectedPeers.slice() : [];
+        this._peersToConnect = [];
+        let candidates = "selectedPeers" in options ? options.selectedPeers.slice() : [];
         if (!("selectedPeers" in options)) {
             let query = Database.Execute("SELECT id FROM Peers");
-            this._peersToConnect = query.data.length > 0 ? query.data.map(x => x.id) : [];
-            Log.Debug("Ready to sync " + this._peersToConnect.length + " peer(s): " + JSON.stringify(this._peersToConnect));
+            candidates = query.data.length > 0 ? query.data.map(x => x.id) : [];
+            Log.Debug("Ready to sync " + candidates.length + " peer(s): " + JSON.stringify(candidates));
         }
-        for (let i in this._peersToConnect) {
-            let id = this._peersToConnect[i];
-            
-            // First check whether already connected to these peers
-            if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
+        for (let i in candidates) {
+            let id = candidates[i];
+
+            // Attempt to connect to the peer, if not already connected
+            if (!this.ConnectToPeer(id)) {
                 if (this._peers[id].connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
                     Log.Debug("Still connecting to peer." + id);
@@ -272,12 +327,6 @@ class PeerwayAPI {
                     Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
                     this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
                 }
-            } else {
-                Log.Debug("Syncing peer." + id);
-                // Check with the server whether the peer is connected
-                Log.Debug("Requesting entity meta for peer." + id);
-                let params = { id: id };
-                this.server.emit("GetEntityMeta", params);
             }
         }
     }
@@ -410,15 +459,22 @@ class PeerwayAPI {
         if (meta.available) {
             // Check if the entity is supposed to be connected to.
             if (this._peersToConnect.includes(meta.id)) {
-                // Make a connection request
-                Log.Info("Sending connection request to peer." + meta.id + " of client " + meta.clientId);
-                this._SendConnectionRequest(meta.id, meta.clientId);
+                let query = Database.Execute("SELECT blocked FROM Peers WHERE id='" + meta.id + "'");
+                if (query.data.length != 0 && query.data[0].blocked) {
+                    Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
+                } else {
+                    // Make a connection request
+                    Log.Info("Sending connection request to peer." + id + " of client " + clientId);
+                    this._SendConnectionRequest(id, clientId);
+                }
+
             } else {
                 // Might have a use case, e.g. interacting with a new entity for the first time.
                 Log.Debug("peer." + meta.id + " not in expected peersToConnect array " + JSON.stringify(this._peersToConnect));
             }
         } else {
             // Peer is unavailable on the signal server; they are probably offline.
+            Log.Debug("Peer." + meta.id + " is unavailable, cannot connect.");
         }
     }
 
@@ -676,8 +732,16 @@ class PeerwayAPI {
             case "chat.request":
                 this._OnChatRequest(from, data);
                 break;
+            case "cert.verify":
+                this._OnVerifyRequest(from, data);
+                break;
+            case "cert.present":
+                this._OnCertificatePresented(from, data);
+                break;
+            case "cert.issue":
+                this._OnCertificateIssued(from, data);
+                break;
             default:
-                this.emit(data.type, from, data);
                 break;
         }
     }
@@ -1084,6 +1148,80 @@ class PeerwayAPI {
                 "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "' AND sub='" + from + "'"
             );
         }
+    }
+
+    // Encrypt data for a peer, returns a promise.
+    _EncryptForPeer(id, data) {
+        let query = Database.Execute("SELECT verifier FROM Peers WHERE id='" + id + "'");
+        if (query.data.length != 0) {
+            if (query.data[0].verifier.length != 0) {
+                return RSA.encrypt(data, query.data[0].verifier);
+            } else {
+                return Promise.reject("No verifier exists for peer." + id);
+            }
+        }
+        return Promise.reject("No such known peer." + id);
+    }
+
+    // Decrypt data from a peer, returns a promise.
+    _DecryptFromPeer(id, data) {
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + id + "'");
+        if (query.data.length != 0) {
+            if (query.data[0].certificate.length != 0) {
+                return RSA.decrypt(data, JSON.parse(query.data[0].certificate).public);
+            } else {
+                return Promise.reject("No certificate exists for peer." + id);
+            }
+        }
+        return Promise.reject("No such known peer." + id);
+    }
+
+    // Check if a remote connected peer has a valid certificate.
+    _VerifyPeer(id) {
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + id + "'");
+        if (query.data.length != 0 && query.data[0].certificate.length != 0) {
+            this._SendPeerData(id, JSON.stringify({
+                type: "cert.verify"
+            }));
+        } else {
+            // Don't even bother 
+            Log.Error("No certificate available for verifying peer." + id);
+        }
+    }
+
+    // Respond to a request to verify
+    _OnVerifyRequest(from, data) {
+        if (from in this._peers) {
+            let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + from + "'");
+            if (query.data.length != 0 && query.data[0].certificate.length != 0) {
+                // Encrypt the certificate - only the real entity should be allowed to read it!
+                this._EncryptForPeer(from, query.data[0].certificate).then((encrypted) => {
+                    this._SendPeerData(from, JSON.stringify({
+                        type: "cert.present",
+                        cert: encrypted
+                    }));
+                }).catch((e) => Log.Error(e));
+            } else {
+                Log.Warning("Peer." + from + " requesting verification but has no recorded certificate.");
+            }
+        }
+    }
+
+    // Called when a remote peer responds to a verification request.
+    _OnCertificatePresented(from, data) {
+        // Decrypt the data and verify that it's the same as the recorded certificate
+        // TODO callback onVerifyPeer
+        this._DecryptFromPeer(from, data.cert).then((decrypted) => {
+            let query = Database.Execute("SELECT issued FROM Peer WHERE id='" + from + "'");
+            // Compare the certificate with the one issued
+            this._verified[from] = query.data.length != 0 && query.data[0].issued === decrypted;
+            if (this._verified[from]) {
+                Log.Info("Peer." + from + " verified successfully.");
+            } else {
+                // Verification failed!
+                Log.Warning("PEER." + from + " FAILED VERIFICATION");
+            }
+        }).catch((e) => Log.Error(e));
     }
 
     // Send a request to connect to a specified entity.

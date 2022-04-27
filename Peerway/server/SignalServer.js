@@ -102,7 +102,6 @@ io.on('connection', socket => {
     // Handle initial setup of an entity.
     // Without this, it's not allowed for clients to connect with other peers.
     // NOTE: When switching active entity, the client should disconnect and reconnect before emitting this.
-    // TODO: Obtain and validate the digital signature of the entity before completing setup.
     socket.on("SetupEntity", (entity) => {
         // Only do this once while the entity is connected
         // Extra conditions handle cases where an entity is connected on multiple devices
@@ -142,7 +141,6 @@ io.on('connection', socket => {
     // NOTE: It's possible for the same entity to appear more than once.
     // This is because it's possible for the same entity to have multiple connections.
     // CONSIDER: Change event name to better reflect the note above.
-    // TODO: Respond with digital signature public key as one of the fields per entity/client.
     // TODO: Optionally omit fields such as avatar, name etc.
     // Options:
     /*

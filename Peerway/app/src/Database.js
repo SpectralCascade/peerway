@@ -126,7 +126,9 @@ export default class Database {
                     "blocked INTEGER," + // Is this peer blocked?
                     "sync TEXT," + // Time of last sync; UTC timestamp in ISO-8601 format
                     "interaction TEXT," + // Time of last interaction; UTC timestamp in ISO-8601 format
-                    "verifier TEXT," + // Digital signature verification key
+                    "certificate TEXT," + // Digital certificate to present to the peer to verify connection
+                    "verifier TEXT," + // Private key for verifying the peer's issued certificate.
+                    "issued TEXT,", + // Certificate that has been issued to this peer.
                     "updated TEXT" + // Last time the peer profile was updated
                 ")"],
                 // Table of chats
