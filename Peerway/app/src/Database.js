@@ -404,15 +404,17 @@ export default class Database {
                 blocked: "blocked" in peer ? peer.blocked : 0,
                 sync: "sync" in peer ? peer.sync : initialDate,
                 interaction: "interaction" in peer ? peer.interaction : dateNow,
+                certificate: "certificate" in peer ? peer.certificate : "",
                 verifier: "verifier" in peer ? peer.verifier : "",
+                issued: "issued" in peer ? peer.issued : "",
                 updated: "updated" in peer ? peer.updated : initialDate
             };
             // Insert blank peer entry
             this.Execute(
-                "INSERT INTO Peers (id,name,avatar,mutual,blocked,sync,interaction,verifier,updated) VALUES (" +
+                "INSERT INTO Peers (id,name,avatar,mutual,blocked,sync,interaction,certificate,verifier,issued,updated) VALUES (" +
                     ToCSV(
                         peer,
-                        ["id", "name", "avatar", "mutual", "blocked", "sync", "interaction", "verifier", "updated"]
+                        ["id", "name", "avatar", "mutual", "blocked", "sync", "interaction", "certificate", "verifier", "issued", "updated"]
                     ) +
                 ")"
             );
