@@ -996,7 +996,11 @@ class PeerwayAPI {
         Database.CreateChat(data.members, {
             id: data.chatId,
             name: data.name,
-            updated: data.updated
+            updated: data.updated,
+            type: data.group,
+            key: data.key,
+            version: data.version,
+            accepted: 1
         });
         this.emit("chat.request", from, data);
     }

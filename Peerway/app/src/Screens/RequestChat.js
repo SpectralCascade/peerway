@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Avatar from '../Components/Avatar';
 import HandleEffect from '../Components/HandleEffect';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Text from '../Components/Text';
 import Colors from '../Stylesheets/Colors';
 import StyleMain from '../Stylesheets/StyleMain';
@@ -75,11 +76,13 @@ export default class RequestChat extends Component {
                 "INNER JOIN ChatMembers ON ChatMembers.peer='" + item.id + "') " +
             "WHERE type = 0"
         );
+        Log.Debug("Query result = " + JSON.stringify(query.data));
 
         let meta = {};
         if (query.data.length > 0) {
             // Private chat already exists with this peer, open it
             meta.id = query.data[0].chat;
+            Log.Debug("Private chat already exists, opening chat." + meta.id + " ...");
         } else {            
             // Private chat creation, type 0
             let allMembers = [this.activeId, item.id];
@@ -128,6 +131,10 @@ export default class RequestChat extends Component {
         );
     }
 
+    onCreateGroupChat() {
+        this.props.navigation.navigate("CreateGroupChat");
+    }
+
     render() {
         return (
             <View style={StyleMain.background}>
@@ -136,6 +143,21 @@ export default class RequestChat extends Component {
 
                 {/* List of entities that the user can request to chat */}
                 <FlatList
+                    ListHeaderComponent={(props) => (
+                        <View style={{backgroundColor: Colors.button}}>
+                        <TouchableOpacity onPress={() => this.onCreateGroupChat()} style={styles.selectable}>
+                            <View style={styles.avatar}>
+                                <Icon name="account-multiple-plus" size={avatarSize} color={"#fff"} />
+                            </View>
+                            <Text
+                                numberOfLines={1}
+                                style={[styles.nameText, {color: "white", fontSize: 18}]}>
+                                {"Create a group chat"}
+                            </Text>
+                        </TouchableOpacity>
+                        <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+                        </View>
+                    )}
                     data={this.state.profiles}
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => (
@@ -162,9 +184,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: paddingAmount,
         top: paddingAmount,
-    },
-    unchecked: {
-        backgroundColor: "#777"
     },
     selectable: {
         padding: paddingAmount,
