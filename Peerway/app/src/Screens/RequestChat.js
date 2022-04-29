@@ -21,21 +21,36 @@ export default class RequestChat extends Component {
         super(props);
 
         this.state = {
-            profiles: [],
-            selected: {}
+            profiles: []
         }
+
+        this.activeId = Database.active.getString("id");
     }
 
     // Callback handler for listing entities
+    // TODO don't use the server listing, just known peers
     onListEntitiesResponse(listing) {
-        this.state.profiles = listing.slice();
+        this.state.profiles = listing.filter(x => x.id != this.activeId);
+
+        // List all known peers as well, even if they're offline
+        let query = Database.Execute("SELECT id,name,avatar FROM Peers");
+        let mapped = query.data.map(peer => ({
+            id: peer.id,
+            name: peer.name,
+            avatar: Peerway.GetAvatarPath(peer.id, peer.avatar, "file://")
+        }));
+        let idList = mapped.map(y => y.id);
+        // Now merge the arrays
+        this.state.profiles = this.state.profiles.filter(x => !(idList.includes(x.id))).concat(mapped);
+
         this.forceUpdate();
     }
 
     // Callback when this screen is opened.
     onOpen() {
-        // TODO: Load up first X peers found on the network
-        // TODO: In future, only list friends unless search terms are entered.
+        this.activeId = Database.active.getString("id");
+
+        // CONSIDER: In future, only list friends?
         console.log("OPENED REQUEST CHAT");
         // Handle retrieval of entities list
         // TODO: Check if slice() copy is needed or not
@@ -53,44 +68,57 @@ export default class RequestChat extends Component {
 
     // Callback when an entity is selected
     onSelect(item) {
-        if (item.clientId in this.state.selected) {
-            delete this.state.selected[item.clientId];
-        } else {
-            this.state.selected[item.clientId] = item.id;
-        }
-        this.forceUpdate();
-    }
-
-    // Callback when the invitations are confirmed.
-    // For now this just creates a new chat
-    onConfirm() {
-        // Create a chat entry in the database
-        let activeId = Database.active.getString("id");
-        let selected = this.state.profiles.filter(item => item.clientId in this.state.selected);
-        
-        // Get peer IDs from selected
-        let peerIds = [];
-        for (let i in selected) {
-            peerIds.push(selected[i].id);
-        }
-        let allMembers = [activeId].concat(peerIds);
-
-        // Blank chat names are replaced by names of all the members
-        let meta = Database.CreateChat(
-            allMembers,
-            { read: 1 }
+        // Find an existing private chat with the peer
+        let query = Database.Execute(
+            "SELECT * FROM (" + 
+                "SELECT Chats.type, ChatMembers.peer, ChatMembers.chat FROM Chats " +
+                "INNER JOIN ChatMembers ON ChatMembers.peer='" + item.id + "') " +
+            "WHERE type = 0"
         );
 
-        Log.Debug("Sending chat request to peers: " + JSON.stringify(peerIds));
+        let meta = {};
+        if (query.data.length > 0) {
+            // Private chat already exists with this peer, open it
+            meta.id = query.data[0].chat;
+        } else {            
+            // Private chat creation, type 0
+            let allMembers = [this.activeId, item.id];
+            meta = Database.CreateChat(
+                allMembers,
+                { type: 0, read: 1 }
+            );
 
-        Peerway.NotifyEntities(peerIds, {
-            type: "chat.request",
-            chatId: meta.id,
-            from: activeId,
-            name: meta.name,
-            members: allMembers
-        });
-        console.log("Created chat with id " + meta.id);
+            // TODO make sure this is secure, connect to the peer and verify or issue cert first?
+            let sendChatRequest = (id) => {
+                Log.Debug("Sending chat request to peer." + id);
+                Peerway.NotifyEntities([id], {
+                    type: "chat.request",
+                    chatId: meta.id,
+                    from: this.activeId,
+                    name: meta.name,
+                    members: allMembers,
+                    key: meta.key,
+                    version: meta.version,
+                    group: 0 // Not a group chat, but a private chat
+                });
+            };
+
+            // Issue a certificate to the peer if necessary - by requesting to chat with them,
+            // you are implicitly trusting them.
+            let query = Database.Execute(
+                "SELECT id FROM Peers WHERE id='" + item.id + "' AND verifier!=''"
+            );
+            if (query.data.length != 0) {
+                sendChatRequest(item.id);
+            } else {
+                Peerway.IssueCertificate(item.id).then(() => {
+                    Log.Debug("Certificate issued!");
+                    sendChatRequest(item.id);
+                }).catch((e) => Log.Error(e));
+            }
+
+            console.log("Created chat with id " + meta.id);
+        }
 
         this.props.navigation.dispatch(
             CommonActions.reset({
@@ -101,20 +129,16 @@ export default class RequestChat extends Component {
     }
 
     render() {
-        let didSelect = Object.keys(this.state.selected).length != 0;
         return (
             <View style={StyleMain.background}>
                 {/* Handles screen opening callback */}
                 <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => this.onOpen()}/>
 
-                {/* List of entities that the user can invite to chat */}
+                {/* List of entities that the user can request to chat */}
                 <FlatList
                     data={this.state.profiles}
-                    keyExtractor={item => item.clientId}
-                    renderItem={({ item }) => {
-                        // Don't list the active entity...
-                        return item.id === Database.active.getString("id") ? (<></>) : 
-                        (
+                    keyExtractor={item => item.id}
+                    renderItem={({ item }) => (
                         <View style={styles.item}>
                         <TouchableOpacity onPress={() => this.onSelect(item)} style={styles.selectable}>
                             <Avatar avatar={item.avatar} size={avatarSize} style={styles.avatar}></Avatar>
@@ -123,32 +147,11 @@ export default class RequestChat extends Component {
                                 style={styles.nameText}>
                                 {item.name}
                             </Text>
-                            <View style={[
-                                styles.checkbox,
-                                item.clientId in this.state.selected ? styles.checked : styles.unchecked
-                            ]}>
-                            </View>
                         </TouchableOpacity>
                         <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
                         </View>
-                        );
-                    }}
+                    )}
                 />
-
-                {/* Confirmation button invites or removes users from the chat */}
-                <View style={styles.confirmButtonContainer}>
-                    <TouchableOpacity
-                        disabled={!didSelect}
-                        onPress={() => { this.onConfirm(); }}
-                        style={[StyleMain.button, styles.confirmButton]}
-                    >
-                        <Text style={[
-                            StyleMain.buttonText,
-                            { color: (didSelect ?
-                                Colors.buttonText : Colors.buttonTextDisabled)}
-                            ]}>Confirm</Text>
-                    </TouchableOpacity>
-                </View>
             </View>
         );
     }
@@ -159,15 +162,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: paddingAmount,
         top: paddingAmount,
-    },
-    checkbox: {
-        position: "absolute",
-        right: paddingAmount,
-        width: avatarSize * 0.5,
-        height: avatarSize * 0.5
-    },
-    checked: {
-        backgroundColor: "#afa"
     },
     unchecked: {
         backgroundColor: "#777"

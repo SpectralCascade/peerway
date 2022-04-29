@@ -128,7 +128,7 @@ export default class Database {
                     "interaction TEXT," + // Time of last interaction; UTC timestamp in ISO-8601 format
                     "certificate TEXT," + // Digital certificate to present to the peer to verify connection
                     "verifier TEXT," + // Private key for verifying the peer's issued certificate.
-                    "issued TEXT,", + // Certificate that has been issued to this peer.
+                    "issued TEXT," + // Certificate that has been issued to this peer.
                     "updated TEXT" + // Last time the peer profile was updated
                 ")"],
                 // Table of chats

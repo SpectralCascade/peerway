@@ -167,7 +167,7 @@ class PeerwayAPI {
         });
     }
 
-    IssueCertificate(id, clientId) {
+    IssueCertificate(id) {
         // Issue certificate
         return this.CreateCertificate().then((cert) => {
             // Save the private key
@@ -262,13 +262,27 @@ class PeerwayAPI {
             "SELECT verifier,certificate FROM Peers WHERE id='" + from + "'"
         );
         if (query.data.length == 0) {
-            // Never interacted with the peer before, treat as a new trust request
+            // Never interacted with the peer before, treat with caution as a new trust request
         } else {
-            // TODO verify the peer first
+            // A new certificate is being issued
+            /*if (!this._verified[from]) {
+                if (this.ConnectToPeer(from)) {
+                    let listener = null;
+                    listener = this.addListener("peer.verified", (verified) => {
+                        if (verified) {
+                            
+                        }
+                        listener.remove();
+                    });
+                    this._VerifyPeer(from);
+                } else {
+                    Log.Warning("Cannot verify peer that is not directly connected.");
+                }
+            }
             if (query.data[0].certificate.length == 0) {
                 // 
             } else {
-            }
+            }*/
         }
     }
 
@@ -291,10 +305,16 @@ class PeerwayAPI {
 
     // Attempt to connect to a specified peer
     // Returns false if connectionState is "connected" or "connecting".
-    ConnectToPeer(id) {
+    ConnectToPeer(id, onConnected=null) {
         if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
-            Log.Debug("Already " + this._peers[id].connectionState + " to peer." + id);            
+            Log.Debug("Already " + this._peers[id].connectionState + " to peer." + id);
         } else {
+            if (onConnected != null) {
+                let listener = this.addListener("peer.connected", (peer) => { 
+                    listener.remove();
+                    onConnected(peer.id);
+                });
+            }
             this._peersToConnect.push(id);
             Log.Debug("Requesting entity meta for peer." + id);
             this.server.emit("GetEntityMeta", { id: id });
@@ -464,8 +484,8 @@ class PeerwayAPI {
                     Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
                 } else {
                     // Make a connection request
-                    Log.Info("Sending connection request to peer." + id + " of client " + clientId);
-                    this._SendConnectionRequest(id, clientId);
+                    Log.Info("Sending connection request to peer." + meta.id + " of client " + meta.clientId);
+                    this._SendConnectionRequest(meta.id, meta.clientId);
                 }
 
             } else {
@@ -507,6 +527,8 @@ class PeerwayAPI {
             delete this._peersPending[id];
             this._peerConnectionTimestamps[id] = ts;
             Log.Info("Connection established to peer." + id);
+
+            this.emit("peer.connected", { id: id });
 
             // Automagically sync with the peer
             if (this._syncConfig) {
@@ -969,6 +991,7 @@ class PeerwayAPI {
     // Handle chat request
     _OnChatRequest(from, data) {
         // TODO notify and let user accept or reject
+
         // TODO REMOVE THIS DEBUG CODE BEFORE RELEASE
         Database.CreateChat(data.members, {
             id: data.chatId,
