@@ -138,7 +138,11 @@ export default class Database {
                     "read INTEGER," + // Has this chat been read by the user?
                     "muted INTEGER," + // Is this chat muted?
                     "blocked INTEGER," + // Is this chat blocked?
-                    "lastMessage TEXT" + // UUID of the last message sent/received in this chat
+                    "lastMessage TEXT," + // UUID of the last message sent/received in this chat
+                    "key TEXT," + // The current symmetric encryption/decryption key for this chat
+                    "version TEXT," + // The timestamp at which the key was generated
+                    "accepted INTEGER," + // Whether the entity has accepted this chat request or not
+                    "type INTEGER" + // Whether this is a group chat (1) or private chat (0)
                 ")"],
                 // Table linking many peers to many chats
                 ["CREATE TABLE IF NOT EXISTS " + "ChatMembers" + "(" +
@@ -178,6 +182,7 @@ export default class Database {
                     "version INTEGER," + // Which version of the post is this? Increments on each edit
                     "content TEXT," + // Text content
                     "media TEXT," + // JSON array of all media content (e.g. images, videos etc.)
+                    "visibility INTEGER," + // Enumeration of visibility level, e.g. public, followers only, private, etc.
                     "PRIMARY KEY (id, author)" + // Composite primary key
                 ")"],
                 // Table linking subscribers to post publishers.
@@ -268,15 +273,17 @@ export default class Database {
             read: "read" in meta ? meta.read : 0,
             muted: "muted" in meta ? meta.muted : 0,
             blocked: "blocked" in meta ? meta.blocked : 0,
-            lastMessage: ""
+            lastMessage: "",
+            key: "key" in meta ? meta.key : "", // TODO generate symmetric key
+            version: "version" in meta ? meta.version : "", // TODO generate version text
         };
 
         // TODO batch these SQL commands
 
         // Create a chat entry
-        let csvData = ToCSV(chatData, ["id", "name", "read", "muted", "blocked", "lastMessage"]);
+        let csvData = ToCSV(chatData, ["id", "name", "read", "muted", "blocked", "lastMessage", "key", "version", "accepted", "type"]);
         this.Execute(
-            "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage) VALUES (" +
+            "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage,key,version,accepted,type) VALUES (" +
                 csvData +
             ")"
         );
@@ -298,7 +305,7 @@ export default class Database {
         return chatData;
     }
 
-    static CreatePost(content, media) {
+    static CreatePost(content, media, visibility=1) {
         let timeNow = (new Date()).toISOString();
         let post = {
             id: uuidv1(),
@@ -308,13 +315,14 @@ export default class Database {
             updated: timeNow,
             version: 0,
             content: content,
-            media: JSON.stringify(media)
+            media: JSON.stringify(media),
+            visibility: visibility
         }
 
         // Create a post entry in the database
         this.Execute(
-            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media) VALUES (" +
-                ToCSV(post, ["id","author","created","edited","updated","version","content","media"]) +
+            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) VALUES (" +
+                ToCSV(post, ["id","author","created","edited","updated","version","content","media","visibility"]) +
             ")"
         );
 
@@ -335,8 +343,8 @@ export default class Database {
         if (query.data.length == 0) {
             Log.Debug("Caching post." + post.id);
             this.Execute(
-                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media) VALUES (" +
-                    ToCSV(post, ["id","author","created","edited","updated","version","content","media"]) +
+                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) VALUES (" +
+                    ToCSV(post, ["id","author","created","edited","updated","version","content","media","visibility"]) +
                 ")"
             );
 

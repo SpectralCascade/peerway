@@ -12,5 +12,10 @@ export default {
     avatarLarge: 128,
     avatarFull: 400,
     floatingButtonSize: 64,
-    paddingGap: 8
+    paddingGap: 8,
+    visibility: {
+        private: 0,
+        mutuals: 1,
+        public: 2
+    }
 }

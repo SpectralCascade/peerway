@@ -62,7 +62,8 @@ export default class CreatePost extends React.Component {
             post.media = [];
         } else {
             Log.Debug("PUBLISHING POST...");
-            post = Database.CreatePost(this.state.content, this.state.media);
+            // TODO set visibility with context menu
+            post = Database.CreatePost(this.state.content, this.state.media, Constants.visibility.mutuals);
         }
 
         // Notify subscribers
