@@ -40,7 +40,8 @@ export default class MessagingOverview extends Component {
                 title: "",
                 content: ""
             },
-            requestCount: 0 // Chat requests count
+            requestCount: 0, // Chat requests count
+            refreshing: false
         }
         this.activeId = "";
         this.contextMenu = React.createRef();
@@ -85,6 +86,7 @@ export default class MessagingOverview extends Component {
 
     Refresh(doSync = true) {
         // First, load up peers data
+        this.state.refreshing = true;
         let peersQuery = Database.Execute("SELECT id,name,avatar FROM Peers");
 
         // Check for peers that are online
@@ -99,6 +101,8 @@ export default class MessagingOverview extends Component {
             this.setState({
                 online: Object.keys(response.availability).filter(id => response.availability[id])
             });
+
+            this.setState({refreshing: false});
         });
         Peerway.server.emit("GetAvailabilities", { entities: peersQuery.data.map(peer => peer.id) });
 
@@ -388,6 +392,10 @@ export default class MessagingOverview extends Component {
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => {
                         return item.id === "requests" ? renderChatRequests(item) : renderChat(item);
+                    }}
+                    refreshing={this.state.refreshing}
+                    onRefresh={() => {
+                        this.Refresh(true);
                     }}
                 />
 
