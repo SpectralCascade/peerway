@@ -1000,7 +1000,7 @@ class PeerwayAPI {
             type: data.group,
             key: data.key,
             version: data.version,
-            accepted: 1
+            accepted: 0
         });
         this.emit("chat.request", from, data);
     }

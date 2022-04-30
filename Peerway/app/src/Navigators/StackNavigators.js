@@ -10,6 +10,7 @@ import Profile from '../Screens/Profile';
 import MainTabs from "./TabNavigators";
 import CreatePost from "../Screens/CreatePost";
 import EditGroupChatMembers from "../Screens/EditGroupChatMembers";
+import ChatRequests from "../Screens/ChatRequests";
 
 const Stack = createNativeStackNavigator();
 
@@ -53,6 +54,11 @@ function MainStack(props) {
                 name="CreateGroupChat"
                 component={EditGroupChatMembers}
                 options={{title: "Create Group Chat", animation: 'slide_from_right', headerShown: true}}
+            />
+            <Stack.Screen
+                name="ChatRequests"
+                component={ChatRequests}
+                options={{title: "Chat Requests", animation: 'slide_from_right', headerShown: true}}
             />
             <Stack.Screen
                 name="Settings"

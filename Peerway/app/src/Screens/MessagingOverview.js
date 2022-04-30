@@ -86,7 +86,7 @@ export default class MessagingOverview extends Component {
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
         this.state.chats = [];
-        this.state.requestCount = 0;
+        this.state.requestCount = Database.Execute("SELECT id FROM Chats WHERE accepted=0").data.length;
 
         // Get all chats ordered by time of last message
         let chatsQuery = Database.Execute(
@@ -94,17 +94,11 @@ export default class MessagingOverview extends Component {
                 "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Chats.accepted, Messages.created " +
                 "FROM Chats INNER JOIN Messages " + 
                     "ON Messages.id=Chats.lastMessage AND Messages.chat=Chats.id" +
-            ")"
+            ") WHERE accepted != 0"
         );
         for (let i = 0, counti = chatsQuery.data.length; i < counti; i++) {
             let id = chatsQuery.data[i].id;
             let meta = chatsQuery.data[i];
-
-            // Skip chat requests
-            if (!meta.accepted) {
-                this.state.requestCount++;
-                continue;
-            }
 
             // Add relevant data required for syncing
             if (doSync) {

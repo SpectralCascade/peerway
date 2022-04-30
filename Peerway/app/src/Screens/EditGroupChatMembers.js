@@ -87,7 +87,8 @@ export default class EditGroupChatMembers extends Component {
                 chatId: meta.id,
                 from: activeId,
                 name: meta.name,
-                members: allMembers
+                members: allMembers,
+                group: 1
             });
         };
 
