@@ -84,11 +84,11 @@ export default class RequestChat extends Component {
             meta.id = query.data[0].chat;
             Log.Debug("Private chat already exists, opening chat." + meta.id + " ...");
         } else {            
-            // Private chat creation, type 0
+            // Private chat creation, type 0, using the entity ID as the chat ID
             let allMembers = [this.activeId, item.id];
             meta = Database.CreateChat(
                 allMembers,
-                { type: 0, read: 1 }
+                { id: item.id, type: 0, read: 1 }
             );
 
             // TODO make sure this is secure, connect to the peer and verify or issue cert first?

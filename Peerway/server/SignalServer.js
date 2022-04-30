@@ -188,6 +188,18 @@ io.on('connection', socket => {
         socket.emit("ListEntitiesResponse", listing);
     });
 
+    // Handle request for checking if specific entities are available or not.
+    socket.on("GetAvailabilities", (request) => {
+        let response = {
+            availability: {}
+        };
+        for (let i = 0, counti = request.entities.length; i < counti; i++) {
+            let id = request.entities[i];
+            response.availability[id] = (id in entities && entities[id].length > 0) ? 1 : 0;
+        }
+        socket.emit("AvailabilitiesResponse", response);
+    });
+
     // Handle request to get some meta data on an entity connected to this server.
     // Meta input data requires an entity id at least.
     // Always returns "id" and "available" fields. Also includes clientId if available.

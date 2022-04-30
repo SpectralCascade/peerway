@@ -33,7 +33,8 @@ export default class MessagingOverview extends Component {
         super(props);
         this.state = {
             chats: [], // Chat listings
-            online: [], // Peers who are online right now
+            online: [], // IDs of peers who are online right now
+            peers: {}, // Known peers data
             contextOptions: [],
             popup: {
                 title: "",
@@ -83,6 +84,23 @@ export default class MessagingOverview extends Component {
     }
 
     Refresh(doSync = true) {
+        // First, load up peers data
+        this.state.online = [];
+        this.state.peers = {};
+        let peersQuery = Database.Execute("SELECT id,name,avatar FROM Peers");
+        for (let i = 0, counti = peersQuery.data.length; i < counti; i++) {
+            this.state.peers[peersQuery.data[i].id] = peersQuery.data[i];
+        }
+
+        // Check for peers that are online
+        Peerway.server.off("AvailabilitiesResponse");
+        Peerway.server.on("AvailabilitiesResponse", (response) => {
+            this.setState({
+                online: Object.keys(response.availability).filter(id => response.availability[id])
+            });
+        });
+        Peerway.server.emit("GetAvailabilities", { entities: peersQuery.data.map(peer => peer.id) });
+
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
         this.state.chats = [];
@@ -91,7 +109,7 @@ export default class MessagingOverview extends Component {
         // Get all chats ordered by time of last message
         let chatsQuery = Database.Execute(
             "SELECT * FROM (" +
-                "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Chats.accepted, Messages.created " +
+                "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Chats.accepted, Chats.type, Messages.created " +
                 "FROM Chats INNER JOIN Messages " + 
                     "ON Messages.id=Chats.lastMessage AND Messages.chat=Chats.id" +
             ") WHERE accepted != 0"
@@ -119,29 +137,33 @@ export default class MessagingOverview extends Component {
 
             // Generate chat name and grab the chat icon
             let chatName = meta.name;
-            query = Database.Execute(
-                "SELECT * FROM (" + 
-                "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
-                "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
-                "WHERE id != '" + this.activeId + "' "
-            );
+            let icon = "";
+            if (meta.type == 0) {
+                query = Database.Execute(
+                    "SELECT * FROM (" + 
+                    "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
+                    "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
+                    "WHERE id != '" + this.activeId + "' "
+                );
 
-            if (query.data.length == 0) {
-                // CONSIDER: support/handle users messaging themselves?
-            } else {
-                // Generate chat name if necessary
-                if (meta.name.length == 0) {
+                if (query.data.length > 0) {
                     chatName = query.data[0].name;
                     for (let j = 1, countj = query.data.length; j < countj; j++) {
                         chatName += ", " + query.data[j].name;
                     }
+                    // Use peer avatar as chat icon
+                    icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
+                } else {
+                    Log.Error(
+                        "Failed to get details for chat." + meta.id + ", query success: " + query.success
+                    );
                 }
+            } else {
+                // TODO load correct icon extension
+                icon = Peerway.GetChatPath(id) + ".png";
             }
 
             // Create a chat entry for the UI
-            // TODO load correct icon extension
-            let icon = Peerway.GetChatPath(id) + ".png";
-            let chatIndex = this.state.chats.length;
             this.state.chats.unshift({
                 id: id,
                 name: chatName,
@@ -152,18 +174,8 @@ export default class MessagingOverview extends Component {
                     // TODO instead of en-GB use device locale
                     timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
                 },
-                read: meta.read
-            });
-            
-            // Load up the chat icon if it exists
-            RNFS.exists(icon).then((exists) => {
-                if (!exists && query.data.length == 1) {
-                    // Use peer avatar as chat icon
-                    icon = Peerway.GetAvatarPath(query.data[0].id, query.data[0].avatar, "file://");
-                    this.state.chats[chatIndex].icon = icon;
-                    this.setState({chats: this.state.chats});
-                }
-            }).catch((e) => {
+                read: meta.read,
+                type: meta.type
             });
         }
 
@@ -246,7 +258,12 @@ export default class MessagingOverview extends Component {
                 style={styles.chatContainer}
             >
                 <View style={styles.chatIcon}>
-                    <Avatar avatar={item.icon} size={iconSize} />
+                    <Avatar
+                        avatar={item.icon}
+                        size={iconSize}
+                        styles={styles.avatar}
+                        status={item.type ? undefined : (this.state.online.includes(item.id) ? 1 : 0)}
+                    />
                 </View>
                 <View style={styles.chatContent}>
                     <Text
@@ -295,36 +312,45 @@ export default class MessagingOverview extends Component {
         );
 
         // Show online peers
-        const renderOnlineSection = () => (<></>/*
-            <View>
-            <TouchableOpacity
-                onPress={() => GoChatRequests(item)}
-                style={styles.chatContainer}
-            >
-                <View style={styles.chatIcon}>
-                    <Icon name="chat-alert" size={iconSize} color="red"/>
+        const renderOnlineSection = () => {
+            if (this.state.online.length <= 0) {
+                return (<></>);
+            }
+
+            let keyed = this.state.online.map(x => ({ id: x }));
+            Log.Debug("RENDER PASS WITH " + JSON.stringify(keyed));
+
+            return (
+                <>
+                <View style={{backgroundColor: "#fff", padding: paddingAmount}}>
+                <Text style={{fontSize: 16}}>Online peers</Text>
+                <View style={{backgroundColor: "#fff"}}>
+                    <FlatList
+                        data={keyed}
+                        keyExtractor={item => item.id}
+                        renderItem={({ item }) => (
+                            <View>
+                                <View style={[styles.chatIcon, { marginVertical: 5, position: "relative", left: 0 }]}>
+                                    <Avatar
+                                        avatar={Peerway.GetAvatarPath(item.id, this.state.peers[item.id].avatar, "file://")}
+                                        size={iconSize}
+                                        status={1}
+                                    />
+                                </View>
+                                <Text 
+                                    numberOfLines={1}
+                                    style={{maxWidth: iconSize, fontSize: 12}}
+                                >{item.id}</Text>
+                            </View>
+                        )}
+                        horizontal
+                    />
                 </View>
-                <View style={styles.chatContent}>
-                    <Text
-                        numberOfLines={1}
-                        style={[styles.chatContentHeader, {fontWeight: item.read ? "normal" : "bold"}]}>
-                        {"Chat requests"}
-                    </Text>
-                    <Text
-                        numberOfLines={1}
-                        style={[styles.chatContentMessage, {
-                            color: item.read ? "#999" : "#000",
-                            fontWeight: item.read ? "normal" : "bold"
-                        }]}
-                    >
-                        {item.message.from + item.message.content}
-                    </Text>
                 </View>
-                <Text style={styles.chatTimestamp}>{item.message.timestamp}</Text>
-            </TouchableOpacity>
-            <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
-            </View>
-        */);
+                <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+                </>
+            );
+        };
 
         // Render header sections
         const renderHeaders = () => (
