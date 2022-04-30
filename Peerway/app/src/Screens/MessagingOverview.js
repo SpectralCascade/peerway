@@ -85,16 +85,17 @@ export default class MessagingOverview extends Component {
 
     Refresh(doSync = true) {
         // First, load up peers data
-        this.state.online = [];
-        this.state.peers = {};
         let peersQuery = Database.Execute("SELECT id,name,avatar FROM Peers");
-        for (let i = 0, counti = peersQuery.data.length; i < counti; i++) {
-            this.state.peers[peersQuery.data[i].id] = peersQuery.data[i];
-        }
 
         // Check for peers that are online
         Peerway.server.off("AvailabilitiesResponse");
         Peerway.server.on("AvailabilitiesResponse", (response) => {
+            this.state.online = [];
+            this.state.peers = {};
+            for (let i = 0, counti = peersQuery.data.length; i < counti; i++) {
+                this.state.peers[peersQuery.data[i].id] = peersQuery.data[i];
+            }
+            
             this.setState({
                 online: Object.keys(response.availability).filter(id => response.availability[id])
             });
