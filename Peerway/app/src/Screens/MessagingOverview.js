@@ -32,12 +32,14 @@ export default class MessagingOverview extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            chats: [],
+            chats: [], // Chat listings
+            online: [], // Peers who are online right now
             contextOptions: [],
             popup: {
                 title: "",
                 content: ""
-            }
+            },
+            requestCount: 0 // Chat requests count
         }
         this.activeId = "";
         this.contextMenu = React.createRef();
@@ -84,11 +86,12 @@ export default class MessagingOverview extends Component {
         // Metadata about chats for syncing purposes
         let chatSyncMeta = [];
         this.state.chats = [];
+        this.state.requestCount = 0;
 
         // Get all chats ordered by time of last message
         let chatsQuery = Database.Execute(
             "SELECT * FROM (" +
-                "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Messages.created " +
+                "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Chats.accepted, Messages.created " +
                 "FROM Chats INNER JOIN Messages " + 
                     "ON Messages.id=Chats.lastMessage AND Messages.chat=Chats.id" +
             ")"
@@ -96,6 +99,12 @@ export default class MessagingOverview extends Component {
         for (let i = 0, counti = chatsQuery.data.length; i < counti; i++) {
             let id = chatsQuery.data[i].id;
             let meta = chatsQuery.data[i];
+
+            // Skip chat requests
+            if (!meta.accepted) {
+                this.state.requestCount++;
+                continue;
+            }
 
             // Add relevant data required for syncing
             if (doSync) {
@@ -175,6 +184,11 @@ export default class MessagingOverview extends Component {
         this.forceUpdate();
     }
 
+    // Go to the chat requests screen
+    GoChatRequests() {
+        this.props.navigation.navigate("ChatRequests");
+    }
+
     render() {
         const onCreateChat = () => {
             this.props.navigation.navigate("RequestChat");
@@ -191,10 +205,6 @@ export default class MessagingOverview extends Component {
                 this.forceUpdate();
                 this.props.navigation.navigate("Chat", { chatId: chat.id });
             }
-        };
-
-        const onOpenSettings = () => {
-            this.props.navigation.navigate("Settings");
         };
 
         const onContextMenu = (chat) => {
@@ -269,6 +279,31 @@ export default class MessagingOverview extends Component {
         const renderChatRequests = (item) => (
             <View>
             <TouchableOpacity
+                onPress={() => this.GoChatRequests(item)}
+                style={styles.chatContainer}
+            >
+                <View style={[styles.chatIcon, {backgroundColor: "#fff"}]}>
+                    <Icon name="chat-alert" size={iconSize} color="red"/>
+                </View>
+                <View style={styles.chatContent}>
+                    <Text
+                        numberOfLines={1}
+                        style={[styles.chatContentHeader, {fontWeight: "bold"}]}>
+                        {this.state.requestCount + " chat request(s)..."}
+                    </Text>
+                </View>
+                <View style={[styles.chatTimestamp, {top: undefined}]} >
+                    <Icon name="chevron-right" size={iconSize / 2} color={Colors.button}/>
+                </View>
+            </TouchableOpacity>
+            <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+            </View>
+        );
+
+        // Show online peers
+        const renderOnlineSection = () => (<></>/*
+            <View>
+            <TouchableOpacity
                 onPress={() => GoChatRequests(item)}
                 style={styles.chatContainer}
             >
@@ -295,6 +330,14 @@ export default class MessagingOverview extends Component {
             </TouchableOpacity>
             <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
             </View>
+        */);
+
+        // Render header sections
+        const renderHeaders = () => (
+            <>
+            {renderOnlineSection()}
+            {this.state.requestCount > 0 ? renderChatRequests() : (<></>)}
+            </>
         );
 
         return (
@@ -319,6 +362,7 @@ export default class MessagingOverview extends Component {
                 />
 
                 <FlatList
+                    ListHeaderComponent={() => renderHeaders()}
                     data={this.state.chats}
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => {

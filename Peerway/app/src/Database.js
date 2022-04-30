@@ -276,8 +276,8 @@ export default class Database {
             lastMessage: "",
             key: "key" in meta ? meta.key : "", // TODO generate symmetric key
             version: "version" in meta ? meta.version : "", // TODO generate version text
-            accepted: "accepted" in meta ? meta.accepted : "",
-            type: "type" in meta ? meta.type : ""
+            accepted: "accepted" in meta ? meta.accepted : 1,
+            type: "type" in meta ? meta.type : 1
         };
 
         // TODO batch these SQL commands
