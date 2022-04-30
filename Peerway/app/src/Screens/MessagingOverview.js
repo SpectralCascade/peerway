@@ -335,13 +335,22 @@ export default class MessagingOverview extends Component {
                         keyExtractor={item => item.id}
                         renderItem={({ item }) => (
                             <View>
-                                <View style={[styles.chatIcon, { marginVertical: 5, position: "relative", left: 0 }]}>
+                                <TouchableOpacity
+                                    onPress={() => 
+                                        this.props.navigation.navigate("Chat", { chatId: item.id })
+                                    }
+                                    style={[styles.chatIcon, {
+                                        marginVertical: 5,
+                                        position: "relative",
+                                        left: 0
+                                    }]}
+                                >
                                     <Avatar
                                         avatar={Peerway.GetAvatarPath(item.id, this.state.peers[item.id].avatar, "file://")}
                                         size={iconSize}
                                         status={1}
                                     />
-                                </View>
+                                </TouchableOpacity>
                                 <Text 
                                     numberOfLines={1}
                                     style={{maxWidth: iconSize, fontSize: 12}}
