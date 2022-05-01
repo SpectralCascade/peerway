@@ -99,7 +99,7 @@ class PeerChannel {
                 Peerway._OnMediaRequest(from, data);
                 break;
             case "connected":
-                Peerway._OnPeerConnected(from, data.ts);
+                this._OnPeerConnected(data.ts);
                 break;
             case "sync":
                 Peerway._OnPeerSync(from, data);
@@ -108,10 +108,10 @@ class PeerChannel {
                 Peerway._OnUpdateChat(from, data);
                 break;
             case "data.begin":
-                Peerway._OnDataBegin(from, data);
+                this._OnDataBegin(from, data);
                 break;
             case "data.end":
-                Peerway._OnDataEnd(from, data);
+                this._OnDataEnd(from, data);
                 break;
             case "peer.update":
                 Peerway._OnUpdatePeer(from, data);
@@ -139,6 +139,76 @@ class PeerChannel {
         }
     }
 
+    // For use with data >16 kiB, see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels
+    // Data must be an Uint8Array. Optionally specify a filename to save it as.
+    SendBytes(data, mime="text/json", filename="") {
+        // Indicate that we're about to send data chunks to the peer
+        this._channel.send(JSON.stringify({
+            type: "data.begin",
+            from: this._activeId,
+            mime: mime,
+            size: data.byteLength,
+            filename: filename
+        }));
+
+        // TODO check this sends large amounts of data correctly e.g. videos
+        this._channel.send(data);
+
+        // Slice up the data into chunks
+        // Thankfully, it can be assumed that the data will be sent in order
+        // https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/ordered
+        /*let start = 0;
+        let end = 0;
+        for (let i = 0, counti = Math.ceil(data.byteLength / Constants.maxBytesPerDataSend); i < counti; i++) {
+            start = i * Constants.maxBytesPerDataSend;
+            end = Math.min(start + Constants.maxBytesPerDataSend, counti);
+            this._channels[peer].send(data.slice(start, end));
+        }*/
+
+        // Finished sending data, indicate this to the peer
+        this._channel.send(JSON.stringify({
+            type: "data.end",
+            from: this._activeId,
+            mime: mime,
+            size: data.byteLength,
+            filename: filename
+        }));
+    }
+
+    // Sends a file to the specified peer.
+    SendFile(path, onDelivered=null, mime="application/octet-stream") {
+        return RNFS.readFile(path, "base64").then((data) => {
+            // TODO handle connection loss!
+            if (onDelivered != null) {
+                let listener = Peerway.addListener("data.ack", (from, data) => {
+                    if (from === this.id) {
+                        listener.remove();
+                        if (onDelivered != null) {
+                            onDelivered(path);
+                        }
+                    }
+                });
+            }
+            let bin = Buffer.from(data, "base64");
+            this.SendBytes(
+                new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
+                mime,
+                path.split("/").pop()
+            );
+        });
+    }
+
+    // Send several files to the specified peer.
+    SendFiles(paths, onDelivered=null, mime="application/octet-stream") {
+        const nextPath = paths.shift();
+        if (nextPath) {
+            return this.SendFile(nextPath, onDelivered, mime).then(
+                () => this.SendFiles(paths, onDelivered, mime)
+            );
+        }
+        return Promise.resolve();
+    }
+
     // Handle large amounts of data from peer
     _OnDataBegin(from, data) {
         Log.Debug("Preparing to receive binary data from peer." + from);
@@ -152,7 +222,7 @@ class PeerChannel {
     _OnDataEnd(from, data) {
         if (this._pendingData != null) {
             // Acknowledge that the data was received
-            this._SendPeerData(from, JSON.stringify({
+            this._channel.send(JSON.stringify({
                 type: "data.ack"
             }));
 
