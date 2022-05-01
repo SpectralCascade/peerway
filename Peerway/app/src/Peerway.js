@@ -736,6 +736,9 @@ class PeerwayAPI {
             case "chat.update":
                 this._OnUpdateChat(from, data);
                 break;
+            case "data.ack":
+                this.emit("data.ack", from, data);
+                break;
             case "data.begin":
                 this._OnDataBegin(from, data);
                 break;
