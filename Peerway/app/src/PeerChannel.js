@@ -153,7 +153,7 @@ export default class PeerChannel {
         }
         
         if (handler && handler != null && typeof handler === "function") {
-            handler(this, data);
+            handler(data);
         } else {
             Log.Warning("Received invalid request from peer." + this.id + " of type: " + data.type);
         }
