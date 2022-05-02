@@ -351,10 +351,12 @@ export default class MessagingOverview extends Component {
                                         status={1}
                                     />
                                 </TouchableOpacity>
-                                <Text 
-                                    numberOfLines={1}
-                                    style={{maxWidth: iconSize, fontSize: 12}}
-                                >{item.id}</Text>
+                                <View style={{alignItems: "center"}}>
+                                    <Text 
+                                        numberOfLines={1}
+                                        style={{maxWidth: iconSize, fontSize: 12}}
+                                    >{this.state.peers[item.id].name}</Text>
+                                </View>
                             </View>
                         )}
                         horizontal
