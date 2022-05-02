@@ -10,6 +10,7 @@ import { v1 as uuidv1 } from "uuid";
 import { RSA } from "react-native-rsa-native";
 import { Buffer } from 'buffer';
 import Notif from "./Notif";
+import PeerChannel from "./PeerChannel";
 
 // This class forms the primary API for communicating with peers
 class PeerwayAPI {
@@ -35,22 +36,11 @@ class PeerwayAPI {
     // "Private" members
     //
 
-    // Peers to be connected to via WebRTC
-    _peersToConnect = [];
-    // Peer entities that have been requested to connect, keyed by client id.
-    _peersPending = {};
-    // ICE candidates that need to be sent once a peer has accepted the connection.
-    _pendingCandidates = {};
-    // Connections to other peers, keyed by entity ID.    
-    _peers = {};
+    // All peer connections (PeerChannel instances)
+    peers = {};
+
     // Connected peers that are verified, keyed by entity ID.
     _verified = {};
-    // Data send channels to connected peers
-    _channels = {};
-    // Binary data that is being received
-    _pendingData = {};
-    // Timestamps of connection establishment to peers
-    _peerConnectionTimestamps = {};
     // URL of the current signal server
     _signalServerURL = "";
     // The id of the entity that is connected to the signal server
@@ -236,11 +226,19 @@ class PeerwayAPI {
 
         
         // Setup other request handlers
-        this.server.on("PeerConnectionRequest", (socket) => { this._OnConnectionRequest(socket); });
-        this.server.on("PeerConnectionAccepted", (socket) => { this._OnConnectionAccepted(socket); });
-        this.server.on("ice-candidate", incoming => { this._OnReceivedNewCandidate(incoming); });
+        this.server.on("Call", (socket) => { this._OnConnectionRequest(socket); });
         this.server.on("EntityMetaResponse", (meta) => { this._OnEntityMetaResponse(meta); });
-        this.server.on("PushNotification", (notif) => { this._OnReceivedJSON(notif.notif, notif.from); });
+        this.server.on("PushNotification", (notif) => {
+            let peer = this.GetPeerChannel(notif.from);
+            if (peer.connected) {
+                // Early out, could be an unverified peer making a security breach attempt
+                // Though it's more likely the peer was somehow disconnected without informing this entity
+                // TODO ensure that this never happens
+                Log.Error("Ignoring received push notification as peer." + peer.id + " should be using WebRTC connection!");
+            } else {
+                peer._OnRequest(notif.notif);
+            }
+        });
 
         // Setup the active entity, sending the avatar if available.
         if ("ext" in entity.avatar) {
@@ -256,17 +254,54 @@ class PeerwayAPI {
         }
     }
 
+    // Get an existing peer channel, or create one with callbacks configured
+    GetPeerChannel(id) {
+        if (!(id in this.peers)) {
+            // First create a communication channel for the peer, then configure request handlers
+            let peer = new PeerChannel(id, this._activeId, this.server);
+
+            // Peer authentication
+            peer.requests.cert.issue = (data) => this._OnCertificateIssued(peer, data);
+            peer.requests.cert.present = (data) => this._OnCertificatePresented(peer, data);
+            peer.requests.cert.verify = (data) => this._OnVerifyRequest(peer);
+            
+            // Chats
+            peer.requests.chat.message = (data) => this._OnChatMessage(peer, data);
+            peer.requests.chat.update = (data) => this._OnUpdateChat(peer, data);
+            peer.requests.chat.invite = (data) => this._OnChatRequest(peer, data);
+
+            // Media files request
+            peer.requests.media.request = (data) => this._OnMediaRequest(peer, data);
+
+            // Peer sub/unsub and profile updates
+            peer.requests.peer.sub = (data) => this._OnPeerSubToggle(peer, true);
+            peer.requests.peer.unsub = (data) => this._OnPeerSubToggle(peer, false);
+            peer.requests.peer.update = (data) => this._OnUpdatePeer(peer, data);
+
+            // Posts
+            peer.requests.post.publish = (data) => this._OnPostPublished(peer, data);
+            peer.requests.post.request = (data) => this._OnPostRequest(peer, data);
+            peer.requests.post.response.begin = (data) => this._OnPostResponse(data);
+
+            // Synchronisation
+            peer.requests.sync = (data) => this._OnPeerSync(peer, data);
+
+            this.peers[id] = peer;
+        }
+        return this.peers[id];
+    }
+
     // TODO handle receiving a certificate
     _OnCertificateIssued(from, data) {
         let query = Database.Execute(
-            "SELECT verifier,certificate FROM Peers WHERE id='" + from + "'"
+            "SELECT verifier,certificate FROM Peers WHERE id='" + from.id + "'"
         );
         if (query.data.length == 0) {
             // Never interacted with the peer before, treat with caution as a new trust request
         } else {
             // A new certificate is being issued
-            /*if (!this._verified[from]) {
-                if (this.ConnectToPeer(from)) {
+            /*if (!this._verified[from.id]) {
+                if (this.ConnectToPeer(from.id)) {
                     let listener = null;
                     listener = this.addListener("peer.verified", (verified) => {
                         if (verified) {
@@ -274,7 +309,7 @@ class PeerwayAPI {
                         }
                         listener.remove();
                     });
-                    this._VerifyPeer(from);
+                    this._VerifyPeer(from.id);
                 } else {
                     Log.Warning("Cannot verify peer that is not directly connected.");
                 }
@@ -306,16 +341,21 @@ class PeerwayAPI {
     // Attempt to connect to a specified peer
     // Returns false if connectionState is "connected" or "connecting".
     ConnectToPeer(id, onConnected=null) {
-        if (id in this._peers && this._peers[id] && this._peers[id].connectionState.startsWith("connect")) {
-            Log.Debug("Already " + this._peers[id].connectionState + " to peer." + id);
+        let peer = this.GetPeerChannel(id);
+        if (peer._peer.connectionState.startsWith("connect")) {
+            Log.Debug("Already " + this.peers[id]._peer.connectionState + " to peer." + id);
         } else {
-            if (onConnected != null) {
-                let listener = this.addListener("peer.connected", (peer) => { 
-                    listener.remove();
+            // Setup connection handler
+            peer.onConnected = () => {
+                if (onConnected) {
                     onConnected(peer.id);
-                });
+                }
+                
+                // Automagically sync with the peer
+                if (this._syncConfig) {
+                    this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
+                }
             }
-            this._peersToConnect.push(id);
             Log.Debug("Requesting entity meta for peer." + id);
             this.server.emit("GetEntityMeta", { id: id });
             return true;
@@ -328,7 +368,6 @@ class PeerwayAPI {
     // See README.md for details on these options.
     SyncPeers(options = {}) {
         this._syncConfig = options;
-        this._peersToConnect = [];
         let candidates = "selectedPeers" in options ? options.selectedPeers.slice() : [];
         if (!("selectedPeers" in options)) {
             let query = Database.Execute("SELECT id FROM Peers");
@@ -340,11 +379,11 @@ class PeerwayAPI {
 
             // Attempt to connect to the peer, if not already connected
             if (!this.ConnectToPeer(id)) {
-                if (this._peers[id].connectionState === "connecting") {
+                if (this.peers[id]._peer.connectionState === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
                     Log.Debug("Still connecting to peer." + id);
                 } else {
-                    Log.Debug("Syncing already connected peer." + this._peersToConnect[i]);
+                    Log.Debug("Syncing already connected peer." + id);
                     this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
                 }
             }
@@ -425,22 +464,24 @@ class PeerwayAPI {
 
     // Send a notification to one or more entities
     NotifyEntities(entities, notification) {
-        let raw = JSON.stringify(notification);
-        //Log.Debug("Sending notification:\n" + raw);
         Log.Debug("Sending notif to entities: " + JSON.stringify(entities));
 
-        // Length can change each iteration, hence no caching
-        for (let i = 0; i < entities.length; i++) {
+        // Attempt to send directly to entities when possible
+        let disconnected = [];
+        for (let i = 0, counti = entities.length; i < counti; i++) {
             let id = entities[i];
-            if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
+            if (id in this.peers && this.peers[id].connected) {
                 // Send directly to connected peers rather than notifying via server when possible
-                this._SendPeerData(id, raw);
-                entities.splice(i, 1);
+                this.peers[id].SendRequest(notification);
+            } else {
+                disconnected.push(entities[i]);
             }
         }
 
-        if (entities.length > 0) {
-            this.server.emit("PushNotification", { targets: entities, notif: notification, from: this._activeId });
+        // Otherwise, send push notification
+        if (disconnected.length > 0) {
+            // TODO check "from" entity ID corresponds to client ID on server side
+            this.server.emit("PushNotification", { targets: disconnected, notif: notification, from: this._activeId });
         }
     }
 
@@ -451,13 +492,13 @@ class PeerwayAPI {
     // Actually sync data with a connected peer.
     // Returns true if syncing begins successfully (i.e. the other peer is connected).
     _SyncPeer(id, config, timestamp, force=false) {
-        if (id in this._peers && this._peers[id] && this._peers[id].connectionState === "connected") {
+        if (id in this.peers && this.peers[id].connected) {
             // Get local peer metadata
             let query = Database.Execute("SELECT * FROM Peers WHERE id='" + id + "'");
             let meta = query.data.length > 0 ? query.data[0] : { sync: (new Date(0)).toISOString() };
 
             // Send sync request to the peer with the configuration data
-            this._SendPeerData(id, JSON.stringify({
+            this.peers[id].SendRequest({
                 type: "sync",
                 from: this._activeId,
                 to: id,
@@ -466,7 +507,7 @@ class PeerwayAPI {
                 config: config,
                 force: force,
                 updated: { profile: meta.updated }
-            }));
+            });
             return true;
         }
         Log.Warning("Cannot sync with disconnected peer." + id);
@@ -478,351 +519,34 @@ class PeerwayAPI {
         Log.Debug("Meta response: " + JSON.stringify(meta));
         if (meta.available) {
             // Check if the entity is supposed to be connected to.
-            if (this._peersToConnect.includes(meta.id)) {
+            if (meta.id in this.peers) {
                 let query = Database.Execute("SELECT blocked FROM Peers WHERE id='" + meta.id + "'");
                 if (query.data.length != 0 && query.data[0].blocked) {
                     Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
                 } else {
                     // Make a connection request
                     Log.Info("Sending connection request to peer." + meta.id + " of client " + meta.clientId);
-                    this._SendConnectionRequest(meta.id, meta.clientId);
+                    this.peers[meta.id].Connect(meta.clientId);
                 }
 
             } else {
                 // Might have a use case, e.g. interacting with a new entity for the first time.
-                Log.Debug("peer." + meta.id + " not in expected peersToConnect array " + JSON.stringify(this._peersToConnect));
+                Log.Debug("peer." + meta.id + " not in peers object.");
             }
         } else {
-            // Peer is unavailable on the signal server; they are probably offline.
+            // Peer is unavailable on the signal server
+            if (meta.id in this.peers) {
+                this.peers[meta.id].online = false;
+            }
             Log.Debug("Peer." + meta.id + " is unavailable, cannot connect.");
         }
     }
 
-    // Callback for handling local ICE candidates.
-    // Takes remote entity id to which the candidate pertains.
-    _OnPeerConnectionCandidate(e, id) {
-        if (this._peers[id].remoteDescription == null) {
-            // Caller may find ICE candidates before the peer is ready to accept them
-            if (!(id in this._pendingCandidates)) {
-                this._pendingCandidates[id] = [];
-            }
-            this._pendingCandidates[id].push(e);
-        } else if (e.candidate) {
-            let payload = {
-                local: this._activeId,
-                remote: id,
-                target: this._peersPending[id], // Target client id
-                candidate: e.candidate, // ICE candidate
-            };
-            Log.Verbose(
-                "Sending new ice-candidate from " + payload.local +
-                " to " + payload.remote + " client " + payload.target
-            );
-            this.server.emit("ice-candidate", payload);
-        }
-    }
-
-    _OnPeerConnected(id, ts) {
-        if (id in this._peersPending && id in this._peers && this._peers[id].connectionState === "connected") {
-            delete this._peersPending[id];
-            this._peerConnectionTimestamps[id] = ts;
-            Log.Info("Connection established to peer." + id);
-
-            this.emit("peer.connected", { id: id });
-
-            // Automagically sync with the peer
-            if (this._syncConfig) {
-                this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
-            }
-        } else {
-            Log.Warning("Peer acknowledged non-existent connection!");
-        }
-    }
-
-    // Add relayed ICE candidate message from the peer we're trying to connect to.
-    _OnReceivedNewCandidate(incoming) {
-        Log.Verbose("Received new ICE candidate from " + incoming.local);
-        this._peers[incoming.local].addIceCandidate(
-            new RTCIceCandidate(incoming.candidate)
-        ).catch((e) => { this.onSyncPeersError({message: e}); });
-    }
-
-    // Callback to respond to WebRTC negotiation. Actually makes the initial peer connection request.
-    // Takes the ID of the remote peer to connect to.
-    _HandleNegotiationNeededEvent(id) {
-        // Make sure this is actually a peer we want to connect to.
-        if (id in this._peersPending) {
-            Log.Verbose("Sending peer request to client " + this._peersPending[id] + " (entity " + id + ")");
-            this._peers[id].createOffer().then(offer => {
-                Log.Info("Setting local SDP for peer." + id + "...");
-                return this._peers[id].setLocalDescription(offer);
-            }).then(() => {
-                let payload = {
-                    local: this._activeId, // id of active entity
-                    remote: id, // Target entity id
-                    target: this._peersPending[id], // Target client
-                    caller: this.server.id, // This client
-                    sdp: this._peers[id].localDescription,
-                };
-                Log.Verbose("Sending peer request to signalling server...");
-                this.server.emit("SendPeerRequest", payload);
-            }).catch((e) => {
-                this.onSyncPeersError({message: "Error handling negotiation needed event: " + e});
-            });
-        } else {
-            Log.Error("No known peer pending with client id " + id + " - aborting connection request.");
-        }
-    }
-
-    // Create a call to a particular peer (specified by entity id).
-    _CreatePeerCall(id) {
-        Log.Info("Setting up WebRTC connection to peer " + id);
-        
-        let peer = this._CreatePeerConnection();
-        let targetId = id;
-
-        // Callback when a new ICE candidate is found for the peer connection.
-        peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, targetId);
-        // Callback when negotiation is required (only when calling)
-        peer.onnegotiationneeded = () => this._HandleNegotiationNeededEvent(targetId);
-
-        return peer;
-    }
-
-    // Create an answer to a peer call request.
-    _CreatePeerAnswer(id) {
-        let peer = this._CreatePeerConnection();
-
-        // Callback when a new ICE candidate is found for the peer connection.
-        peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, id);
-
-        return peer;
-    }
-
-    // Creates a WebRTC connection object.
-    _CreatePeerConnection() {
-        // TODO: Run local STUN and TURN servers, instead of using these
-        return new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: "stun:" + Constants.server_ip + ":3478"
-                },
-                {
-                    urls: "turn:" + Constants.server_ip + ":3478",
-                    username: "peerway",
-                    credential: "peerway"
-                },
-            ]
-        });
-    }
-
-    // For use with data >16 kiB, see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels
-    // Data must be an Uint8Array. Optionally specify a filename to save it as.
-    SendBytes(peer, data, mime="text/json", filename="") {
-        // Indicate that we're about to send data chunks to the peer
-        this._SendPeerData(peer, JSON.stringify({
-            type: "data.begin",
-            from: this._activeId,
-            mime: mime,
-            size: data.byteLength,
-            filename: filename
-        }));
-
-        // TODO check this sends large amounts of data correctly e.g. videos
-        this._channels[peer].send(data);
-
-        // Slice up the data into chunks
-        // Thankfully, it can be assumed that the data will be sent in order
-        // https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/ordered
-        /*let start = 0;
-        let end = 0;
-        for (let i = 0, counti = Math.ceil(data.byteLength / Constants.maxBytesPerDataSend); i < counti; i++) {
-            start = i * Constants.maxBytesPerDataSend;
-            end = Math.min(start + Constants.maxBytesPerDataSend, counti);
-            this._channels[peer].send(data.slice(start, end));
-        }*/
-
-        // Finished sending data, indicate this to the peer
-        this._SendPeerData(peer, JSON.stringify({
-            type: "data.end",
-            from: this._activeId,
-            mime: mime,
-            size: data.byteLength,
-            filename: filename
-        }));
-    }
-
-    // Sends a file to the specified peer.
-    SendFile(peer, path, onDelivered=null, mime="application/octet-stream") {
-        return RNFS.readFile(path, "base64").then((data) => {
-            // TODO handle connection loss!
-            if (onDelivered != null) {
-                let listener = Peerway.addListener("data.ack", (from, data) => {
-                    if (from === peer) {
-                        listener.remove();
-                        if (onDelivered != null) {
-                            onDelivered(path);
-                        }
-                    }
-                });
-            }
-            let bin = Buffer.from(data, "base64");
-            Peerway.SendBytes(
-                peer,
-                new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
-                mime,
-                path.split("/").pop()
-            );
-        });
-    }
-
-    // Send several files to the specified peer.
-    SendFiles(peer, paths, onDelivered=null, mime="application/octet-stream") {
-        const nextPath = paths.shift();
-        if (nextPath) {
-            return this.SendFile(peer, nextPath, onDelivered, mime).then(
-                () => this.SendFiles(peer, paths, onDelivered, mime)
-            );
-        }
-        return Promise.resolve();
-    }
-
-    // Send data to a specified peer.
-    _SendPeerData(id, data) {
-        Log.Debug("Sending data to peer." + id);
-        this._channels[id].send(data);
-    }
-
-    // Handle receiving data from peer over WebRTC.
-    _OnPeerData(event, from) {
-        if (typeof(event.data) === "string" && event.data.startsWith("{")) {
-            this._OnReceivedJSON(JSON.parse(event.data), from);
-        } else if (typeof(event.data) === "object" && from in this._pendingData) {
-            Log.Debug("Received binary from peer." + from + " = " + JSON.stringify(event));
-            this._pendingData[from] = Buffer.concat([this._pendingData[from], Buffer.from(event.data)]);
-        } else {
-            Log.Warning("Received unknown data from peer." + from + ": " + JSON.stringify(event));
-        }
-    };
-
-    // Listener for receiving JSON from peers.
-    _OnReceivedJSON(data, from) {
-        Log.Debug("Data received from peer." + from);
-        switch (data.type) {
-            case "chat.message":
-                this._OnChatMessage(from, data);
-                break;
-            case "post.publish":
-                this._OnPostPublished(from, data);
-                break;
-            case "post.request":
-                this._OnPostRequest(from, data);
-                break;
-            case "post.response.begin":
-                this._OnPostResponse(from, data);
-                break;
-            case "post.response.error":
-                Log.Error(data.error);
-                break;
-            case "media.request":
-                this._OnMediaRequest(from, data);
-                break;
-            case "connected":
-                this._OnPeerConnected(from, data.ts);
-                break;
-            case "sync":
-                this._OnPeerSync(from, data);
-                break;
-            case "chat.update":
-                this._OnUpdateChat(from, data);
-                break;
-            case "data.ack":
-                this.emit("data.ack", from, data);
-                break;
-            case "data.begin":
-                this._OnDataBegin(from, data);
-                break;
-            case "data.end":
-                this._OnDataEnd(from, data);
-                break;
-            case "peer.update":
-                this._OnUpdatePeer(from, data);
-                break;
-            case "peer.sub":
-                this._OnPeerSubToggle(from, true);
-                break;
-            case "peer.unsub":
-                this._OnPeerSubToggle(from, false);
-                break;
-            case "chat.request":
-                this._OnChatRequest(from, data);
-                break;
-            case "cert.verify":
-                this._OnVerifyRequest(from, data);
-                break;
-            case "cert.present":
-                this._OnCertificatePresented(from, data);
-                break;
-            case "cert.issue":
-                this._OnCertificateIssued(from, data);
-                break;
-            default:
-                break;
-        }
-    }
-
-    _OnDataBegin(from, data) {
-        Log.Debug("Preparing to receive binary data from peer." + from);
-        if (from in this._pendingData) {
-            Log.Warning("New data being received but peer has not sent data.end request.");
-        }
-        this._pendingData[from] = Buffer.alloc(0);
-    }
-
-    _OnDataEnd(from, data) {
-        if (from in this._pendingData) {
-            // Acknowledge that the data was received
-            this._SendPeerData(from, JSON.stringify({
-                type: "data.ack"
-            }));
-
-            // Disallow paths! Must be just a file name
-            if (data.filename.includes("/") || data.filename.includes("\\")) {
-                Log.Error("data.end: filename \"" + data.filename + "\" must be end point, NOT a path.");
-            } else if (data.filename.length > 0) {
-                // Save as binary file (base64 string)
-                // TODO avoid gross base64 conversion. Should just be able to save directly to binary.
-                let content = this._pendingData[from].toString("base64");
-                // Save media types in media, other files in generic download directory
-                let dir = data.mime.startsWith("image/") || data.mime.startsWith("video/") ? 
-                    this.GetMediaPath() : this.GetDownloadPath();
-                let path = dir + "/" + data.filename;
-
-                RNFS.mkdir(dir).then(() => {
-                    return RNFS.writeFile(path, content, "base64");
-                }).then(() => {
-                    return RNFS.stat(path);
-                }).then((res) => {
-                    Log.Info("Saved file from peer." + from + " at " + path + " successfully with size " + res.size);
-                }).catch((e) => { Log.Error("Failed to save data to " + path + " due to " + e); });
-            } else if (data.mime === "text/json") {
-                // Convert to JSON and pass to regular handler
-                let content = JSON.parse(this._pendingData[from].toString());
-                this._OnReceivedJSON(content, from);
-            } else {
-                Log.Error("data.end: Mime type must be text/json or have a valid filename specified. Received: " + data.mime);
-            }
-            delete this._pendingData[from];
-        } else {
-            Log.Warning("data.end received but never got data.begin request from peer." + from);
-        }
-    }
-
     _OnPeerSync(from, data) {
-        Log.Debug("Received sync request from peer." + from + " for entity " + data.to);
+        Log.Debug("Received sync request from peer." + from.id + " for entity " + data.to);
 
         // Load local peer data
-        let query = Database.Execute("SELECT * FROM Peers WHERE id='" + from + "'");
+        let query = Database.Execute("SELECT * FROM Peers WHERE id='" + from.id + "'");
         if (query.data.length == 0) {
             // TODO validate and verify peer before any notification callbacks
             // Early out, this peer isn't valid!
@@ -848,11 +572,11 @@ class PeerwayAPI {
         
         // Compare ISO timestamps
         if (data.updated.profile !== profile.updated) {
-            Log.Debug("Profile desync detected, updating remote peer." + from);
+            Log.Debug("Profile desync detected, updating remote peer." + from.id);
 
             let sendUpdate = () => {
-                Log.Debug("Sending peer.update to peer." + from);
-                Peerway.NotifyEntities([from],
+                Log.Debug("Sending peer.update to peer." + from.id);
+                this.NotifyEntities([from.id],
                     {
                         ts: (new Date()).toISOString(),
                         type: "peer.update",
@@ -867,14 +591,14 @@ class PeerwayAPI {
             if ("ext" in profile.avatar) {
                 RNFS.readFile(this.GetAvatarPath(this._activeId, profile.avatar.ext), "base64").then((data) => {
                     // TODO handle connection loss!
-                    let listener = Peerway.addListener("data.ack", (from, data) => {
-                        listener.remove();
-                        Log.Debug("Received data ACK, proceeding to update remote peer." + from);
+                    from.requests.data.ack = (remote, data) => {
+                        delete from.requests.data.ack;
+                        Log.Debug("Received data ACK, proceeding to update remote peer." + remote.id);
                         sendUpdate();
-                    });
+                    };
                     let bin = Buffer.from(data, "base64");
-                    Peerway.SendBytes(
-                        from,
+                    // TODO check if this is suitable or if SendFile would be better
+                    from.SendBytes(
                         new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
                         profile.avatar.mime,
                         this._activeId + "." + profile.avatar.ext
@@ -899,11 +623,11 @@ class PeerwayAPI {
             /*
             // TODO check if there is a mismatch between registered subscriptions remotely
             query = Database.Execute(
-                "SELECT * FROM Subscriptions WHERE pub='" + from + "' AND sub='" + this._activeId + "'"
+                "SELECT * FROM Subscriptions WHERE pub='" + from.id + "' AND sub='" + this._activeId + "'"
             );
             let subbed = query.data.length > 0;
             if (subbed != data.config.subscription.pub) {
-                this.NotifyEntities([from], {
+                this.NotifyEntities([from.id], {
                     type: subbed ? "peer.sub" : "peer.unsub"
                 });
             }
@@ -932,7 +656,7 @@ class PeerwayAPI {
 
                     if (query.data.length > 0) {
                         // Update the remote peer's chat data accordingly
-                        this.NotifyEntities([from],
+                        this.NotifyEntities([from.id],
                             {
                                 type: "chat.update",
                                 chat: localChat.id,
@@ -966,7 +690,7 @@ class PeerwayAPI {
                 // Check if remote peer has the post and the post is up to date
                 if (index < 0 || data.config.posts[index].version != post.version) {
                     // Notify remote peer about the post so it can be requested
-                    this.NotifyEntities([from], {
+                    this.NotifyEntities([from.id], {
                         type: "post.publish",
                         id: post.id,
                         created: post.created
@@ -981,13 +705,13 @@ class PeerwayAPI {
             // Store time of this sync with the peer
             Database.Execute(
                 "UPDATE Peers SET sync='" + data.ts + "' " +
-                "WHERE id='" + from + "'"
+                "WHERE id='" + from.id + "'"
             );
         }
 
         // Send a sync request right back at the remote peer.
         if (syncRequired) {
-            this._SyncPeer(from, data.config, data.ts);
+            this._SyncPeer(from.id, data.config, data.ts);
         }
     }
 
@@ -1005,20 +729,20 @@ class PeerwayAPI {
             version: data.version,
             accepted: 0
         });
-        this.emit("chat.request", from, data);
+        this.emit("chat.request", from.id, data);
     }
 
     // Handle chat message
     _OnChatMessage(from, data) {
         // TODO reject messages from chats that the user hasn't accepted or has blocked
-        Log.Debug("Received chat message from peer." + from);
+        Log.Debug("Received chat message from peer." + from.id);
 
         // Add the message to the database
         Database.Execute(
             "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES ('" +
                 data.chat + "','" +
                 data.id + "','" +
-                from + "','" +
+                from.id + "','" +
                 data.created + "','" +
                 data.content + "','" +
                 data.mime + "'" + 
@@ -1034,34 +758,32 @@ class PeerwayAPI {
 
         let chat = query.data.length != 0 ? query.data[0] : {};
 
-        query = Database.Execute("SELECT * FROM Peers WHERE id='" + from + "'");
+        query = Database.Execute("SELECT * FROM Peers WHERE id='" + from.id + "'");
         let peer = query.data.length != 0 ? query.data[0] : {};
 
         let avatar = peer.id && peer.avatar ? Peerway.GetAvatarPath(peer.id, peer.avatar, "file://") : "";
         // TODO only show when not in messaging overview or chat itself
         Notif.Message(chat, data, peer, avatar);
 
-        if (!data.mime.startsWith("text/") && from in this._channels) {
+        if (!data.mime.startsWith("text/")) {
             // Request the media automagically
-            this.NotifyEntities([from], {
+            this.NotifyEntities([from.id], {
                 type: "media.request",
                 filename: data.content,
                 mime: data.mime
             });
         } else {
-            this.emit("chat.message", from, data);
+            this.emit("chat.message", from.id, data);
         }
     }
 
     // Handle a post being published
     _OnPostPublished(from, data) {
-        Log.Debug("Received notification of post being published by peer." + from);
-        if (from in this._peers) {
-            this.NotifyEntities([from], {
-                type: "post.request",
-                id: data.id
-            });
-        }
+        Log.Debug("Received notification of post being published by peer." + from.id);
+        this.NotifyEntities([from.id], {
+            type: "post.request",
+            id: data.id
+        });
     }
 
     // Handle a request to send a particular post
@@ -1072,7 +794,7 @@ class PeerwayAPI {
             "SELECT * FROM Posts WHERE id='" + data.id + "' AND author='" + this._activeId + "'"
         );
         if (query.data.length == 0) {
-            this.NotifyEntities([from], {
+            this.NotifyEntities([from.id], {
                 type: "post.response.error",
                 error: "No such post with id " + data.id
             });
@@ -1083,58 +805,58 @@ class PeerwayAPI {
                 post: query.data[0]
             };
             let bin = Buffer.from(JSON.stringify(response), "utf8");
-            this.SendBytes(from, new Uint8Array(bin.buffer, bin.byteOffset, bin.length));
+            from.SendBytes(new Uint8Array(bin.buffer, bin.byteOffset, bin.length));
             let media = JSON.parse(query.data[0].media);
             let delivered = 0;
-            this.SendFiles(from, media, (path) => {
+            from.SendFiles(media, (path) => {
                 delivered++;
                 if (delivered >= media.length) {
                     Log.Debug("All files delivered for post." + data.id);
                 }
             }).then(() => {
                 // All files should have been sent at least by this point
-                this._SendPeerData(from, JSON.stringify({
+                from.SendRequest({
                     type: "post.response.end",
                     id: data.id
-                }));
+                });
             }).catch((e) => Log.Error("Could not deliver files to peer." + from + " due to: " + e));
         }
     }
 
     // Handle initial post response (before the files arrive)
-    _OnPostResponse(from, data) {
+    _OnPostResponse(data) {
         Database.CachePost(data.post);
     }
 
     _OnMediaRequest(from, data) {
-        // TODO check if peer is allowed the file
-        this.SendFile(from, this.GetMediaPath() + "/" + data.filename, null, data.mime).catch((e) => 
+        // TODO check if peer is allowed the file first, and make sure filename is stripped!
+        from.SendFile(this.GetMediaPath() + "/" + data.filename, null, data.mime).catch((e) => 
             Log.Error("Could not send file: " + e)
         );
     }
 
     // Handle updated peer data
     _OnUpdatePeer(from, data) {
-        Log.Debug("Received update for peer." + from);
+        Log.Debug("Received update for peer." + from.id);
         let avatarExt = "avatar" in data.profile && "ext" in data.profile.avatar ? data.profile.avatar.ext : "";
         Database.Execute(
             "UPDATE Peers SET name='" + data.profile.name + "', " + 
             "avatar='" + avatarExt + "', " + 
             "updated='" + data.profile.updated + "' " +
-            "WHERE id='" + from + "'"
+            "WHERE id='" + from.id + "'"
         );
-        let avatarPath = this.GetMediaPath() + "/" + from + "." + avatarExt;
+        let avatarPath = this.GetMediaPath() + "/" + from.id + "." + avatarExt;
         RNFS.exists(avatarPath).then((exists) => {
             if (exists) {
-                let path = this.GetPeerPath(from) + "." + avatarExt;
-                RNFS.mkdir(this.GetPeerPath(from) + "/").then(() => RNFS.moveFile(avatarPath, path)).then(() => {
-                    Peerway.MarkAvatarPathDirty(from);
-                    Log.Debug("Updated avatar for peer." + from);
+                let path = this.GetPeerPath(from.id) + "." + avatarExt;
+                RNFS.mkdir(this.GetPeerPath(from.id) + "/").then(() => RNFS.moveFile(avatarPath, path)).then(() => {
+                    Peerway.MarkAvatarPathDirty(from.id);
+                    Log.Debug("Updated avatar for peer." + from.id);
                 }).catch((e) => {
                     Log.Error("Failed to mkdir or move file. " + e);
                 });
             } else {
-                Log.Warning("Cannot update avatar file for peer." + from + ", no such path " + avatarPath);
+                Log.Warning("Cannot update avatar file for peer." + from.id + ", no such path " + avatarPath);
             }
         }).catch((e) => {
             Log.Error("Failed to determine if file exists. " + e);
@@ -1146,7 +868,7 @@ class PeerwayAPI {
         for (let i = 0, counti = data.messages.length; i < counti; i++) {
             // TODO validate received messages
 
-            Log.Debug("Updating chat." + data.chat + " from peer." + from);
+            Log.Debug("Updating chat." + data.chat + " from peer." + from.id);
             let query = Database.Execute(
                 "SELECT id FROM Messages " +
                 "WHERE chat='" + data.chat + "' AND id='" + data.messages[i].id + "'"
@@ -1167,15 +889,15 @@ class PeerwayAPI {
 
     // Handle peer subscribing or unsubscribing
     _OnPeerSubToggle(from, sub) {
-        Log.Debug("Received " + (sub ? "subscription" : "unsubscription") + " from peer." + from);
+        Log.Debug("Received " + (sub ? "subscription" : "unsubscription") + " from peer." + from.id);
         if (sub) {
             Database.Execute(
                 "INSERT OR IGNORE INTO Subscriptions (pub,sub) VALUES (" +
-                    "'" + this._activeId + "','" + from + "')"
+                    "'" + this._activeId + "','" + from.id + "')"
             );
         } else {
             Database.Execute(
-                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "' AND sub='" + from + "'"
+                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "' AND sub='" + from.id + "'"
             );
         }
     }
@@ -1220,20 +942,18 @@ class PeerwayAPI {
     }
 
     // Respond to a request to verify
-    _OnVerifyRequest(from, data) {
-        if (from in this._peers) {
-            let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + from + "'");
-            if (query.data.length != 0 && query.data[0].certificate.length != 0) {
-                // Encrypt the certificate - only the real entity should be allowed to read it!
-                this._EncryptForPeer(from, query.data[0].certificate).then((encrypted) => {
-                    this._SendPeerData(from, JSON.stringify({
-                        type: "cert.present",
-                        cert: encrypted
-                    }));
-                }).catch((e) => Log.Error(e));
-            } else {
-                Log.Warning("Peer." + from + " requesting verification but has no recorded certificate.");
-            }
+    _OnVerifyRequest(from) {
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + from.id + "'");
+        if (query.data.length != 0 && query.data[0].certificate.length != 0) {
+            // Encrypt the certificate - only the real entity should be allowed to read it!
+            this._EncryptForPeer(from.id, query.data[0].certificate).then((encrypted) => {
+                from.SendRequest({
+                    type: "cert.present",
+                    cert: encrypted
+                });
+            }).catch((e) => Log.Error(e));
+        } else {
+            Log.Warning("Peer." + from.id + " requesting verification but has no recorded certificate.");
         }
     }
 
@@ -1241,120 +961,34 @@ class PeerwayAPI {
     _OnCertificatePresented(from, data) {
         // Decrypt the data and verify that it's the same as the recorded certificate
         // TODO callback onVerifyPeer
-        this._DecryptFromPeer(from, data.cert).then((decrypted) => {
-            let query = Database.Execute("SELECT issued FROM Peer WHERE id='" + from + "'");
+        this._DecryptFromPeer(from.id, data.cert).then((decrypted) => {
+            let query = Database.Execute("SELECT issued FROM Peer WHERE id='" + from.id + "'");
             // Compare the certificate with the one issued
-            this._verified[from] = query.data.length != 0 && query.data[0].issued === decrypted;
-            if (this._verified[from]) {
-                Log.Info("Peer." + from + " verified successfully.");
+            this._verified[from.id] = query.data.length != 0 && query.data[0].issued === decrypted;
+            if (this._verified[from.id]) {
+                Log.Info("Peer." + from.id + " verified successfully.");
             } else {
                 // Verification failed!
-                Log.Warning("PEER." + from + " FAILED VERIFICATION");
+                Log.Warning("PEER." + from.id + " FAILED VERIFICATION");
             }
         }).catch((e) => Log.Error(e));
     }
 
-    // Send a request to connect to a specified entity.
-    _SendConnectionRequest(id, clientId) {
-        // The client ID is required due to potential for duplicate entity IDs on the server.
-        this._peersPending[id] = clientId;
-        // Create local peer connection config
-        this._peers[id] = this._CreatePeerCall(id);
-        // Create a data channel for data transfer with the remote peer.
-        this._channels[id] = this._peers[id].createDataChannel(this._activeId + "[->]" + id);
-        
-        // listen to incoming messages from the other peer once a connection is established.
-        this._channels[id].onmessage = (event) => this._OnPeerData(event, id);
-    }
-    
     // Respond to an offer to connect to a peer.
     _OnConnectionRequest(peer) {
-        Log.Info("Received request to connect from peer with id " + peer.local);
-
-        // Syncing may not have taken place yet
-        if (this._peersToConnect.length == 0) {
-            let query = Database.Execute("SELECT id FROM Peers");
-            this._peersToConnect = query.data.map(x => x.id);
-        }
+        Log.Info("Received request to connect from peer." + peer.local);
 
         let meta = {};
-        // Check if peer has been seen before
-        let query = Database.Execute("SELECT * FROM Peers WHERE id='" + peer.local + "'");
-        if (query.data.length > 0) {
-            // Remove from peers waiting to be connected
-            let toRemove = this._peersToConnect.indexOf(peer.local);
-            if (toRemove >= 0) {
-                this._peersToConnect.splice(toRemove, 1);
-            }
-        } else {
-            // Not seen this peer before, add to the database
-            meta = Database.AddPeer(peer.local);
-        }
+        meta = Database.AddPeer(peer.local, {}, false);
 
         // Check to ensure the peer isn't blocked.
         if (!meta.blocked) {
-            this._peersPending[peer.local] = peer.caller;
-
-            // Setup the local peer connection and prepare the appropriate channel for receiving data.
-            // The ID passed in is the entity ID of the peer requesting this connection;
-            // it has no relevance to the returned value.
-            this._peers[peer.local] = this._CreatePeerAnswer(peer.local);
-            // Setup event handler for creation of the data channel by the remote peer. 
-            this._peers[peer.local].ondatachannel = (event) => {
-                // Create a channel for data transfer to the other peer.
-                this._channels[peer.local] = event.channel;
-                this._channels[peer.local].onmessage = (e) => this._OnPeerData(e, peer.local);
-                // Record connection timestamp
-                this._peerConnectionTimestamps[peer.local] = (new Date()).toISOString();
-                Log.Info("Connection established to peer." + peer.local);
-
-                // Send acknowledgement of connection
-                this.NotifyEntities([peer.local], {
-                    type: "connected",
-                    from: peer.remote,
-                    ts: this._peerConnectionTimestamps[peer.local]
-                });
-            }
-
-            // Accept the call request
-            this._peers[peer.local].setRemoteDescription(new RTCSessionDescription(peer.sdp)).then(() => {}).then(() => {
-                Log.Debug("Creating WebRTC answer...");
-                return this._peers[peer.local].createAnswer();
-            }).then(answer => {
-                Log.Debug("Setting local SDP of the client...");
-                return this._peers[peer.local].setLocalDescription(answer);
-            }).then(() => {
-                let payload = {
-                    local: peer.remote,
-                    remote: peer.local,
-                    target: peer.caller,
-                    caller: peer.target,
-                    sdp: this._peers[peer.local].localDescription
-                }
-                Log.Info("Accepting request from peer." + peer.local);
-                this.server.emit("AcceptPeerRequest", payload);
-            });
+            this.GetPeerChannel(peer.local)._OnConnectionRequest(peer);
         } else {
             Log.Info("Discarding request received to connect to blocked peer." + peer.local);
         }
     }
 
-    // Handle acception of a connection request to a peer.
-    _OnConnectionAccepted(payload) {
-        Log.Info("Connection to peer." + payload.local + " accepted, setting SDP.");
-        this._peers[payload.local].setRemoteDescription(new RTCSessionDescription(payload.sdp)).then(() => {
-            // Check for any pending ICE candidates
-            if (payload.local in this._pendingCandidates) {
-                Log.Verbose("Some ICE candidates are pending, sending to peer." + payload.local);
-                for (let i in this._pendingCandidates[payload.local]) {
-                    this._OnPeerConnectionCandidate((this._pendingCandidates[payload.local])[i], payload.local);
-                }
-                delete this._pendingCandidates[payload.local];
-            }
-        }).catch(
-            (e) => { this.onSyncPeersError({message: "Failed to handle WebRTC connection answer: " + e}); }
-        );
-    }
 }
 
 // Global instance grants access to the API

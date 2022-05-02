@@ -10,7 +10,6 @@ import { v1 as uuidv1 } from "uuid";
 import { RSA } from "react-native-rsa-native";
 import { Buffer } from 'buffer';
 import Notif from "./Notif";
-import Peerway from "./Peerway";
 
 // Wrapper for a WebRTC connection to a peer, as well as peer authentication & data encryption.
 class PeerChannel {
@@ -25,6 +24,8 @@ class PeerChannel {
         this.connected = false;
         // Signalling server connection
         this.server = server;
+        // Callback handler for establishment of WebRTC connection. Only called for the initiator.
+        this.onConnected = () => {};
 
         // Peer request handlers
         this.requests = {
@@ -314,11 +315,8 @@ class PeerChannel {
             this.connected = true;
             Log.Info("Connection established to peer." + id);
 
-            Peerway.emit("peer.connected", { id: id });
-
-            // Automagically sync with the peer
-            if (this._syncConfig) {
-                this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
+            if (this.onConnected) {
+                this.onConnected();
             }
         } else {
             Log.Warning("Peer acknowledged non-existent connection!");
@@ -395,7 +393,7 @@ class PeerChannel {
             this.connected = true;
             Log.Info("Connection established to peer." + peer.local);
 
-            // TODO confirm this is always received
+            // Inform the peer that the connection is established.
             this.SendRequest({
                 type: "connected",
                 from: peer.remote,
