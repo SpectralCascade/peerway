@@ -342,8 +342,9 @@ class PeerwayAPI {
     // Returns false if connectionState is "connected" or "connecting".
     ConnectToPeer(id, onConnected=null) {
         let peer = this.GetPeerChannel(id);
-        if (peer._peer.connectionState.startsWith("connect")) {
-            Log.Debug("Already " + this.peers[id]._peer.connectionState + " to peer." + id);
+        let connectionState = peer.GetConnectionState();
+        if (connectionState.startsWith("connect")) {
+            Log.Debug("Already " + connectionState + " to peer." + id);
         } else {
             // Setup connection handler
             peer.onConnected = () => {
@@ -379,7 +380,7 @@ class PeerwayAPI {
 
             // Attempt to connect to the peer, if not already connected
             if (!this.ConnectToPeer(id)) {
-                if (this.peers[id]._peer.connectionState === "connecting") {
+                if (this.peers[id].GetConnectionState() === "connecting") {
                     // If it's still connecting, peer syncing should automagically happen on connection
                     Log.Debug("Still connecting to peer." + id);
                 } else {

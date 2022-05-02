@@ -12,10 +12,12 @@ import { Buffer } from 'buffer';
 import Notif from "./Notif";
 
 // Wrapper for a WebRTC connection to a peer, as well as peer authentication & data encryption.
-class PeerChannel {
+export default class PeerChannel {
     // Constructor takes the id of the peer this channel is associated with, the local active entity ID,
     // and a signalling server connection.
     constructor(id, activeId, server) {
+        Log.Debug("Creating new PeerChannel for peer." + id);
+
         // ID of the peer
         this.id = id;
         // Is this peer available on the server?
@@ -82,7 +84,6 @@ class PeerChannel {
         this._pendingData = null;
 
         // Setup server callbacks
-        this.server.on("Call/" + id, (socket) => this._OnConnectionRequest(socket));
         this.server.on("Answer/" + id, (socket) => this._OnConnectionAccepted(socket));
         // TODO check this works both ways
         this.server.on("ICE/" + id, (incoming) => this._OnReceivedNewCandidate(incoming));
@@ -108,6 +109,11 @@ class PeerChannel {
             return true;
         }
         return false;
+    }
+
+    // Return the state of the WebRTC connection
+    GetConnectionState() {
+        return this._peer ? this._peer.connectionState : "disconnected";
     }
 
     //
@@ -363,9 +369,9 @@ class PeerChannel {
         // Create local peer connection config
         this._peer = this._CreatePeerConnection();
         // Callback when a new ICE candidate is found for the peer connection.
-        peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, this.id);
+        this._peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, this.id);
         // Callback when negotiation is required (only when calling)
-        peer.onnegotiationneeded = () => this._HandleNegotiationNeededEvent(this.id);
+        this._peer.onnegotiationneeded = () => this._HandleNegotiationNeededEvent(this.id);
 
         // Create a data channel for data transfer with the remote peer.
         this._channel = this._peer.createDataChannel(this.id);
@@ -383,7 +389,7 @@ class PeerChannel {
         // Setup the local peer connection and prepare the appropriate channel for receiving data.
         // The ID passed in is the entity ID of the peer requesting this connection;
         // it has no relevance to the returned value.
-        this._peer = this._CreatePeerAnswer(peer.local);
+        this._peer = this._CreatePeerConnection();
         // Setup event handler for creation of the data channel by the remote peer. 
         this._peer.ondatachannel = (event) => {
             // Create a channel for data transfer to the other peer.
