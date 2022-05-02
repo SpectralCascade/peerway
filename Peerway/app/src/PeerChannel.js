@@ -390,6 +390,8 @@ export default class PeerChannel {
         // The ID passed in is the entity ID of the peer requesting this connection;
         // it has no relevance to the returned value.
         this._peer = this._CreatePeerConnection();
+        this._peer.onicecandidate = (e) => this._OnPeerConnectionCandidate(e, this.id);
+        
         // Setup event handler for creation of the data channel by the remote peer. 
         this._peer.ondatachannel = (event) => {
             // Create a channel for data transfer to the other peer.
