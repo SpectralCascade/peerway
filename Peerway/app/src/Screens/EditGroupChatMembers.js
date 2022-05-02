@@ -82,7 +82,7 @@ export default class EditGroupChatMembers extends Component {
 
         let sendChatRequest = (id) => {
             Log.Debug("Sending chat request to peer." + id);
-            Peerway.NotifyEntities([id], {
+            Peerway.SendRequest(id, {
                 type: "chat.request",
                 chatId: meta.id,
                 from: activeId,

@@ -76,7 +76,7 @@ export default class CombinedFeed extends React.Component {
                 "DELETE FROM Subscriptions WHERE " + 
                     "pub='" + peer + "' AND sub='" + this.activeId + "'"
             );
-            Peerway.NotifyEntities([peer], {
+            Peerway.SendRequest(peer, {
                 type: "peer.unsub"
             });
             Log.Debug("Unsubscribed from peer." + peer);
@@ -85,7 +85,7 @@ export default class CombinedFeed extends React.Component {
             Database.Execute(
                 "INSERT INTO Subscriptions (pub,sub) VALUES ('" + peer + "','" + this.activeId + "')"
             );
-            Peerway.NotifyEntities([peer], {
+            Peerway.SendRequest(peer, {
                 type: "peer.sub"
             });
             Log.Debug("Subscribed to peer." + peer);

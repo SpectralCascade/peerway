@@ -122,7 +122,7 @@ export default class Profile extends React.Component {
                     "DELETE FROM Subscriptions WHERE " + 
                         "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
                 );
-                Peerway.NotifyEntities([this.peerId], {
+                Peerway.SendRequest(this.peerId, {
                     type: "peer.unsub"
                 });
                 Log.Debug("Unsubscribed from peer." + this.peerId);
@@ -131,7 +131,7 @@ export default class Profile extends React.Component {
                 Database.Execute(
                     "INSERT INTO Subscriptions (pub,sub) VALUES ('" + this.peerId + "','" + this.activeId + "')"
                 );
-                Peerway.NotifyEntities([this.peerId], {
+                Peerway.SendRequest(this.peerId, {
                     type: "peer.sub"
                 });
                 Log.Debug("Subscribed to peer." + this.peerId);

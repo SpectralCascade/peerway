@@ -1,8 +1,12 @@
+import RNFS from "react-native-fs";
+
 export default {
     authVersion: 1,
     server_ip: "86.3.206.225",//"192.168.0.59",
     port: 20222,
     website: "https://github.com/SpectralCascade/peerway",
+    GetMediaPath: (id) => RNFS.DocumentDirectoryPath + "/" + id + "/media",
+    GetDownloadPath: (id) => RNFS.DocumentDirectoryPath + "/" + id + "/download",
     maxMessageCharacters: 2048,
     messagesPerLoad: 50,
     maxBytesPerDataSend: 16384,

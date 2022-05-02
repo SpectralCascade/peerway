@@ -94,7 +94,7 @@ export default class RequestChat extends Component {
             // TODO make sure this is secure, connect to the peer and verify or issue cert first?
             let sendChatRequest = (id) => {
                 Log.Debug("Sending chat request to peer." + id);
-                Peerway.NotifyEntities([id], {
+                Peerway.SendRequest(id, {
                     type: "chat.request",
                     chatId: meta.id,
                     from: this.activeId,

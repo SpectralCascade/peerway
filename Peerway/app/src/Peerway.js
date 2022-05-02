@@ -4,7 +4,6 @@ import Database from "./Database";
 import { Log } from "./Log";
 import RNFS from "react-native-fs";
 import Constants from "./Constants";
-import { EventEmitter } from "react-native";
 import { EventListener } from "./Components/EventListener";
 import { v1 as uuidv1 } from "uuid";
 import { RSA } from "react-native-rsa-native";
@@ -25,10 +24,6 @@ class PeerwayAPI {
     onServerConnected = (id) => { Log.Info("Connection established to signal server for entity " + id + "."); };
     // Callback to handle failure to connect the active entity.
     onServerConnectionError = (error) => { Log.Error(error.message); };
-    // Callback when peer syncing is done.
-    onSyncPeersComplete = () => { Log.Info("Peer syncing has finished."); };
-    // Callback when all peers have been synced.
-    onSyncPeersError = (error) => { Log.Error(error.message); };
     // Callback when an avatar has been modified.
     onAvatarChange = (id) => {};
 
@@ -132,12 +127,12 @@ class PeerwayAPI {
 
     // Get the path to the downloads folder
     GetDownloadPath() {
-        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/download";
+        return Constants.GetDownloadPath(this._activeId);
     }
 
     // Path to the folder where media is stored for the active entity.
     GetMediaPath() {
-        return RNFS.DocumentDirectoryPath + "/" + this._activeId + "/media";
+        return Constants.GetMediaPath(this._activeId);
     }
 
     // Create a certificate to use for comms authentication (returns a promise).
@@ -160,6 +155,7 @@ class PeerwayAPI {
     IssueCertificate(id) {
         // Issue certificate
         return this.CreateCertificate().then((cert) => {
+            Log.Debug("Issuing certificate...");
             // Save the private key
             Database.Execute(
                 "UPDATE Peers SET " + 
@@ -170,7 +166,7 @@ class PeerwayAPI {
 
             // Issue the certificate
             // TODO send only to the specific client!
-            this.NotifyEntities([id], {
+            this.SendRequest(id, {
                 type: "cert.issue",
                 cert: cert.certificate
             });
@@ -224,7 +220,6 @@ class PeerwayAPI {
             }
         });
 
-        
         // Setup other request handlers
         this.server.on("Call", (socket) => { this._OnConnectionRequest(socket); });
         this.server.on("EntityMetaResponse", (meta) => { this._OnEntityMetaResponse(meta); });
@@ -268,7 +263,7 @@ class PeerwayAPI {
             // Chats
             peer.requests.chat.message = (data) => this._OnChatMessage(peer, data);
             peer.requests.chat.update = (data) => this._OnUpdateChat(peer, data);
-            peer.requests.chat.invite = (data) => this._OnChatRequest(peer, data);
+            peer.requests.chat.request = (data) => this._OnChatRequest(peer, data);
 
             // Media files request
             peer.requests.media.request = (data) => this._OnMediaRequest(peer, data);
@@ -342,12 +337,11 @@ class PeerwayAPI {
     // Returns false if connectionState is "connected" or "connecting".
     ConnectToPeer(id, onConnected=null) {
         let peer = this.GetPeerChannel(id);
-        let connectionState = peer.GetConnectionState();
-        if (connectionState.startsWith("connect")) {
-            Log.Debug("Already " + connectionState + " to peer." + id);
+        if (peer.connecting || peer.connected) {
+            Log.Debug("Already " + (peer.connecting ? "connecting" : "connected") + " to peer." + id);
         } else {
             // Setup connection handler
-            peer.onConnected = () => {
+            peer.onCallSuccess = () => {
                 if (onConnected) {
                     onConnected(peer.id);
                 }
@@ -357,8 +351,7 @@ class PeerwayAPI {
                     this._SyncPeer(id, this._syncConfig, (new Date()).toISOString(), true);
                 }
             }
-            Log.Debug("Requesting entity meta for peer." + id);
-            this.server.emit("GetEntityMeta", { id: id });
+            peer.Connect();
             return true;
         }
         return false;
@@ -448,7 +441,7 @@ class PeerwayAPI {
 
             // Now send out a notification to all peers in the chat
             // TODO: ENCRYPT NOTIFICATION CONTENT
-            this.NotifyEntities(targets, {
+            this.MulticastRequest(targets, {
                 type: "chat.message",
                 id: id,
                 chat: message.chat,
@@ -463,26 +456,35 @@ class PeerwayAPI {
         }
     }
 
-    // Send a notification to one or more entities
-    NotifyEntities(entities, notification) {
-        Log.Debug("Sending notif to entities: " + JSON.stringify(entities));
-
-        // Attempt to send directly to entities when possible
-        let disconnected = [];
-        for (let i = 0, counti = entities.length; i < counti; i++) {
-            let id = entities[i];
-            if (id in this.peers && this.peers[id].connected) {
-                // Send directly to connected peers rather than notifying via server when possible
-                this.peers[id].SendRequest(notification);
-            } else {
-                disconnected.push(entities[i]);
-            }
+    // Send a request to a peer or list of peers, even if they're not connected.
+    SendRequest(id, data) {
+        let peer = this.GetPeerChannel(id);
+        if (peer.connected) {
+            peer.SendRequest(data);
+        } else {
+            // Try to connect before sending the request
+            let listener = peer.addListener("connected", (result) => {
+                listener.remove();
+                if ("available" in result && !result.available) {
+                    // TODO try sending as a push notification if possible
+                } else if (result.error) {
+                    // An error occurred during the connection attempt
+                    Log.Error(result.error);
+                } else {
+                    // Connection successful, send the request directly.
+                    peer.SendRequest(data);
+                }
+            });
+            // Attempt to connect to the peer
+            this.ConnectToPeer(id);
         }
+    }
 
-        // Otherwise, send push notification
-        if (disconnected.length > 0) {
-            // TODO check "from" entity ID corresponds to client ID on server side
-            this.server.emit("PushNotification", { targets: disconnected, notif: notification, from: this._activeId });
+    // Send a request to multiple entities
+    MulticastRequest(entities, data) {
+        Log.Debug("Sending request to entities: " + JSON.stringify(entities));
+        for (let i = 0, counti = entities.length; i < counti; i++) {
+            this.SendRequest(entities[i], data);
         }
     }
 
@@ -515,34 +517,6 @@ class PeerwayAPI {
         return false;
     }
     
-    // Handle response to emitting GetEntityMeta signal server request.
-    _OnEntityMetaResponse(meta) {
-        Log.Debug("Meta response: " + JSON.stringify(meta));
-        if (meta.available) {
-            // Check if the entity is supposed to be connected to.
-            if (meta.id in this.peers) {
-                let query = Database.Execute("SELECT blocked FROM Peers WHERE id='" + meta.id + "'");
-                if (query.data.length != 0 && query.data[0].blocked) {
-                    Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
-                } else {
-                    // Make a connection request
-                    Log.Info("Sending connection request to peer." + meta.id + " of client " + meta.clientId);
-                    this.peers[meta.id].Connect(meta.clientId);
-                }
-
-            } else {
-                // Might have a use case, e.g. interacting with a new entity for the first time.
-                Log.Debug("peer." + meta.id + " not in peers object.");
-            }
-        } else {
-            // Peer is unavailable on the signal server
-            if (meta.id in this.peers) {
-                this.peers[meta.id].online = false;
-            }
-            Log.Debug("Peer." + meta.id + " is unavailable, cannot connect.");
-        }
-    }
-
     _OnPeerSync(from, data) {
         Log.Debug("Received sync request from peer." + from.id + " for entity " + data.to);
 
@@ -577,7 +551,7 @@ class PeerwayAPI {
 
             let sendUpdate = () => {
                 Log.Debug("Sending peer.update to peer." + from.id);
-                this.NotifyEntities([from.id],
+                this.SendRequest(from.id,
                     {
                         ts: (new Date()).toISOString(),
                         type: "peer.update",
@@ -592,9 +566,9 @@ class PeerwayAPI {
             if ("ext" in profile.avatar) {
                 RNFS.readFile(this.GetAvatarPath(this._activeId, profile.avatar.ext), "base64").then((data) => {
                     // TODO handle connection loss!
-                    from.requests.data.ack = (remote, data) => {
+                    from.requests.data.ack = (data) => {
                         delete from.requests.data.ack;
-                        Log.Debug("Received data ACK, proceeding to update remote peer." + remote.id);
+                        Log.Debug("Received data ACK, proceeding to update remote peer." + from.id);
                         sendUpdate();
                     };
                     let bin = Buffer.from(data, "base64");
@@ -628,7 +602,7 @@ class PeerwayAPI {
             );
             let subbed = query.data.length > 0;
             if (subbed != data.config.subscription.pub) {
-                this.NotifyEntities([from.id], {
+                this.SendRequest(from.id, {
                     type: subbed ? "peer.sub" : "peer.unsub"
                 });
             }
@@ -657,7 +631,7 @@ class PeerwayAPI {
 
                     if (query.data.length > 0) {
                         // Update the remote peer's chat data accordingly
-                        this.NotifyEntities([from.id],
+                        this.SendRequest(from.id,
                             {
                                 type: "chat.update",
                                 chat: localChat.id,
@@ -691,7 +665,7 @@ class PeerwayAPI {
                 // Check if remote peer has the post and the post is up to date
                 if (index < 0 || data.config.posts[index].version != post.version) {
                     // Notify remote peer about the post so it can be requested
-                    this.NotifyEntities([from.id], {
+                    this.SendRequest(from.id, {
                         type: "post.publish",
                         id: post.id,
                         created: post.created
@@ -768,7 +742,7 @@ class PeerwayAPI {
 
         if (!data.mime.startsWith("text/")) {
             // Request the media automagically
-            this.NotifyEntities([from.id], {
+            this.SendRequest(from.id, {
                 type: "media.request",
                 filename: data.content,
                 mime: data.mime
@@ -781,7 +755,7 @@ class PeerwayAPI {
     // Handle a post being published
     _OnPostPublished(from, data) {
         Log.Debug("Received notification of post being published by peer." + from.id);
-        this.NotifyEntities([from.id], {
+        this.SendRequest(from.id, {
             type: "post.request",
             id: data.id
         });
@@ -795,7 +769,7 @@ class PeerwayAPI {
             "SELECT * FROM Posts WHERE id='" + data.id + "' AND author='" + this._activeId + "'"
         );
         if (query.data.length == 0) {
-            this.NotifyEntities([from.id], {
+            this.SendRequest(from.id, {
                 type: "post.response.error",
                 error: "No such post with id " + data.id
             });

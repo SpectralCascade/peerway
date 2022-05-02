@@ -4,7 +4,6 @@ import Database from "./Database";
 import { Log } from "./Log";
 import RNFS from "react-native-fs";
 import Constants from "./Constants";
-import { EventEmitter } from "react-native";
 import { EventListener } from "./Components/EventListener";
 import { v1 as uuidv1 } from "uuid";
 import { RSA } from "react-native-rsa-native";
@@ -24,10 +23,13 @@ export default class PeerChannel {
         this.online = false;
         // Is this peer connected over WebRTC?
         this.connected = false;
+        // Is this peer currently establishing a WebRTC connection?
+        this.connecting = false;
         // Signalling server connection
         this.server = server;
         // Callback handler for establishment of WebRTC connection. Only called for the initiator.
-        this.onConnected = () => {};
+        // You should use addListener() if you want to handle connection establishment.
+        this.onCallSuccess = () => {};
 
         // Peer request handlers
         this.requests = {
@@ -66,7 +68,12 @@ export default class PeerChannel {
             sync: (data) => this._Unhandled(data)
         };
 
-        // "Private" WebRTC bits
+        // "Private" WebRTC and event bits
+
+        // All events
+        this._events = {};
+        // Event handler count
+        this._handleCount = 0;
 
         // The client ID of the remote peer
         this._clientId = "";
@@ -85,14 +92,47 @@ export default class PeerChannel {
 
         // Setup server callbacks
         this.server.on("Answer/" + id, (socket) => this._OnConnectionAccepted(socket));
-        this.server.on("ICE/" + this._activeId, (incoming) => this._OnReceivedNewCandidate(incoming));
+        this.server.on("ICE/" + id, (incoming) => this._OnReceivedNewCandidate(incoming));
+        this.server.on("Meta/" + id, (data) => this._OnEntityMetaResponse(data));
+        //this.server.on("Disconnect/" + id, (data) => this._emit("disconnected", {}));
+    }
+
+    // Create an EventListener. Returns the listener.
+    addListener(eventType, listener) {
+        this._handleCount++;
+        return new EventListener(this._events, eventType, this._handleCount.toString(), listener);
+    }
+
+    // Emit an event.
+    _emit(eventType, ...args) {
+        if (eventType in this._events) {
+            Object.keys(this._events[eventType]).forEach((key) => {
+                this._events[eventType][key].invoke(...args);
+            });
+        }
+    }
+
+    // Remove all EventListener instances of a given event type.
+    removeAllListeners(eventType) {
+        if (eventType in this._events) {
+            Object.keys(this._events[eventType]).forEach((key) => {
+                delete this._events[eventType][key];
+            });
+        }
     }
 
     // Attempt to connect to the peer with the specified server clientId.
-    Connect(clientId) {
+    Connect(clientId=null) {
         this.connected = false;
-        this.online = true;
-        this._SendConnectionRequest(clientId);
+        this.connecting = true;
+        // Try and find the peer on the server just using the ID
+        if (!clientId) {
+            Log.Debug("Requesting entity meta for peer." + this.id);
+            this.server.emit("GetEntityMeta", { id: this.id });
+        } else {
+            this.online = true;
+            this._SendConnectionRequest(clientId);
+        }
     }
 
     // Check whether this peer is online or not. Returns true if connected, even if not online via server.
@@ -114,10 +154,108 @@ export default class PeerChannel {
     GetConnectionState() {
         return this._peer ? this._peer.connectionState : "disconnected";
     }
+    
+    // For use with data >16 kiB, see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels
+    // Data must be an Uint8Array. Optionally specify a filename to save it as.
+    SendBytes(data, mime="text/json", filename="") {
+        if (!this.connected) {
+            return false;
+        }
+
+        // Indicate that we're about to send data chunks to the peer
+        this.SendRequest({
+            type: "data.begin",
+            from: this._activeId,
+            mime: mime,
+            size: data.byteLength,
+            filename: filename
+        });
+
+        // TODO check this sends large amounts of data correctly e.g. videos
+        // Thankfully, it can be assumed that the data will be sent in order
+        // https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/ordered
+        this._channel.send(data);
+
+        // Finished sending data, indicate this to the peer
+        this.SendRequest({
+            type: "data.end",
+            from: this._activeId,
+            mime: mime,
+            size: data.byteLength,
+            filename: filename
+        });
+
+        return true;
+    }
+
+    // Sends a file to the specified peer.
+    SendFile(path, onDelivered=null, mime="application/octet-stream") {
+        return RNFS.readFile(path, "base64").then((data) => {
+            // TODO handle connection loss!
+            if (onDelivered != null) {
+                // Add data acknowledgement handler
+                this.requests.data.ack = () => {
+                    delete this.requests.data.ack;
+                    if (onDelivered != null) {
+                        onDelivered(path);
+                    }
+                };
+            }
+            let bin = Buffer.from(data, "base64");
+            let sentBytes = this.SendBytes(
+                new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
+                mime,
+                path.split("/").pop()
+            );
+            if (!sentBytes) {
+                return Promise.reject("Not connected to peer." + this.id);
+            }
+            return Promise.resolve();
+        });
+    }
+
+    // Send several files to the specified peer.
+    SendFiles(paths, onDelivered=null, mime="application/octet-stream") {
+        const nextPath = paths.shift();
+        if (nextPath) {
+            return this.SendFile(nextPath, onDelivered, mime).then(
+                () => this.SendFiles(paths, onDelivered, mime)
+            );
+        }
+        return Promise.resolve();
+    }
 
     //
     // "Private" methods
     //
+
+    // Handle response from server for GetEntityMeta request.
+    _OnEntityMetaResponse(meta) {
+        if (meta.available) {
+            // Peer is available on the signal server
+            if (!this.online) { 
+                this.online = true;
+                this._emit("onlineChange", {});
+            }
+            // Check if the peer is blocked or not before initiating connection
+            let query = Database.Execute("SELECT blocked FROM Peers WHERE id='" + meta.id + "'");
+            if (query.data.length != 0 && query.data[0].blocked) {
+                Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
+            } else if (meta.clientId) {
+                // Make a connection request, with the provided client ID
+                this.Connect(meta.clientId);
+            } else {
+                Log.Error("Meta clientId is invalid. Meta: " + JSON.stringify(meta));
+            }
+        } else {
+            // Peer is unavailable on the signal server
+            if (this.online != false) {
+                this.online = false;
+                this._emit("onlineChange", {});
+            }
+            Log.Debug("Peer." + meta.id + " is unavailable, cannot connect.");
+        }
+    }
 
     // Default request handler
     _Unhandled(data) {
@@ -159,75 +297,6 @@ export default class PeerChannel {
         }
     }
 
-    // For use with data >16 kiB, see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels
-    // Data must be an Uint8Array. Optionally specify a filename to save it as.
-    SendBytes(data, mime="text/json", filename="") {
-        // Indicate that we're about to send data chunks to the peer
-        this.SendRequest({
-            type: "data.begin",
-            from: this._activeId,
-            mime: mime,
-            size: data.byteLength,
-            filename: filename
-        });
-
-        // TODO check this sends large amounts of data correctly e.g. videos
-        this._channel.send(data);
-
-        // Slice up the data into chunks
-        // Thankfully, it can be assumed that the data will be sent in order
-        // https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/ordered
-        /*let start = 0;
-        let end = 0;
-        for (let i = 0, counti = Math.ceil(data.byteLength / Constants.maxBytesPerDataSend); i < counti; i++) {
-            start = i * Constants.maxBytesPerDataSend;
-            end = Math.min(start + Constants.maxBytesPerDataSend, counti);
-            this._channels[peer].send(data.slice(start, end));
-        }*/
-
-        // Finished sending data, indicate this to the peer
-        this.SendRequest({
-            type: "data.end",
-            from: this._activeId,
-            mime: mime,
-            size: data.byteLength,
-            filename: filename
-        });
-    }
-
-    // Sends a file to the specified peer.
-    SendFile(path, onDelivered=null, mime="application/octet-stream") {
-        return RNFS.readFile(path, "base64").then((data) => {
-            // TODO handle connection loss!
-            if (onDelivered != null) {
-                // Add data acknowledgement handler
-                this.requests.data.ack = () => {
-                    delete this.requests.data.ack;
-                    if (onDelivered != null) {
-                        onDelivered(path);
-                    }
-                };
-            }
-            let bin = Buffer.from(data, "base64");
-            this.SendBytes(
-                new Uint8Array(bin.buffer, bin.byteOffset, bin.length),
-                mime,
-                path.split("/").pop()
-            );
-        });
-    }
-
-    // Send several files to the specified peer.
-    SendFiles(paths, onDelivered=null, mime="application/octet-stream") {
-        const nextPath = paths.shift();
-        if (nextPath) {
-            return this.SendFile(nextPath, onDelivered, mime).then(
-                () => this.SendFiles(paths, onDelivered, mime)
-            );
-        }
-        return Promise.resolve();
-    }
-
     // Handle large amounts of data from peer
     _OnDataBegin(data) {
         Log.Debug("Preparing to receive binary data from peer." + this.id);
@@ -254,7 +323,7 @@ export default class PeerChannel {
                 let content = this._pendingData.toString("base64");
                 // Save media types in media, other files in generic download directory
                 let dir = data.mime.startsWith("image/") || data.mime.startsWith("video/") ? 
-                    this.GetMediaPath() : this.GetDownloadPath();
+                    Constants.GetMediaPath(this._activeId) : Constants.GetDownloadPath(this._activeId);
                 let path = dir + "/" + data.filename;
 
                 RNFS.mkdir(dir).then(() => {
@@ -318,11 +387,14 @@ export default class PeerChannel {
         if (this._peer.connectionState === "connected") {
             this._connectionTS = ts;
             this.connected = true;
+            this.connecting = false;
             Log.Info("Connection established to peer." + this.id);
 
-            if (this.onConnected) {
-                this.onConnected();
+            if (this.onCallSuccess) {
+                this.onCallSuccess();
             }
+
+            this._emit("connected", {});
         } else {
             Log.Warning("Peer acknowledged non-existent connection!");
         }
@@ -333,7 +405,7 @@ export default class PeerChannel {
         Log.Verbose("Received new ICE candidate from " + incoming.local);
         this._peer.addIceCandidate(
             new RTCIceCandidate(incoming.candidate)
-        ).catch((e) => { this.onSyncPeersError({message: e}); });
+        ).catch((e) => Log.Error(e));
     }
 
     // Callback to respond to WebRTC negotiation. Actually makes the initial peer connection request.
@@ -353,14 +425,12 @@ export default class PeerChannel {
             };
             Log.Verbose("Sending peer request to signalling server...");
             this.server.emit("Call", payload);
-        }).catch((e) => {
-            this.onSyncPeersError({message: "Error handling negotiation needed event: " + e});
-        });
+        }).catch((e) => Log.Error("Error handling negotiation needed event: " + e));
     }
 
     // Start to establish a WebRTC connection
     _SendConnectionRequest(clientId) {
-        Log.Info("Setting up WebRTC connection to peer." + this.id);
+        Log.Info("Setting up WebRTC connection to peer." + this.id + " (client ID: " + clientId + ")");
 
         // The client ID is required due to potential for duplicate entity IDs on the server.
         this._clientId = clientId;
@@ -398,6 +468,7 @@ export default class PeerChannel {
             this._channel.onmessage = (e) => this._OnPeerData(e, peer.local);
             this._connectionTS = (new Date()).toISOString();
             this.connected = true;
+            this.connecting = false;
             Log.Info("Connection established to peer." + peer.local);
 
             // Inform the peer that the connection is established.
@@ -406,6 +477,8 @@ export default class PeerChannel {
                 from: peer.remote,
                 ts: this._connectionTS
             });
+
+            this._emit("connected", {});
         }
 
         // Accept the call request
@@ -437,9 +510,7 @@ export default class PeerChannel {
                 this._OnPeerConnectionCandidate(this._pendingCandidates[i], payload.local);
             }
             this._pendingCandidates = [];
-        }).catch(
-            (e) => { this.onSyncPeersError({message: "Failed to handle WebRTC connection answer: " + e}); }
-        );
+        }).catch((e) => Log.Error("Failed to handle WebRTC connection answer: " + e));
     }
 
 }

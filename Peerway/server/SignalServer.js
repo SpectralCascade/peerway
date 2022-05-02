@@ -226,7 +226,7 @@ io.on('connection', socket => {
 
         // Send back metadata as requested
         Log.Info("Responding to GetEntityMeta with entity id " + request.id + " from socket " + socket.id);
-        socket.emit("EntityMetaResponse", meta);
+        socket.emit("Meta/" + request.id, meta);
     });
 
     // Handle request to send a push notification to various target entities.
@@ -249,16 +249,7 @@ io.on('connection', socket => {
         }
     });
 
-    // A peer wishes to connect to another peer.
-    socket.on("SendPeerRequest", payload => {
-        Log.Info(
-            "Relaying peer connection request to client " + payload.target +
-            " (entity: " + payload.remote + ") from client " + payload.caller +
-            " (entity: " + payload.local + ")"
-        );
-        io.to(payload.target).emit("PeerConnectionRequest", payload);
-    });
-
+    // Relay a call request
     socket.on("Call", payload => {
         Log.Info(
             "Relaying peer connection request to client " + payload.target +
@@ -268,12 +259,7 @@ io.on('connection', socket => {
         io.to(payload.target).emit("Call", payload);
     });
 
-    // A peer accepts a request to connect to a peer.
-    socket.on("AcceptPeerRequest", payload => {
-        Log.Info("Answered connection request from client " + payload.target);
-        io.to(payload.target).emit("PeerConnectionAccepted", payload);
-    });
-
+    // Relay an answer to a call
     socket.on("Answer", payload => {
         Log.Info("Answered connection request from client " + payload.target);
         io.to(payload.target).emit("Answer/" + payload.local, payload);
@@ -285,9 +271,7 @@ io.on('connection', socket => {
             "Sending ice candidate to target client " + incoming.target +
             " (entity: " + incoming.remote + ") from entity " + incoming.local
         );
-        io.to(incoming.target).emit('ice-candidate', incoming);
-        // NEW CODE BELOW to replace line above
-        io.to(incoming.target).emit("ICE/" + incoming.remote, incoming);
+        io.to(incoming.target).emit("ICE/" + incoming.local, incoming);
     });
 
 });
