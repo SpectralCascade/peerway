@@ -287,7 +287,7 @@ io.on('connection', socket => {
         );
         io.to(incoming.target).emit('ice-candidate', incoming);
         // NEW CODE BELOW to replace line above
-        io.to(incoming.target).emit("ICE/" + incoming.target, incoming);
+        io.to(incoming.target).emit("ICE/" + incoming.remote, incoming);
     });
 
 });

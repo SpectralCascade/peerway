@@ -85,8 +85,7 @@ export default class PeerChannel {
 
         // Setup server callbacks
         this.server.on("Answer/" + id, (socket) => this._OnConnectionAccepted(socket));
-        // TODO check this works both ways
-        this.server.on("ICE/" + id, (incoming) => this._OnReceivedNewCandidate(incoming));
+        this.server.on("ICE/" + this._activeId, (incoming) => this._OnReceivedNewCandidate(incoming));
     }
 
     // Attempt to connect to the peer with the specified server clientId.
@@ -319,7 +318,7 @@ export default class PeerChannel {
         if (this._peer.connectionState === "connected") {
             this._connectionTS = ts;
             this.connected = true;
-            Log.Info("Connection established to peer." + id);
+            Log.Info("Connection established to peer." + this.id);
 
             if (this.onConnected) {
                 this.onConnected();
