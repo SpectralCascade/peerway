@@ -249,6 +249,23 @@ io.on('connection', socket => {
         }
     });
 
+    // Handle sync request
+    socket.on("Sync", (request) => {
+        if (request.target && request.target in entities && entities[request.target].length > 0) {
+            Log.Debug("Relaying sync request...")
+            io.to(entities[request.target][0].socketId).emit(
+                "Sync",
+                {
+                    from: clients[socket.id].entityId,
+                    data: request.data
+                }
+            );
+        } else {
+            // TODO send push notification if peer is offline
+            Log.Info("Cannot relay sync request as the peer is not online.")
+        }
+    });
+
     // Relay a call request
     socket.on("Call", payload => {
         Log.Info(

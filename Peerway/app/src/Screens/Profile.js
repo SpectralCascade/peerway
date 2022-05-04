@@ -220,10 +220,17 @@ export default class Profile extends React.Component {
                     syncPosts={(onComplete) => {
                         this.onSyncComplete = onComplete;
                         if (this.peerId !== this.activeId) {
-                            let config = Peerway.GetSyncConfigPosts(this.peerId);
-                            config.sub = this.state.subscribed;
-                            config.selectedPeers = [this.peerId];
-                            Peerway.SyncPeers(config);
+                            let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
+                            let config = Peerway.GetSyncConfigPosts(this.peerId, cachePostLimitPerUser);
+                            let options = {
+                                general: Peerway.GetSyncConfigGeneral(),
+                                posts: {},
+                                cachePostLimitPerUser: cachePostLimitPerUser
+                            };
+                            options.posts[this.peerId] = config;
+
+                            // Synchronise with the peer
+                            Peerway.SyncPeers(options);
                         }
                         if (this.onSyncComplete) {
                             this.onSyncComplete();

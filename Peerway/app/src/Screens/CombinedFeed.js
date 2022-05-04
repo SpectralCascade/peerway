@@ -126,19 +126,7 @@ export default class CombinedFeed extends React.Component {
                     ListHeaderComponent={() => renderHeader()}
                     syncPosts={(onComplete) => {
                         this.onSyncComplete = onComplete;
-
-                        let query = Database.Execute(
-                            "SELECT pub FROM Subscriptions WHERE sub='" + this.activeId + "'"
-                        );
-
-                        for (let i in query.data) {
-                            let peer = query.data[i].pub;
-
-                            let config = Peerway.GetSyncConfigPosts(peer);
-                            config.sub = 1;
-                            config.selectedPeers = [peer];
-                            Peerway.SyncPeers(config);
-                        }
+                        Peerway.SyncPeers(Peerway.GetSyncOptions(false, false, true));
 
                         if (this.onSyncComplete) {
                             this.onSyncComplete();

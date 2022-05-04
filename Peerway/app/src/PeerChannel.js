@@ -348,7 +348,7 @@ export default class PeerChannel {
 
     // Creates a WebRTC connection object.
     _CreatePeerConnection() {
-        return new RTCPeerConnection({
+        let peercon = new RTCPeerConnection({
             iceServers: [
                 {
                     urls: "stun:" + Constants.server_ip + ":3478"
@@ -360,6 +360,15 @@ export default class PeerChannel {
                 },
             ]
         });
+        peercon.oniceconnectionstatechange = () => {
+            if (peercon.iceConnectionState === "disconnected") {
+                Log.Debug("Disconnected from peer." + this.id);
+                this.connected = false;
+                this.connecting = false;
+                peercon.oniceconnectionstatechange = () => {};
+            }
+        }
+        return peercon;
     }
 
     // Callback for handling local ICE candidates.

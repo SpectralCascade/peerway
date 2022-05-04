@@ -107,6 +107,8 @@ export default class Settings extends React.Component {
 
     DeleteAllChats() {
         Log.Debug("DELETING ALL CHATS...");
+        Database.Execute("DELETE FROM ChatMembers");
+        Database.Execute("DELETE FROM Messages");
         Database.Execute("DELETE FROM Chats");
     }
 

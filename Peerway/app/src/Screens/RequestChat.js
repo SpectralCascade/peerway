@@ -69,60 +69,7 @@ export default class RequestChat extends Component {
 
     // Callback when an entity is selected
     onSelect(item) {
-        // Find an existing private chat with the peer
-        let query = Database.Execute(
-            "SELECT * FROM (" + 
-                "SELECT Chats.type, ChatMembers.peer, ChatMembers.chat FROM Chats " +
-                "INNER JOIN ChatMembers ON ChatMembers.peer='" + item.id + "') " +
-            "WHERE type = 0"
-        );
-        Log.Debug("Query result = " + JSON.stringify(query.data));
-
-        let meta = {};
-        if (query.data.length > 0) {
-            // Private chat already exists with this peer, open it
-            meta.id = query.data[0].chat;
-            Log.Debug("Private chat already exists, opening chat." + meta.id + " ...");
-        } else {            
-            // Private chat creation, type 0, using the entity ID as the chat ID
-            let allMembers = [this.activeId, item.id];
-            meta = Database.CreateChat(
-                allMembers,
-                { id: item.id, type: 0, read: 1 }
-            );
-
-            // TODO make sure this is secure, connect to the peer and verify or issue cert first?
-            let sendChatRequest = (id) => {
-                Log.Debug("Sending chat request to peer." + id);
-                Peerway.SendRequest(id, {
-                    type: "chat.request",
-                    chatId: meta.id,
-                    from: this.activeId,
-                    name: meta.name,
-                    members: allMembers,
-                    key: meta.key,
-                    version: meta.version,
-                    group: 0 // Not a group chat, but a private chat
-                });
-            };
-
-            // Issue a certificate to the peer if necessary - by requesting to chat with them,
-            // you are implicitly trusting them.
-            let query = Database.Execute(
-                "SELECT id FROM Peers WHERE id='" + item.id + "' AND verifier!=''"
-            );
-            if (query.data.length != 0) {
-                sendChatRequest(item.id);
-            } else {
-                Peerway.IssueCertificate(item.id).then(() => {
-                    Log.Debug("Certificate issued!");
-                    sendChatRequest(item.id);
-                }).catch((e) => Log.Error(e));
-            }
-
-            console.log("Created chat with id " + meta.id);
-        }
-
+        let meta = Peerway.GetPrivateChat(item.id);
         this.props.navigation.dispatch(
             CommonActions.reset({
                 index: 2,

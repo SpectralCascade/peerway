@@ -43,7 +43,7 @@ export default class MessagingOverview extends Component {
             requestCount: 0, // Chat requests count
             refreshing: false
         }
-        this.activeId = "";
+        this.activeId = Database.active.getString("id");
         this.contextMenu = React.createRef();
         this.popup = React.createRef();
     }
@@ -87,7 +87,10 @@ export default class MessagingOverview extends Component {
     Refresh(doSync = true) {
         // First, load up peers data
         this.state.refreshing = true;
-        let peersQuery = Database.Execute("SELECT id,name,avatar FROM Peers");
+        let peersQuery = Database.Execute(
+            "SELECT Peers.id, Peers.name, Peers.avatar FROM Peers " +
+                "WHERE Peers.id != '" + this.activeId + "' "
+        );
 
         // Check for peers that are online
         Peerway.server.off("AvailabilitiesResponse");
@@ -95,6 +98,13 @@ export default class MessagingOverview extends Component {
             this.state.online = [];
             this.state.peers = {};
             for (let i = 0, counti = peersQuery.data.length; i < counti; i++) {
+                let privateChat = Database.Execute(
+                    "SELECT * FROM (" + 
+                        "SELECT Chats.type, ChatMembers.peer, ChatMembers.chat FROM Chats " +
+                        "INNER JOIN ChatMembers ON ChatMembers.peer='" + peersQuery.data[i].id + "') " +
+                    "WHERE type = 0"
+                );
+                peersQuery.data[i].chat = privateChat.data.length > 0 ? privateChat.data[0].chat : undefined;
                 this.state.peers[peersQuery.data[i].id] = peersQuery.data[i];
             }
             
@@ -106,8 +116,6 @@ export default class MessagingOverview extends Component {
         });
         Peerway.server.emit("GetAvailabilities", { entities: peersQuery.data.map(peer => peer.id) });
 
-        // Metadata about chats for syncing purposes
-        let chatSyncMeta = [];
         this.state.chats = [];
         this.state.requestCount = Database.Execute("SELECT id FROM Chats WHERE accepted=0").data.length;
 
@@ -123,20 +131,12 @@ export default class MessagingOverview extends Component {
             let id = chatsQuery.data[i].id;
             let meta = chatsQuery.data[i];
 
-            // Add relevant data required for syncing
-            if (doSync) {
-                chatSyncMeta.push({
-                    id: id,
-                    lastMessageTS: meta.created
-                });
-            }
-
             // Get last message
             let query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
             let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
 
             // Get peer who sent last message
-            // TODO merge with above into single SQL query
+            // TODO merge with above into single SQL query (or batch).
             query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
             let peer = query.data.length > 0 ? query.data[0] : {};
 
@@ -186,10 +186,7 @@ export default class MessagingOverview extends Component {
 
         if (doSync) {
             // Connect to peers to update chats
-            // TODO only synchronise messages, not feeds
-            Peerway.SyncPeers({
-                chats: chatSyncMeta
-            });
+            Peerway.SyncPeers(Peerway.GetSyncOptions(true, true, false));
         }
 
         this.forceUpdate();
@@ -323,8 +320,6 @@ export default class MessagingOverview extends Component {
             }
 
             let keyed = this.state.online.map(x => ({ id: x }));
-            Log.Debug("RENDER PASS WITH " + JSON.stringify(keyed));
-
             return (
                 <>
                 <View style={{backgroundColor: "#fff", padding: paddingAmount}}>
@@ -336,9 +331,14 @@ export default class MessagingOverview extends Component {
                         renderItem={({ item }) => (
                             <View>
                                 <TouchableOpacity
-                                    onPress={() => 
-                                        this.props.navigation.navigate("Chat", { chatId: item.id })
-                                    }
+                                    onPress={() => {
+                                        if (!this.state.peers[item.id].chat) {
+                                            this.state.peers[item.id].chat = Peerway.GetPrivateChat(item.id);
+                                        }
+                                        this.props.navigation.navigate("Chat", {
+                                            chatId: this.state.peers[item.id].chat
+                                        });
+                                    }}
                                     style={[styles.chatIcon, {
                                         marginVertical: 5,
                                         position: "relative",

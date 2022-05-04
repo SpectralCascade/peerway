@@ -131,12 +131,14 @@ export default class ProfileEdit extends React.Component {
                                         height: 400,
                                         cropping: true,
                                         writeTempFile: true,
+                                        includeBase64: true,
                                         avoidEmptySpaceAroundImage: true,
                                         cropperCircleOverlay: true
                                     }).then(image => {
                                         this.OnChange("avatar", {
                                             path: image.path,
-                                            mime: image.mime
+                                            mime: image.mime,
+                                            base64: image.data
                                         });
                                     }, () => {
                                         // Do nothing if cancelled
@@ -238,7 +240,17 @@ export default class ProfileEdit extends React.Component {
                                 delete this.state.avatar.path;
                             }
 
-                            // Extract state
+                            // Extract avatar base64 string
+                            hasBase64 = "base64" in this.state.avatar;
+                            Database.active.set(
+                                "avatar",
+                                hasBase64 ? this.state.avatar.base64 : ""
+                            );
+                            if (hasBase64) {
+                                delete this.state.avatar.base64;
+                            }
+
+                            // Extract other state into profile
                             let timeNow = (new Date()).toISOString();
                             var profile = {
                                 name: this.state.name,
