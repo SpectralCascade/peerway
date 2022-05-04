@@ -121,6 +121,7 @@ export default class Chat extends React.Component {
         }
         this.onChatMessage = Peerway.addListener("chat.message", (from, message) => {
             if (message.chat === this.chatId) {
+                Log.Debug("Received chat message");
                 let peer = this.peers[message.from];
 
                 // Automatically mark as read

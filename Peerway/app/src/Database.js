@@ -242,9 +242,9 @@ export default class Database {
     }
 
     // Execute some arbitrary SQL command (synchronous)
-    static Execute(sql) {
+    static Execute(sql, params=[]) {
         //Log.Debug("Executing SQL command:\n" + sql);
-        let query = sqlite.executeSql(this.db, sql);
+        let query = sqlite.executeSql(this.db, sql, params);
         if (query.status) {
             Log.Error("Failed to execute SQL command \"" + sql + "\":\n" + query.message);
             return { success: false, data: [] };

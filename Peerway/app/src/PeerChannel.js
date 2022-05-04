@@ -365,6 +365,7 @@ export default class PeerChannel {
                 Log.Debug("Disconnected from peer." + this.id);
                 this.connected = false;
                 this.connecting = false;
+                this.online = false;
                 peercon.oniceconnectionstatechange = () => {};
             }
         }

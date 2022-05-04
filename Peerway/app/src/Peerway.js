@@ -549,10 +549,11 @@ class PeerwayAPI {
                     meta.id + "','" + // Chat id
                     id + "','" + // Generate an ID for this message
                     message.from + "','" +
-                    isoTime + "','" +
-                    message.content + "','" + // TODO only insert text content; link to non-text content
+                    isoTime + "'," +
+                    " ? ,'" + // TODO only insert text content; link to non-text content
                     message.mime + "'" + 
-                ")"
+                ")",
+                [message.content]
             );
             
             // Update the last message sent of the chat
@@ -848,10 +849,11 @@ class PeerwayAPI {
                 data.chat + "','" +
                 data.id + "','" +
                 from.id + "','" +
-                data.created + "','" +
-                data.content + "','" +
+                data.created + "'," +
+                " ? ,'" +
                 data.mime + "'" + 
-            ")"
+            ")",
+            [data.content]
         );
         
         // Update the last message sent of the chat
