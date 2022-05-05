@@ -92,7 +92,7 @@ export default {
     ButtonToggle: (params) => {
         return (
             <TouchableOpacity onPress={() => {
-                params.parent.state.settings[params.name] = !params.parent.state.settings[params.name];
+                params.parent.state.settings[params.name] = params.parent.state.settings[params.name] ? 0 : 1;
                 params.parent.setState({settings: params.parent.state.settings});
                 Database.userdata.set(
                     params.name,
