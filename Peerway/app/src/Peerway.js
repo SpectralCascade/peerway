@@ -156,10 +156,8 @@ class PeerwayAPI {
             Log.Debug("Issuing certificate...");
             // Save the private key
             Database.Execute(
-                "UPDATE Peers SET " + 
-                    "verifier='" + cert.private + "', " + 
-                    "issued='" + JSON.stringify(cert.certificate) + "' " +
-                        "WHERE id='" + id + "'"
+                "UPDATE Peers SET verifier=?, issued=? WHERE id=?",
+                [cert.private, JSON.stringify(cert.certificate), id]
             );
 
             // Issue the certificate
@@ -286,8 +284,9 @@ class PeerwayAPI {
         let query = Database.Execute(
             "SELECT * FROM (" + 
                 "SELECT Chats.type, ChatMembers.peer, ChatMembers.chat FROM Chats " +
-                "INNER JOIN ChatMembers ON ChatMembers.peer='" + id + "') " +
-            "WHERE type = 0"
+                "INNER JOIN ChatMembers ON ChatMembers.peer=?) " +
+            "WHERE type = 0",
+            [id]
         );
 
         let meta = {};
@@ -321,7 +320,8 @@ class PeerwayAPI {
             // Issue a certificate to the peer if necessary - by requesting to chat with them,
             // you are implicitly trusting them.
             let query = Database.Execute(
-                "SELECT id FROM Peers WHERE id='" + id + "' AND verifier!=''"
+                "SELECT id FROM Peers WHERE id=? AND verifier!=''",
+                [id]
             );
             if (query.data.length != 0) {
                 sendChatRequest(id);
@@ -340,9 +340,7 @@ class PeerwayAPI {
 
     // TODO handle receiving a certificate
     _OnCertificateIssued(from, data) {
-        let query = Database.Execute(
-            "SELECT verifier,certificate FROM Peers WHERE id='" + from.id + "'"
-        );
+        let query = Database.Execute("SELECT verifier,certificate FROM Peers WHERE id=?", [from.id]);
         if (query.data.length == 0) {
             // Never interacted with the peer before, treat with caution as a new trust request
         } else {
@@ -403,8 +401,8 @@ class PeerwayAPI {
     GetSyncConfigPosts(peerId, cacheLimit) {
         // Get all cached posts
         let query = Database.Execute(
-            "SELECT id,author,version FROM Posts " + 
-                "WHERE author='" + peerId + "' ORDER BY created DESC LIMIT " + cacheLimit
+            "SELECT id,author,version FROM Posts WHERE author=? ORDER BY created DESC LIMIT ?",
+            [peerId, cacheLimit]
         );
         return query.data.length > 0 ? query.data : undefined;
     }
@@ -422,16 +420,15 @@ class PeerwayAPI {
             // First, get the most recent chat message from each peer in each chat
             query = Database.Execute(
                 "SELECT * FROM (SELECT DISTINCT chat, MAX(created) AS created, [from] FROM Messages " +
-                    "WHERE [from] != '" + this._activeId + "' ORDER BY created DESC) " + 
-                    "WHERE created IS NOT NULL"
+                    "WHERE [from] != ? ORDER BY created DESC) " + 
+                    "WHERE created IS NOT NULL",
+                [this._activeId]
             );
             options.chats = query.data.length > 0 ? query.data : undefined;
         }
 
         if (posts) {
-            query = Database.Execute(
-                "SELECT pub FROM Subscriptions WHERE sub='" + this._activeId + "'"
-            );
+            query = Database.Execute("SELECT pub FROM Subscriptions WHERE sub=?", [this._activeId]);
             if (query.data.length > 0) {
                 let peers = {};
                 let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
@@ -542,7 +539,7 @@ class PeerwayAPI {
     */
     SendChatMessage(message) {
         // TODO load database for the "from" entity, rather than using active
-        let query = Database.Execute("SELECT * FROM Chats WHERE id='" + message.chat + "'");
+        let query = Database.Execute("SELECT * FROM Chats WHERE id=?", [message.chat]);
         if (query.data.length > 0) {
             // Load the chat data
             let meta = query.data[0];
@@ -551,28 +548,17 @@ class PeerwayAPI {
             let isoTime = timeNow.toISOString();
             let id = uuidv1();
             Database.Execute(
-                "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES ('" +
-                    meta.id + "','" + // Chat id
-                    id + "','" + // Generate an ID for this message
-                    message.from + "','" +
-                    isoTime + "'," +
-                    " ? ,'" + // TODO only insert text content; link to non-text content
-                    message.mime + "'" + 
-                ")",
-                [message.content]
+                "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES (?,?,?,?,?,?)",
+                [meta.id, id, message.from, isoTime, message.content, message.mime]
             );
             
             // Update the last message sent of the chat
             meta.lastMessage = message.mime.startsWith("text") ? message.content : message.mime;
-            Database.Execute(
-                "UPDATE Chats SET lastMessage='" + id + "' WHERE id='" + meta.id + "'"
-            );
+            Database.Execute("UPDATE Chats SET lastMessage=? WHERE id=?", [id, meta.id]);
 
             // Get members of the chat
             let targets = [];
-            query = Database.Execute(
-                "SELECT * FROM ChatMembers WHERE chat='" + meta.id + "'"
-            );
+            query = Database.Execute("SELECT * FROM ChatMembers WHERE chat=?", [meta.id]);
             for (let i = 0, counti = query.data.length; i < counti; i++) {
                 // Skip self
                 if (query.data[i].peer === message.from) {
@@ -664,7 +650,7 @@ class PeerwayAPI {
         Log.Debug("Received sync request from peer." + from.id);
 
         // Load local peer data
-        let query = Database.Execute("SELECT * FROM Peers WHERE id='" + from.id + "'");
+        let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [from.id]);
 
         // Track whether actual data syncing takes place
         let didSync = false;
@@ -752,7 +738,7 @@ class PeerwayAPI {
                 let created = data.chats[id];
 
                 // Check if the chat exists
-                query = Database.Execute("SELECT * FROM Chats WHERE id='" + id + "'");
+                query = Database.Execute("SELECT * FROM Chats WHERE id=?", [id]);
                 if (query.data.length > 0) {
                     Log.Debug("Syncing chat." + id);
                     let localChat = query.data[0];
@@ -761,10 +747,8 @@ class PeerwayAPI {
 
                     // Get all messages this entity has sent in the selected chat since last message
                     query = Database.Execute(
-                        "SELECT * FROM Messages " + 
-                        "WHERE chat = '" + id + "' " +
-                        "AND [from] = '" + this._activeId + "' " +
-                        "AND created > '" + created + "'"
+                        "SELECT * FROM Messages WHERE chat = ? AND [from] = ? AND created > ?",
+                        [id, this._activeId, created]
                     );
 
                     if (query.data.length > 0) {
@@ -791,9 +775,8 @@ class PeerwayAPI {
             Log.Debug("Syncing posts...");
             // Get the latest posts, up to the limit
             query = Database.Execute(
-                "SELECT id,version FROM Posts WHERE " + 
-                    "author='" + this._activeId + "' " + 
-                    "ORDER BY created DESC LIMIT " + data.cachePostLimitPerUser
+                "SELECT id,version FROM Posts WHERE author=? ORDER BY created DESC LIMIT ?",
+                [this._activeId, data.cachePostLimitPerUser]
             );
             for (let i in query.data) {
                 let post = query.data[i];
@@ -812,18 +795,12 @@ class PeerwayAPI {
         if (didSync && !("ts" in data)) {
             // Store time of this sync with the peer
             let ts = (new Date()).toISOString();
-            Database.Execute(
-                "UPDATE Peers SET sync='" + ts + "' " +
-                "WHERE id='" + from.id + "'"
-            );
+            Database.Execute("UPDATE Peers SET sync=? WHERE id=?", [ts, from.id]);
             let options = this.GetSyncOptions("general" in data, "chats" in data, "posts" in data);
             options.ts = ts;
             this.SyncPeers(options);
         } else if ("ts" in data) {
-            Database.Execute(
-                "UPDATE Peers SET sync='" + data.ts + "' " +
-                "WHERE id='" + from.id + "'"
-            );
+            Database.Execute("UPDATE Peers SET sync=? WHERE id=?", [data.ts, from.id]);
         }
     }
 
@@ -851,27 +828,18 @@ class PeerwayAPI {
 
         // Add the message to the database
         Database.Execute(
-            "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES ('" +
-                data.chat + "','" +
-                data.id + "','" +
-                from.id + "','" +
-                data.created + "'," +
-                " ? ,'" +
-                data.mime + "'" + 
-            ")",
-            [data.content]
+            "INSERT INTO Messages (chat,id,[from],created,content,mime) VALUES (?,?,?,?,?,?)",
+            [data.chat, data.id, from.id, data.created, data.content, data.mime]
         );
         
         // Update the last message sent of the chat
-        Database.Execute(
-            "UPDATE Chats SET lastMessage='" + data.id + "', read=" + 0 + " WHERE id='" + data.chat + "'"
-        );
+        Database.Execute("UPDATE Chats SET lastMessage=?, read=? WHERE id=?", [data.id, 0, data.chat]);
 
-        let query = Database.Execute("SELECT * FROM Chats WHERE id='" + data.chat + "'");
+        let query = Database.Execute("SELECT * FROM Chats WHERE id=?", [data.chat]);
 
         let chat = query.data.length != 0 ? query.data[0] : {};
 
-        query = Database.Execute("SELECT * FROM Peers WHERE id='" + from.id + "'");
+        query = Database.Execute("SELECT * FROM Peers WHERE id=?", [from.id]);
         let peer = query.data.length != 0 ? query.data[0] : {};
 
         let avatar = peer.id && peer.avatar ? Peerway.GetAvatarPath(peer.id, peer.avatar, "file://") : "";
@@ -904,7 +872,7 @@ class PeerwayAPI {
         Log.Debug("Received request for post." + data.id);
         // TODO check sharing permissions before sending
         let query = Database.Execute(
-            "SELECT * FROM Posts WHERE id='" + data.id + "' AND author='" + this._activeId + "'"
+            "SELECT * FROM Posts WHERE id=? AND author=?", [data.id, this._activeId]
         );
         if (query.data.length == 0) {
             this.SendRequest(from.id, {
@@ -953,10 +921,8 @@ class PeerwayAPI {
         Log.Debug("Received update for peer." + from.id);
         let avatarExt = "avatar" in data.profile && "ext" in data.profile.avatar ? data.profile.avatar.ext : "";
         Database.Execute(
-            "UPDATE Peers SET name='" + data.profile.name + "', " + 
-            "avatar='" + avatarExt + "', " + 
-            "updated='" + data.profile.updated + "' " +
-            "WHERE id='" + from.id + "'"
+            "UPDATE Peers SET name=?, avatar=?, updated=? WHERE id=?",
+            [data.profile.name, avatarExt, data.profile.updated, from.id]
         );
         let avatarPath = this.GetMediaPath() + "/" + from.id + "." + avatarExt;
         RNFS.exists(avatarPath).then((exists) => {
@@ -983,15 +949,15 @@ class PeerwayAPI {
 
             Log.Debug("Updating chat." + data.chat + " from peer." + from.id);
             let query = Database.Execute(
-                "SELECT id FROM Messages " +
-                "WHERE chat='" + data.chat + "' AND id='" + data.messages[i].id + "'"
+                "SELECT id FROM Messages WHERE chat=? AND id=?",
+                [data.chat, data.messages[i].id]
             );
 
             if (query.data.length > 0) {
                 // Existing message that has been edited and needs to be updated
                 Database.Execute(
-                    "UPDATE Messages SET content='" + data.messages[i].content + "' " +
-                    "WHERE chat='" + data.chat + "' AND id='" + data.messages[i].id + "'"
+                    "UPDATE Messages SET content=? WHERE chat=? AND id=?",
+                    [data.messages[i].content, data.chat, data.messages[i].id]
                 );
             } else {
                 // Unbeforeseen, treat as a new message
@@ -1005,19 +971,17 @@ class PeerwayAPI {
         Log.Debug("Received " + (sub ? "subscription" : "unsubscription") + " from peer." + from.id);
         if (sub) {
             Database.Execute(
-                "INSERT OR IGNORE INTO Subscriptions (pub,sub) VALUES (" +
-                    "'" + this._activeId + "','" + from.id + "')"
+                "INSERT OR IGNORE INTO Subscriptions (pub,sub) VALUES (?,?)",
+                [this._activeId, from.id]
             );
         } else {
-            Database.Execute(
-                "DELETE FROM Subscriptions WHERE pub='" + this._activeId + "' AND sub='" + from.id + "'"
-            );
+            Database.Execute("DELETE FROM Subscriptions WHERE pub=? AND sub=?", [this._activeId, from.id]);
         }
     }
 
     // Encrypt data for a peer, returns a promise.
     _EncryptForPeer(id, data) {
-        let query = Database.Execute("SELECT verifier FROM Peers WHERE id='" + id + "'");
+        let query = Database.Execute("SELECT verifier FROM Peers WHERE id=?", [id]);
         if (query.data.length != 0) {
             if (query.data[0].verifier.length != 0) {
                 return RSA.encrypt(data, query.data[0].verifier);
@@ -1030,7 +994,7 @@ class PeerwayAPI {
 
     // Decrypt data from a peer, returns a promise.
     _DecryptFromPeer(id, data) {
-        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + id + "'");
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id=?", [id]);
         if (query.data.length != 0) {
             if (query.data[0].certificate.length != 0) {
                 return RSA.decrypt(data, JSON.parse(query.data[0].certificate).public);
@@ -1043,7 +1007,7 @@ class PeerwayAPI {
 
     // Check if a remote connected peer has a valid certificate.
     _VerifyPeer(id) {
-        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + id + "'");
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id=?", [id]);
         if (query.data.length != 0 && query.data[0].certificate.length != 0) {
             this._SendPeerData(id, JSON.stringify({
                 type: "cert.verify"
@@ -1056,7 +1020,7 @@ class PeerwayAPI {
 
     // Respond to a request to verify
     _OnVerifyRequest(from) {
-        let query = Database.Execute("SELECT certificate FROM Peers WHERE id='" + from.id + "'");
+        let query = Database.Execute("SELECT certificate FROM Peers WHERE id=?", [from.id]);
         if (query.data.length != 0 && query.data[0].certificate.length != 0) {
             // Encrypt the certificate - only the real entity should be allowed to read it!
             this._EncryptForPeer(from.id, query.data[0].certificate).then((encrypted) => {
@@ -1075,7 +1039,7 @@ class PeerwayAPI {
         // Decrypt the data and verify that it's the same as the recorded certificate
         // TODO callback onVerifyPeer
         this._DecryptFromPeer(from.id, data.cert).then((decrypted) => {
-            let query = Database.Execute("SELECT issued FROM Peer WHERE id='" + from.id + "'");
+            let query = Database.Execute("SELECT issued FROM Peer WHERE id=?", [from.id]);
             // Compare the certificate with the one issued
             this._verified[from.id] = query.data.length != 0 && query.data[0].issued === decrypted;
             if (this._verified[from.id]) {

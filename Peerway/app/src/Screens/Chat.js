@@ -48,10 +48,8 @@ export default class Chat extends React.Component {
         // Get the last N messages
         // TODO make this async
         let query = Database.Execute(
-            "SELECT * FROM Messages " +
-                "WHERE chat='" + this.chatId + "' AND created < '" + this.state.loadedTS + "' " +
-                "ORDER BY created DESC " +
-                "LIMIT " + Constants.messagesPerLoad
+            "SELECT * FROM Messages WHERE chat=? AND created < ? ORDER BY created DESC LIMIT ?",
+            [this.chatId, this.state.loadedTS, Constants.messagesPerLoad]
         );
         if (query.data.length > 0) {
             for (let i in query.data) {
@@ -103,8 +101,9 @@ export default class Chat extends React.Component {
         let query = Database.Execute(
             "SELECT * FROM (" + 
             "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
-            "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + this.chatId + "') " +
-            "WHERE id != '" + this.activeId + "' "
+            "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat=?) " +
+            "WHERE id != ? ",
+            [this.chatId, this.activeId]
         );
         for (let i in query.data) {
             this.peers[query.data[i].id] = query.data[i];
@@ -125,7 +124,7 @@ export default class Chat extends React.Component {
                 let peer = this.peers[message.from];
 
                 // Automatically mark as read
-                Database.Execute("UPDATE Chats SET read=" + 1 + " WHERE id='" + this.chatId + "'");
+                Database.Execute("UPDATE Chats SET read=? WHERE id=?", [1, this.chatId]);
 
                 let isImage = message.mime.startsWith("image/");
                 let isText = message.mime.startsWith("text/");
@@ -289,13 +288,8 @@ export default class Chat extends React.Component {
                 );
             }).then(() => {
                 let query = Database.Execute(
-                    "INSERT INTO MediaCache VALUES ('" +
-                        id + "', '" +
-                        hash + "', + '" +
-                        ext + "', '" +
-                        this.activeId + "', '" +
-                        mime + "'" +
-                    ")"
+                    "INSERT INTO MediaCache VALUES (?,?,?,?,?)",
+                    [id, hash, ext, this.activeId, mime]
                 );
 
                 //if (query.success) {
@@ -318,9 +312,8 @@ export default class Chat extends React.Component {
                 RNFS.hash(data[i].path, "md5").then((hash) => {
                     let ext = data[i].path.split('.').pop();
                     let query = Database.Execute(
-                        "SELECT * FROM MediaCache WHERE " + 
-                            "author='" + this.activeId + "' AND " +
-                            "hash='" + hash + "' AND ext='" + ext + "'"
+                        "SELECT * FROM MediaCache WHERE author=? AND hash=? AND ext=?",
+                        [this.activeId, hash, ext]
                     );
 
                     if (query.data.length != 0) {

@@ -191,7 +191,7 @@ export default class Feed extends React.Component {
             renderItem={({ item }) => {
                 let author = this.peers[item.author];
                 if (!author) {
-                    let query = Database.Execute("SELECT * FROM Peers WHERE id='" + item.author + "'");
+                    let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [item.author]);
                     if (query.data.length > 0) {
                         Log.Debug("Loaded data for peer." + item.author);
                         this.peers[item.author] = query.data[0];

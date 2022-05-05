@@ -67,7 +67,7 @@ export default class CreatePost extends React.Component {
         }
 
         // Notify subscribers
-        let query = Database.Execute("SELECT sub FROM Subscriptions WHERE pub='" + this.activeId + "'");
+        let query = Database.Execute("SELECT sub FROM Subscriptions WHERE pub=?", [this.activeId]);
         let subs = query.data.map(x => x.sub);
         Peerway.MulticastRequest(subs, {
             type: "post.publish",

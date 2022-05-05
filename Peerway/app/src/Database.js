@@ -280,7 +280,8 @@ export default class Database {
 
             // Link member to chat
             this.Execute(
-                "INSERT INTO ChatMembers (chat,peer) VALUES ('" + meta.id + "','" + members[i] + "')"
+                "INSERT INTO ChatMembers (chat,peer) VALUES (?,?)",
+                [meta.id, members[i]]
             );
         }
 
@@ -445,19 +446,19 @@ export default class Database {
     // Delete a particular peer, along with all associated cached data (including messages & posts)
     static DeletePeer(id) {
         Log.Debug("Attempting to delete peer." + id);
-        Database.Execute("DELETE FROM Messages WHERE [from]='" + id + "'");
-        Database.Execute("DELETE FROM Posts WHERE author='" + id + "'");
-        Database.Execute("DELETE FROM Peers WHERE id='" + id + "'");
+        Database.Execute("DELETE FROM Messages WHERE [from]=?", [id]);
+        Database.Execute("DELETE FROM Posts WHERE author=?", [id]);
+        Database.Execute("DELETE FROM Peers WHERE id=?", [id]);
     }
 
     static DeleteChat(id) {
         Log.Debug("Attempting to delete chat." + id);
-        Database.Execute("DELETE FROM Chats WHERE id='" + id + "'");
+        Database.Execute("DELETE FROM Chats WHERE id=?", [id]);
     }
 
     static DeletePost(id) {
         Log.Debug("Attempting to delete post." + id);
-        Database.Execute("DELETE FROM Posts WHERE id='" + id + "'");
+        Database.Execute("DELETE FROM Posts WHERE id=?", [id]);
     }
 
 }

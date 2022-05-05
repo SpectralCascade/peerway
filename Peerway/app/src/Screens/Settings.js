@@ -115,8 +115,8 @@ export default class Settings extends React.Component {
     DeleteAllPeers() {
         Log.Debug("DELETING ALL PEERS...");
         let activeId = Database.active.getString("id");
-        Database.Execute("DELETE FROM Messages WHERE [from] != '" + activeId + "'");
-        Database.Execute("DELETE FROM Posts WHERE author != '" + activeId + "'");
+        Database.Execute("DELETE FROM Messages WHERE [from] != ?", [activeId]);
+        Database.Execute("DELETE FROM Posts WHERE author != ?", [activeId]);
         Database.Execute("DELETE FROM Peers");
     }
 

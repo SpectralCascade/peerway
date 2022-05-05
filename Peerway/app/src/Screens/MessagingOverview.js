@@ -88,8 +88,8 @@ export default class MessagingOverview extends Component {
         // First, load up peers data
         this.state.refreshing = true;
         let peersQuery = Database.Execute(
-            "SELECT Peers.id, Peers.name, Peers.avatar FROM Peers " +
-                "WHERE Peers.id != '" + this.activeId + "' "
+            "SELECT Peers.id, Peers.name, Peers.avatar FROM Peers WHERE Peers.id != ? ",
+            [this.activeId]
         );
 
         // Check for peers that are online
@@ -101,8 +101,9 @@ export default class MessagingOverview extends Component {
                 let privateChat = Database.Execute(
                     "SELECT * FROM (" + 
                         "SELECT Chats.type, ChatMembers.peer, ChatMembers.chat FROM Chats " +
-                        "INNER JOIN ChatMembers ON ChatMembers.peer='" + peersQuery.data[i].id + "') " +
-                    "WHERE type = 0"
+                        "INNER JOIN ChatMembers ON ChatMembers.peer=?) " +
+                    "WHERE type = 0",
+                    [peersQuery.data[i].id]
                 );
                 peersQuery.data[i].chat = privateChat.data.length > 0 ? privateChat.data[0].chat : undefined;
                 this.state.peers[peersQuery.data[i].id] = peersQuery.data[i];
@@ -132,12 +133,15 @@ export default class MessagingOverview extends Component {
             let meta = chatsQuery.data[i];
 
             // Get last message
-            let query = Database.Execute("SELECT * FROM Messages WHERE chat='" + id + "' AND id='" + meta.lastMessage + "'");
+            let query = Database.Execute(
+                "SELECT * FROM Messages WHERE chat=? AND id=?",
+                [id, meta.lastMessage]
+            );
             let lastMessage = query.data.length > 0 ? query.data[0] : { peer: "", content: "", mime: "" };
 
             // Get peer who sent last message
             // TODO merge with above into single SQL query (or batch).
-            query = Database.Execute("SELECT * FROM Peers WHERE id='" + lastMessage.from + "'");
+            query = Database.Execute("SELECT * FROM Peers WHERE id=?", [lastMessage.from]);
             let peer = query.data.length > 0 ? query.data[0] : {};
 
             // Generate chat name and grab the chat icon
@@ -146,9 +150,10 @@ export default class MessagingOverview extends Component {
             if (meta.type == 0) {
                 query = Database.Execute(
                     "SELECT * FROM (" + 
-                    "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat FROM Peers " +
-                    "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat='" + id + "') " +
-                    "WHERE id != '" + this.activeId + "' "
+                    "SELECT Peers.id, Peers.name, Peers.avatar, ChatMembers.peer, ChatMembers.chat " + 
+                    "FROM Peers INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id AND ChatMembers.chat=?) " +
+                    "WHERE id != ? ",
+                    [id, this.activeId]
                 );
 
                 if (query.data.length > 0) {
@@ -206,9 +211,7 @@ export default class MessagingOverview extends Component {
             chat = chat != null ? this.state.chats.find((item) => item.id === chat.id) : null;
             if (chat != null) {
                 chat.read = true;
-                Database.Execute(
-                    "UPDATE Chats SET read=1 WHERE id='" + chat.id + "'"
-                );
+                Database.Execute("UPDATE Chats SET read=1 WHERE id=?", [chat.id]);
 
                 this.forceUpdate();
                 this.props.navigation.navigate("Chat", { chatId: chat.id });
@@ -240,9 +243,7 @@ export default class MessagingOverview extends Component {
                     onPress: () => {
                         if (chat.read != markRead) {
                             chat.read = markRead ? 1 : 0;
-                            Database.Execute(
-                                "UPDATE Chats SET read=" + chat.read + " WHERE id='" + chat.id + "'"
-                            );
+                            Database.Execute("UPDATE Chats SET read=? WHERE id=?", [chat.read, chat.id]);
                         }
                         this.contextMenu.current.Hide();
                         this.forceUpdate();

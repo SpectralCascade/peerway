@@ -50,7 +50,8 @@ export default class ChatRequests extends Component {
                 let query = Database.Execute(
                     "SELECT Peers.id, Peers.avatar, Peers.name FROM Peers " + 
                     "INNER JOIN ChatMembers ON ChatMembers.peer=Peers.id WHERE " + 
-                        "ChatMembers.chat='" + chat.id + "' AND ChatMembers.peer!='" + this.activeId + "'"
+                        "ChatMembers.chat=? AND ChatMembers.peer!=?",
+                    [chat.id, this.activeId]
                 );
                 if (query.data.length > 0) {
                     let peer = query.data[0];
@@ -73,9 +74,7 @@ export default class ChatRequests extends Component {
 
     // Callback when a request is accepted
     onRequestAccept(item) {
-        Database.Execute(
-            "UPDATE Chats SET accepted=1 WHERE id='" + item.id + "'"
-        );
+        Database.Execute("UPDATE Chats SET accepted=1 WHERE id=?", [item.id]);
 
         this.state.requests.splice(item.index, 1);
         this.setState({requests: this.state.requests});

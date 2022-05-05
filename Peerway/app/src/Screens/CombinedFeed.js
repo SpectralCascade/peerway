@@ -72,19 +72,14 @@ export default class CombinedFeed extends React.Component {
         if (this.state.subscribed) {
             // TODO show confirmation popup
             this.setState({subscribed: 0});
-            Database.Execute(
-                "DELETE FROM Subscriptions WHERE " + 
-                    "pub='" + peer + "' AND sub='" + this.activeId + "'"
-            );
+            Database.Execute("DELETE FROM Subscriptions WHERE pub=? AND sub=?", [peer, this.activeId]);
             Peerway.SendRequest(peer, {
                 type: "peer.unsub"
             });
             Log.Debug("Unsubscribed from peer." + peer);
         } else {
             this.setState({subscribed: 1});
-            Database.Execute(
-                "INSERT INTO Subscriptions (pub,sub) VALUES ('" + peer + "','" + this.activeId + "')"
-            );
+            Database.Execute("INSERT INTO Subscriptions (pub,sub) VALUES (?,?)", [peer, this.activeId]);
             Peerway.SendRequest(peer, {
                 type: "peer.sub"
             });
@@ -143,14 +138,14 @@ export default class CombinedFeed extends React.Component {
                         let query = Database.Execute(
                             "SELECT * FROM (" + 
                                 "SELECT * FROM Posts INNER JOIN Subscriptions " + 
-                                    "ON Subscriptions.sub='" + this.activeId + "' " + 
-                                    "AND Subscriptions.pub=Posts.author" +
+                                    "ON Subscriptions.sub=? AND Subscriptions.pub=Posts.author" +
                             ") " +
                             (posts.length > 0 ?
-                                ("WHERE created < '" + posts[posts.length - 1].created + "' ") :
+                                ("WHERE created < ? ") :
                                 ""
                             ) +
-                            "ORDER BY created DESC LIMIT 10"
+                            "ORDER BY created DESC LIMIT 10",
+                            posts.length > 0 ? [this.activeId, posts[posts.length - 1].created] : [this.activeId]
                         );
                         if (query.data.length > 0) {
                             for (let i in query.data) {

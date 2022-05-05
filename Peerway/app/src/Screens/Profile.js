@@ -63,12 +63,12 @@ export default class Profile extends React.Component {
                 "post.response.end",
                 (from, data) => this.OnPostResponse(from, data)
             );
-            let query = Database.Execute("SELECT * FROM Peers WHERE id='" + this.peerId + "'");
+            let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [this.peerId]);
             if (query.data.length > 0) {
                 let peer = query.data[0];
                 query = Database.Execute(
-                    "SELECT * FROM Subscriptions WHERE " +
-                        "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
+                    "SELECT * FROM Subscriptions WHERE pub=? AND sub=?",
+                    [this.peerId, this.activeId]
                 );
                 this.setState({
                     name: peer.name,
@@ -119,8 +119,8 @@ export default class Profile extends React.Component {
                 // TODO show confirmation popup
                 this.setState({subscribed: 0});
                 Database.Execute(
-                    "DELETE FROM Subscriptions WHERE " + 
-                        "pub='" + this.peerId + "' AND sub='" + this.activeId + "'"
+                    "DELETE FROM Subscriptions WHERE pub=? AND sub=?",
+                    [this.peerId, this.activeId]
                 );
                 Peerway.SendRequest(this.peerId, {
                     type: "peer.unsub"
@@ -129,7 +129,8 @@ export default class Profile extends React.Component {
             } else {
                 this.setState({subscribed: 1});
                 Database.Execute(
-                    "INSERT INTO Subscriptions (pub,sub) VALUES ('" + this.peerId + "','" + this.activeId + "')"
+                    "INSERT INTO Subscriptions (pub,sub) VALUES (?,?)",
+                    [this.peerId, this.activeId]
                 );
                 Peerway.SendRequest(this.peerId, {
                     type: "peer.sub"
@@ -238,12 +239,10 @@ export default class Profile extends React.Component {
                             posts = [];
                         }
                         let query = Database.Execute(
-                            "SELECT * FROM Posts WHERE author='" + this.peerId + "' " +
-                            (posts.length > 0 ?
-                                ("AND created < '" + posts[posts.length - 1].created + "' ") :
-                                ""
-                            ) +
-                            "ORDER BY created DESC LIMIT 10"
+                            "SELECT * FROM Posts " + 
+                                "WHERE author=? " + (posts.length > 0 ? "AND created < ? " : "") +
+                            "ORDER BY created DESC LIMIT 10",
+                            posts.length > 0 ? [this.peerId, posts[posts.length - 1].created] : [this.peerId]
                         );
                         if (query.data.length > 0) {
                             for (let i in query.data) {

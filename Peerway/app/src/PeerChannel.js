@@ -238,7 +238,7 @@ export default class PeerChannel {
                 this._emit("onlineChange", {});
             }
             // Check if the peer is blocked or not before initiating connection
-            let query = Database.Execute("SELECT blocked FROM Peers WHERE id='" + meta.id + "'");
+            let query = Database.Execute("SELECT blocked FROM Peers WHERE id=?", [meta.id]);
             if (query.data.length != 0 && query.data[0].blocked) {
                 Log.Info("Not connecting to peer." + meta.id + " as they are blocked.");
             } else if (meta.clientId) {

@@ -95,7 +95,7 @@ export default class EditGroupChatMembers extends Component {
         // Issue a certificate to these peers if necessary - by requesting to chat with them,
         // you are implicitly trusting them.
         for (let i = 0, counti = peerIds.length; i < counti; i++) {
-            let query = Database.Execute("SELECT * FROM Peers WHERE id='" + peerIds[i] + "'");
+            let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [peerIds[i]]);
             if (query.data.length != 0 && query.data[0].issued.length != 0) {
                 sendChatRequest(peerIds[i]);
             } else {
