@@ -9,36 +9,6 @@ import { Buffer } from 'buffer';
 import Constants from './Constants';
 import DefaultSettings from './DefaultSettings';
 
-// Automagically converts string into an SQL escaped single quote wrapped string.
-// Non-strings are unaffected by this function.
-function wrapSQL(value) {
-    if (typeof(value) === "string") {
-        // Escape single quotes
-        let escaped = "";
-        for (let i = 0, counti = value.length; i < counti; i++) {
-            if (value[i] === "'") {
-                escaped += "'";
-            }
-            escaped += value[i];
-        }
-        return "'" + value + "'";
-    }
-    return value;
-}
-
-// Get comma separated list of values from keys
-// Helper for SQL statements
-function ToCSV(obj, keys) {
-    let sql = keys[0] in obj ?
-        (typeof(obj[keys[0]]) === "string" ? wrapSQL(obj[keys[0]]) : obj[keys[0]].toString()) : "";
-    for (let i = 1, counti = keys.length; i < counti; i++) {
-        if (keys[i] in obj) {
-            sql += ", " + (typeof(obj[keys[i]]) === "string" ? wrapSQL(obj[keys[i]]) : obj[keys[i]].toString());
-        }
-    }
-    return sql;
-}
-
 export default class Database {
 
     // All entities, by entity ID.
@@ -267,7 +237,7 @@ export default class Database {
         }
         
         // Generate chat metadata
-        let chatData = {
+        let chat = {
             id: meta.id,
             name: "name" in meta ? meta.name : "",
             read: "read" in meta ? meta.read : 0,
@@ -283,11 +253,21 @@ export default class Database {
         // TODO batch these SQL commands
 
         // Create a chat entry
-        let csvData = ToCSV(chatData, ["id", "name", "read", "muted", "blocked", "lastMessage", "key", "version", "accepted", "type"]);
         this.Execute(
-            "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage,key,version,accepted,type) VALUES (" +
-                csvData +
-            ")"
+            "INSERT INTO Chats (id,name,read,muted,blocked,lastMessage,key,version,accepted,type) " + 
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            [
+                chat.id,
+                chat.name,
+                chat.read,
+                chat.muted,
+                chat.blocked,
+                chat.lastMessage,
+                chat.key,
+                chat.version,
+                chat.accepted,
+                chat.type
+            ]
         );
         
         let activeId = this.active.getString("id");
@@ -304,7 +284,7 @@ export default class Database {
             );
         }
 
-        return chatData;
+        return chat;
     }
 
     static CreatePost(content, media, visibility=1) {
@@ -323,9 +303,19 @@ export default class Database {
 
         // Create a post entry in the database
         this.Execute(
-            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) VALUES (" +
-                ToCSV(post, ["id","author","created","edited","updated","version","content","media","visibility"]) +
-            ")"
+            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) " + 
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+            [
+                post.id,
+                post.author,
+                post.created,
+                post.edited,
+                post.updated,
+                post.version,
+                post.content,
+                post.media,
+                post.visibility
+            ]
         );
 
         return post;
@@ -345,9 +335,19 @@ export default class Database {
         if (query.data.length == 0) {
             Log.Debug("Caching post." + post.id);
             this.Execute(
-                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) VALUES (" +
-                    ToCSV(post, ["id","author","created","edited","updated","version","content","media","visibility"]) +
-                ")"
+                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) " + 
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                [
+                    post.id,
+                    post.author,
+                    post.created,
+                    post.edited,
+                    post.updated,
+                    post.version,
+                    post.content,
+                    post.media,
+                    post.visibility
+                ]
             );
 
             // TODO delete older posts (and associated media files) outside of the cache limit
@@ -355,11 +355,12 @@ export default class Database {
             Log.Debug("Updating cached post." + post.id);
             this.Execute(
                 "UPDATE Posts SET " + 
-                    "edited='" + post.edited + "', " + 
-                    "version=" + post.version + ", " + 
-                    "content='" + post.content + "', " +
-                    "media='" + post.media + "' " +
-                "WHERE id='" + post.id + "' AND author='" + post.author + "'"
+                    "edited=?, " + 
+                    "version=?, " + 
+                    "content=?, " +
+                    "media=? " +
+                "WHERE id=? AND author=?",
+                [post.edited, post.version, post.content, post.media, post.id, post.author]
             );
         } else {
             Log.Debug("No version change detected in received post, no need to recache.");
@@ -421,12 +422,21 @@ export default class Database {
             };
             // Insert blank peer entry
             this.Execute(
-                "INSERT INTO Peers (id,name,avatar,mutual,blocked,sync,interaction,certificate,verifier,issued,updated) VALUES (" +
-                    ToCSV(
-                        peer,
-                        ["id", "name", "avatar", "mutual", "blocked", "sync", "interaction", "certificate", "verifier", "issued", "updated"]
-                    ) +
-                ")"
+                "INSERT INTO Peers (id,name,avatar,mutual,blocked,sync,interaction,certificate,verifier,issued,updated) " + 
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                [
+                    peer.id,
+                    peer.name,
+                    peer.avatar,
+                    peer.mutual,
+                    peer.blocked,
+                    peer.sync,
+                    peer.interaction,
+                    peer.certificate,
+                    peer.verifier,
+                    peer.issued,
+                    peer.updated
+                ]
             );
         }
         return peer;

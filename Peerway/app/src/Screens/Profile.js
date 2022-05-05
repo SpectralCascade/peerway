@@ -199,10 +199,7 @@ export default class Profile extends React.Component {
                     </TouchableOpacity>
 
                     <View style={[styles.headerBottom]}>
-                        {/* TODO only show these to peers with permissions */}
-                        <Text>{this.state.location}</Text>
-                        <Text>{dob.toLocaleDateString("en-GB")}</Text>
-                        <Text>{this.state.website}</Text>
+                        {/* TODO show other profile information to permitted peers */}
                     </View>
 
                 </ScrollView>
