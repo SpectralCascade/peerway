@@ -1,6 +1,7 @@
 import { CommonActions } from "@react-navigation/native";
 import React from "react";
-import { StyleSheet, ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, ScrollView, View } from "react-native";
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import HandleEffect from "../Components/HandleEffect";
 import Database from "../Database";
 import { Log } from "../Log";
@@ -46,34 +47,6 @@ export default class Settings extends React.Component {
         this.Init();
     }
 
-    DeleteAllChats() {
-        Log.Debug("DELETING ALL CHATS...");
-        Database.Execute("DELETE FROM ChatMembers");
-        Database.Execute("DELETE FROM Messages");
-        Database.Execute("DELETE FROM Chats");
-    }
-
-    DeleteAllPeers() {
-        Log.Debug("DELETING ALL PEERS...");
-        let activeId = Database.active.getString("id");
-        Database.Execute("DELETE FROM Messages WHERE [from] != ?", [activeId]);
-        Database.Execute("DELETE FROM Posts WHERE author != ?", [activeId]);
-        Database.Execute("DELETE FROM Peers");
-    }
-
-    DeleteAllPosts() {
-        Log.Debug("DELETING ALL POSTS...");
-        Database.Execute("DELETE FROM Posts");
-    }
-
-    DeleteAllMedia() {
-        Log.Debug("DELETING ALL MEDIA...");
-        Database.Execute("DELETE FROM MediaCache");
-        RNFS.unlink(Peerway.GetMediaPath()).catch((e) => {
-            // Do nothing
-        });
-    }
-
     render() {
         return (
             <View style={[StyleMain.background]}>
@@ -92,72 +65,24 @@ export default class Settings extends React.Component {
 
                 <ScrollView>
                     <Widget.Button
-                        style={StyleMain.button}
+                        style={[StyleMain.button, styles.goButton]}
                         title="Sharing & Privacy Settings"
                         onPress={() => this.props.navigation.navigate("SharingPrivacySettings")}
+                        icon="account-cog"
                     />
-
-                    <Widget.Text title="Signal Server URL" name="SignalServerURL" parent={this}/>
-                    <Widget.Numeric title="Maximum posts cached per user" name="CachePostLimitPerUser" parent={this}/>
+                    <View style={{height: 2, backgroundColor: "#aaa"}}></View>
                     <Widget.Button
-                        style={[StyleMain.button, styles.widgetButton]}
-                        title="Delete All Chats"
-                        onPress={() => {
-                            let confirmPopup = {
-                                title: "Delete All Chats",
-                                content: "Are you sure you wish to delete all chats? This will remove you from all associated chats and delete the history from your device.",
-                                positiveText: "Yes",
-                                positiveOnPress: () => this.DeleteAllChats(),
-                                negativeText: "No"
-                            }
-                            this.popup.current.Show();
-                            this.setState({popup: confirmPopup});
-                        }}
+                        style={[StyleMain.button, styles.goButton]}
+                        title="Storage & Cache Settings"
+                        onPress={() => this.props.navigation.navigate("StorageCacheSettings")}
+                        icon="folder-cog"
                     />
+                    <View style={{height: 2, backgroundColor: "#aaa"}}></View>
                     <Widget.Button
-                        style={[StyleMain.button, styles.widgetButton]}
-                        title="Delete All Peers"
-                        onPress={() => {
-                            let confirmPopup = {
-                                title: "Delete All Peers",
-                                content: "Are you sure you wish to delete all peers? This will remove all data associated with other peers, including chat messages and cached posts.",
-                                positiveText: "Yes",
-                                positiveOnPress: () => this.DeleteAllPeers(),
-                                negativeText: "No"
-                            }
-                            this.popup.current.Show();
-                            this.setState({popup: confirmPopup});
-                        }}
-                    />
-                    <Widget.Button
-                        style={[StyleMain.button, styles.widgetButton]}
-                        title="Delete All Posts"
-                        onPress={() => {
-                            let confirmPopup = {
-                                title: "Delete All Posts",
-                                content: "Are you sure you wish to delete all posts? This will remove all posts you have created as well as cached posts from other users.",
-                                positiveText: "Yes",
-                                positiveOnPress: () => this.DeleteAllPosts(),
-                                negativeText: "No"
-                            }
-                            this.popup.current.Show();
-                            this.setState({popup: confirmPopup});
-                        }}
-                    />
-                    <Widget.Button
-                        style={[StyleMain.button, styles.widgetButton]}
-                        title="Delete All Media"
-                        onPress={() => {
-                            let confirmPopup = {
-                                title: "Delete All Media",
-                                content: "Are you sure you wish to delete all media? Messages and posts you have created will not be able to load associated media.",
-                                positiveText: "Yes",
-                                positiveOnPress: () => this.DeleteAllMedia(),
-                                negativeText: "No"
-                            }
-                            this.popup.current.Show();
-                            this.setState({popup: confirmPopup});
-                        }}
+                        style={[StyleMain.button, styles.goButton]}
+                        title="Network Settings"
+                        onPress={() => this.props.navigation.navigate("NetworkSettings")}
+                        icon="wifi-cog"
                     />
                 </ScrollView>
             </View>
@@ -166,9 +91,11 @@ export default class Settings extends React.Component {
 }
 
 const styles = StyleSheet.create({
-    widgetButton: {
+    goButton: {
         backgroundColor: Colors.button,
-        height: 40,
-        marginTop: 12
+        height: 64,
+        marginTop: 0,
+        alignItems: undefined,
+        paddingHorizontal: 10
     }
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import Database from "../Database";
-import { Dimensions, TextInput, TouchableOpacity, View, StyleSheet } from "react-native";
+import { TextInput, TouchableOpacity, View, StyleSheet } from "react-native";
 import NumericInput from "react-native-numeric-input";
 import Text from "../Components/Text";
 import ButtonText from "../Components/ButtonText";
@@ -10,7 +10,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const toggleHeight = 48;
 const togglePadding = 24;
-const dimensions = Dimensions.get('window');
 
 function RenderHelpButton(params) {
     let button = (<></>);
@@ -72,9 +71,21 @@ export default {
         );
     },
     Button: (params) => {
+        let renderIcon = (<></>);
+        if (params.icon) {
+            renderIcon = (
+                <View style={styles.buttonIcon}>
+                    <Icon name={params.icon} size={toggleHeight} color="black" />
+                </View>
+            );
+        }
+
         return (
-            <TouchableOpacity {...params}>
-                <ButtonText>{params.title}</ButtonText>
+            <TouchableOpacity {...params} style={[params.style]}>
+                <View style={params.icon ? {flexDirection: "row", alignItems: "center"} : {justifyContent: "center"} }>
+                    {renderIcon}
+                    <ButtonText>{params.title}</ButtonText>
+                </View>
             </TouchableOpacity>
         );
     },
@@ -109,6 +120,11 @@ export default {
 }
 
 const styles = StyleSheet.create({
+    buttonIcon: {
+        justifyContent: "center",
+        alignContent: "center",
+        marginRight: 10
+    },
     toggleContainer: {
         flexDirection: "row",
         backgroundColor: "#fff",

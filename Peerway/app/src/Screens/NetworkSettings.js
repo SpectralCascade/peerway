@@ -10,7 +10,7 @@ import Popup from "../Components/Popup";
 import Peerway from "../Peerway";
 import Widget from "../Components/Widget";
 
-export default class SharingPrivacySettings extends React.Component {
+export default class NetworkSettings extends React.Component {
     constructor(props) {
         super(props);
 
@@ -61,12 +61,7 @@ export default class SharingPrivacySettings extends React.Component {
                 />
 
                 <ScrollView>
-                    <Widget.ButtonToggle
-                        title="Allow chat requests from unknown peers"
-                        name="AllowUnknownChatRequests"
-                        onHelpPress={() => {}}
-                        parent={this}
-                    />
+                    <Widget.Text title="Signal Server URL" name="SignalServerURL" parent={this}/>
                 </ScrollView>
             </View>
         );

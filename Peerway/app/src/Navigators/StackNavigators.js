@@ -7,6 +7,8 @@ import RequestChat from '../Screens/RequestChat';
 import SplashScreen from '../Screens/SplashScreen';
 import Settings from '../Screens/Settings';
 import SharingPrivacySettings from "../Screens/SharingPrivacySettings";
+import StorageCacheSettings from "../Screens/StorageCacheSettings";
+import NetworkSettings from "../Screens/NetworkSettings";
 import Profile from '../Screens/Profile';
 import MainTabs from "./TabNavigators";
 import CreatePost from "../Screens/CreatePost";
@@ -69,7 +71,17 @@ function MainStack(props) {
             <Stack.Screen
                 name="SharingPrivacySettings"
                 component={SharingPrivacySettings}
-                options={{title: "Sharing & Privacy", animation: 'slide_from_right', headerShown: true}}
+                options={{title: "Sharing & Privacy Settings", animation: 'slide_from_right', headerShown: true}}
+            />
+            <Stack.Screen
+                name="StorageCacheSettings"
+                component={StorageCacheSettings}
+                options={{title: "Storage & Cache Settings", animation: 'slide_from_right', headerShown: true}}
+            />
+            <Stack.Screen
+                name="NetworkSettings"
+                component={NetworkSettings}
+                options={{title: "Network Settings", animation: 'slide_from_right', headerShown: true}}
             />
             <Stack.Screen
                 name="CreatePost"
