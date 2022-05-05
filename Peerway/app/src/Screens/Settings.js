@@ -1,11 +1,7 @@
 import { CommonActions } from "@react-navigation/native";
 import React from "react";
 import { StyleSheet, ScrollView, TextInput, TouchableOpacity, View } from "react-native";
-import NumericInput from "react-native-numeric-input";
-import ButtonText from "../Components/ButtonText";
 import HandleEffect from "../Components/HandleEffect";
-import Text from "../Components/Text";
-import Constants from "../Constants";
 import Database from "../Database";
 import { Log } from "../Log";
 import Colors from "../Stylesheets/Colors";
@@ -14,6 +10,7 @@ import DefaultSettings from "../DefaultSettings";
 import Popup from "../Components/Popup";
 import RNFS from "react-native-fs";
 import Peerway from "../Peerway";
+import Widget from "../Components/Widget";
 
 export default class Settings extends React.Component {
     constructor(props) {
@@ -47,62 +44,6 @@ export default class Settings extends React.Component {
     OnOpen() {
         Log.Debug("OPENED SETTINGS SCREEN");
         this.Init();
-    }
-
-    // Settings text input widget
-    WidgetText(params) {
-        return (
-            <View {...params}>
-                <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
-                <TextInput
-                    onChangeText={(text) => {
-                        params.parent.state.settings[params.name] = text;
-                        params.parent.setState({settings: params.parent.state.settings});
-                        Database.userdata.set(
-                            params.name,
-                            params.parent.state.settings[params.name].toString()
-                        );
-                    }}
-                    style={StyleMain.textInput}
-                    value={"default" in params ? params.default : params.parent.state.settings[params.name]}
-                />
-            </View>
-        );
-    }
-
-    WidgetNumeric(params) {
-        return (
-            <View {...params}>
-                <Text style={{paddingBottom: 5, paddingTop: 5}}>{params.title}</Text>
-                <NumericInput
-                    inputStyle={{backgroundColor: "white"}}
-                    rounded
-                    step={1}
-                    minValue={0}
-                    onChange={(value) => {
-                        params.parent.state.settings[params.name] = value;
-                        params.parent.setState({settings: params.parent.state.settings});
-                        Database.userdata.set(
-                            params.name,
-                            params.parent.state.settings[params.name].toString()
-                        );
-                    }}
-                    value={"default" in params ? params.default : params.parent.state.settings[params.name]}
-                    textColor="black"
-                    iconStyle={{ color: "white" }}
-                    rightButtonBackgroundColor={Colors.button}
-                    leftButtonBackgroundColor={Colors.button}
-                />
-            </View>
-        );
-    }
-
-    WidgetButton(params) {
-        return (
-            <TouchableOpacity {...params}>
-                <ButtonText>{params.title}</ButtonText>
-            </TouchableOpacity>
-        );
     }
 
     DeleteAllChats() {
@@ -149,10 +90,16 @@ export default class Settings extends React.Component {
                     ref={this.popup}
                 />
 
-                <ScrollView style={{padding: 10}}>
-                    <this.WidgetText title="Signal Server URL" name="SignalServerURL" parent={this}/>
-                    <this.WidgetNumeric title="Maximum posts cached per user" name="CachePostLimitPerUser" parent={this}/>
-                    <this.WidgetButton
+                <ScrollView>
+                    <Widget.Button
+                        style={StyleMain.button}
+                        title="Sharing & Privacy Settings"
+                        onPress={() => this.props.navigation.navigate("SharingPrivacySettings")}
+                    />
+
+                    <Widget.Text title="Signal Server URL" name="SignalServerURL" parent={this}/>
+                    <Widget.Numeric title="Maximum posts cached per user" name="CachePostLimitPerUser" parent={this}/>
+                    <Widget.Button
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Chats"
                         onPress={() => {
@@ -167,7 +114,7 @@ export default class Settings extends React.Component {
                             this.setState({popup: confirmPopup});
                         }}
                     />
-                    <this.WidgetButton
+                    <Widget.Button
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Peers"
                         onPress={() => {
@@ -182,7 +129,7 @@ export default class Settings extends React.Component {
                             this.setState({popup: confirmPopup});
                         }}
                     />
-                    <this.WidgetButton
+                    <Widget.Button
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Posts"
                         onPress={() => {
@@ -197,7 +144,7 @@ export default class Settings extends React.Component {
                             this.setState({popup: confirmPopup});
                         }}
                     />
-                    <this.WidgetButton
+                    <Widget.Button
                         style={[StyleMain.button, styles.widgetButton]}
                         title="Delete All Media"
                         onPress={() => {
