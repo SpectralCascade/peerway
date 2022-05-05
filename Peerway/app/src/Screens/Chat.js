@@ -13,6 +13,7 @@ import Text from "../Components/Text";
 import RNFS from "react-native-fs";
 import {v1 as uuidv1, v4 as uuidv4 } from 'uuid';
 import Colors from '../Stylesheets/Colors';
+import Notif from '../Notif';
 
 const iconSize = 72;
 
@@ -88,6 +89,9 @@ export default class Chat extends React.Component {
 
     // Called when the screen is opened.
     OnOpen() {
+        Notif.Clear();
+        Notif.DisableMessages();
+
         this.chatId = this.props.route.params.chatId;
         console.log("OPENED CHAT with id: " + this.chatId);
 
@@ -156,6 +160,7 @@ export default class Chat extends React.Component {
 
     OnClose() {
         Log.Debug("CLOSING CHAT");
+        Notif.EnableMessages();
         if (this.onChatMessage) {
             this.onChatMessage.remove();
             this.onChatMessage = null;

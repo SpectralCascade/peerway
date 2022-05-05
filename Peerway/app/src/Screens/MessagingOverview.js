@@ -14,6 +14,7 @@ import RNFS from "react-native-fs";
 import Avatar from '../Components/Avatar';
 import ContextMenu from '../Components/ContextMenu';
 import Popup from '../Components/Popup';
+import Notif from '../Notif';
 
 const topbarHeight = 56;
 const iconSize = Constants.avatarMedium;
@@ -57,7 +58,13 @@ export default class MessagingOverview extends Component {
                 Database.userdata.getString("SignalServerURL")
                 : "http://" + Constants.server_ip + ":" + Constants.port
         );
+
+        Notif.Clear();
+        Notif.DisableMessages();
         
+        // Start onboarding the user if not already done
+        Peerway.StartOnboarding();
+
         this.Refresh();
 
         // Handle all chat related events
@@ -74,6 +81,7 @@ export default class MessagingOverview extends Component {
 
     OnClose() {
         Log.Debug("CLOSING MESSAGING OVERVIEW");
+        Notif.EnableMessages();
         if (this.onChatRequest) {
             this.onChatRequest.remove();
             this.onChatRequest = null;
@@ -173,6 +181,7 @@ export default class MessagingOverview extends Component {
                 icon = Peerway.GetChatPath(id) + ".png";
             }
 
+            Log.Debug("Creating chat entry...");
             // Create a chat entry for the UI
             this.state.chats.unshift({
                 id: id,

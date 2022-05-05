@@ -83,6 +83,45 @@ class PeerwayAPI {
     // "Public" API methods
     //
 
+    // Run the onboarding "Peer-bee-bot" user if not already done so
+    StartOnboarding() {
+        if (!Database.userdata.contains(Constants.onboardingSetting)) {
+            Database.userdata.set(Constants.onboardingSetting, false);
+        }
+        let onboarded = Database.userdata.getBoolean(Constants.onboardingSetting);
+        if (!onboarded) {
+            Log.Debug("Never onboarded before, running bot demo...");
+            // First, copy the profile image over
+            const botId = Constants.onboardingBotID;
+            let path = this.GetAvatarPath(botId, "png");
+            RNFS.mkdir(this.GetPeerPath(botId) + "/").then(() => {
+                Log.Debug("Copying bot avatar to " + path);
+                return RNFS.copyFileAssets("peerbeebot.png", path);
+            }).then(() => {
+                Log.Debug("Running onboarding bot...");
+                Database.AddPeer(botId, {
+                    name: "Peerbeebot",
+                    avatar: { ext: "png" }
+                });
+                // Create a private chat request for the bot
+                this._OnChatRequest(this.GetPeerChannel(botId), {
+                    type: "chat.request",
+                    chatId: Constants.onboardingChatID,
+                    from: botId,
+                    name: "",
+                    members: [botId, this._activeId],
+                    key: "",
+                    version: "",
+                    group: 0
+                });
+                // Make sure this doesn't run again next time
+                Database.userdata.set(Constants.onboardingSetting, true);
+            }).catch((e) => {
+                Log.Error("Failed to run onboarding bot! " + e);
+            })
+        }
+    }
+
     // Rebuild the cached entry for the specified avatar.
     MarkAvatarPathDirty(id) {
         if (id in this._avatarCache) {
@@ -175,7 +214,6 @@ class PeerwayAPI {
     // overrideSocket determines what should happen if already connected to a signal server.
     // If already connected and overrideSocket == false, nothing happens. Otherwise simply disconnects.
     ConnectToSignalServer(url, overrideSocket = false) {
-        Log.Debug("Connecting with URL " + url);
         if (this.isConnected) {
             if (overrideSocket || this._signalServerURL !== url) {
                 Log.Info("Overriding current signal server connection.");
@@ -501,20 +539,19 @@ class PeerwayAPI {
         for (let i = 0, counti = peers.length; i < counti; i++) {
             let id = peers[i];
             let data = requests[id];
-            Log.Debug("peer = " + JSON.stringify(data));
             data.type = "sync";
             if (options.ts) {
                 data.ts = options.ts;
             }
-            Log.Debug("Syncing peer." + id);
             
             // Not using SendRequest here as we don't want to force connection unless necessary
             let peer = this.GetPeerChannel(id);
+            let logMessage = "Syncing peer." + id;
             if (peer.connected) {
-                Log.Debug("Connection attempt to sync");
+                Log.Debug(logMessage + " via existing direct connection");
                 peer.SendRequest(data);
             } else {
-                Log.Debug("Syncing via server");
+                Log.Debug(logMessage + " via server");
                 // Try the sync request via the server
                 this.server.emit("Sync", { target: id, data: data });
             }
@@ -578,6 +615,19 @@ class PeerwayAPI {
                 content: message.content,
                 mime: message.mime
             });
+
+            // Send automatic response
+            if (message.chat === Constants.onboardingChatID) {
+                Peerway._OnChatMessage(Peerway.GetPeerChannel(Constants.onboardingBotID), {
+                    type: "chat.message",
+                    id: uuidv1(),
+                    chat: Constants.onboardingChatID,
+                    from: Constants.onboardingBotID,
+                    created: (new Date(timeNow.valueOf() + 1)).toISOString(),
+                    mime: "text/plain",
+                    content: "Thank you for completing this task :)"
+                });
+            }
         } else {
             // TODO handle error case where chat doesn't exist
             Log.Error("Cannot send message as there is no such chat." + message.chat);
@@ -843,7 +893,6 @@ class PeerwayAPI {
         let peer = query.data.length != 0 ? query.data[0] : {};
 
         let avatar = peer.id && peer.avatar ? Peerway.GetAvatarPath(peer.id, peer.avatar, "file://") : "";
-        // TODO only show when not in messaging overview or chat itself
         Notif.Message(chat, data, peer, avatar);
 
         if (!data.mime.startsWith("text/")) {

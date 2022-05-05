@@ -1,7 +1,5 @@
-import { CommonActions } from "@react-navigation/native";
 import React from "react";
 import { StyleSheet, ScrollView, View } from "react-native";
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import HandleEffect from "../Components/HandleEffect";
 import Database from "../Database";
 import { Log } from "../Log";
@@ -9,8 +7,6 @@ import Colors from "../Stylesheets/Colors";
 import StyleMain from "../Stylesheets/StyleMain";
 import DefaultSettings from "../DefaultSettings";
 import Popup from "../Components/Popup";
-import RNFS from "react-native-fs";
-import Peerway from "../Peerway";
 import Widget from "../Components/Widget";
 
 export default class Settings extends React.Component {

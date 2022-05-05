@@ -21,5 +21,8 @@ export default {
         private: 0,
         mutuals: 1,
         public: 2
-    }
+    },
+    onboardingBotID: "peerbeebot",
+    onboardingChatID: "OnboardingChat",
+    onboardingSetting: "onboarded"
 }

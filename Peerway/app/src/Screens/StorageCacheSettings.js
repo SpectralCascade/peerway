@@ -9,6 +9,7 @@ import DefaultSettings from "../DefaultSettings";
 import Popup from "../Components/Popup";
 import Peerway from "../Peerway";
 import Widget from "../Components/Widget";
+import Constants from "../Constants";
 
 export default class StorageCacheSettings extends React.Component {
     constructor(props) {
@@ -144,6 +145,35 @@ export default class StorageCacheSettings extends React.Component {
                                 content: "Are you sure you wish to delete all media? Messages and posts you have created will not be able to load associated media.",
                                 positiveText: "Yes",
                                 positiveOnPress: () => this.DeleteAllMedia(),
+                                negativeText: "No"
+                            }
+                            this.popup.current.Show();
+                            this.setState({popup: confirmPopup});
+                        }}
+                    />
+                    <Widget.Button
+                        style={[StyleMain.button, styles.widgetButton]}
+                        title="Reset Peerbeebot"
+                        onPress={() => {
+                            let confirmPopup = {
+                                title: "Reset Peerbeebot",
+                                content: "Doing this run the Peerbeebot demo again when you next visit the chats screen. Are you sure you wish to continue?",
+                                positiveText: "Yes",
+                                positiveOnPress: () => {
+                                    Database.Execute(
+                                        "DELETE FROM ChatMembers WHERE chat=?",
+                                        [Constants.onboardingChatID]
+                                    );
+                                    Database.Execute(
+                                        "DELETE FROM Messages WHERE chat=?",
+                                        [Constants.onboardingChatID]
+                                    );
+                                    Database.Execute(
+                                        "DELETE FROM Chats WHERE id=?",
+                                        [Constants.onboardingChatID]
+                                    );
+                                    Database.userdata.set("onboarded", false);
+                                },
                                 negativeText: "No"
                             }
                             this.popup.current.Show();

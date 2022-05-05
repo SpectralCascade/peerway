@@ -75,6 +75,7 @@ export default class Database {
         // Add entity to userdata.
         this.userdata.set(id, key);
         
+        // Initialise the settings
         Object.keys(DefaultSettings).forEach((key) => {
             this.userdata.set(key, DefaultSettings[key].toString());
         });

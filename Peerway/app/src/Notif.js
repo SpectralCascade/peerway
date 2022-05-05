@@ -3,6 +3,8 @@ import { Log } from "./Log";
 
 class PushNotifications {
     constructor() {
+        this.showMessages = true;
+
         // Must be outside of any component LifeCycle (such as `componentDidMount`).
         PushNotification.configure({
             // (optional) Called when Token is generated (iOS and Android)
@@ -62,15 +64,32 @@ class PushNotifications {
         });
     }
 
+    EnableMessages() {
+        this.showMessages = true;
+    }
+
+    DisableMessages() {
+        this.showMessages = false;
+    }
+
     Message(chat, message, peer, avatar) {
+        if (!this.showMessages) {
+            return;
+        }
+
         let name = peer.name ? peer.name : "[Unknown]";
 
         PushNotification.localNotification({
             channelId: "chat.message",
             largeIconUrl: avatar,
             title: chat.name && chat.name.length != 0 ? chat.name : name,
-            message: name + ": " + message.content
+            message: (chat.type ? name + ": " : "") + message.content
         });
+    }
+
+    // Clear all notifications
+    Clear() {
+        PushNotification.cancelAllLocalNotifications();
     }
 
 };

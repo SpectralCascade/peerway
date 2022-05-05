@@ -11,6 +11,8 @@ import { CommonActions } from '@react-navigation/native';
 import Peerway from '../Peerway';
 import { Log } from '../Log';
 import Popup from '../Components/Popup';
+import Constants from '../Constants';
+import { v1 as uuidv1 } from "uuid";
 
 const dimensions = Dimensions.get('window');
 const iconSize = dimensions.width * 0.2;
@@ -75,6 +77,38 @@ export default class ChatRequests extends Component {
     // Callback when a request is accepted
     onRequestAccept(item) {
         Database.Execute("UPDATE Chats SET accepted=1 WHERE id=?", [item.id]);
+
+        // Onboarding bot code
+        if (item.id === Constants.onboardingChatID) {
+            let query = Database.Execute(
+                "SELECT * FROM Messages WHERE chat=? AND [from]=?",
+                [Constants.onboardingChatID, Constants.onboardingBotID]
+            );
+            if (query.data.length == 0) {
+                let profile = JSON.parse(Database.active.getString("profile"));
+                // Send a generated bot message
+                let dateNow = new Date();
+                Peerway._OnChatMessage(Peerway.GetPeerChannel(Constants.onboardingBotID), {
+                    type: "chat.message",
+                    id: uuidv1(),
+                    chat: Constants.onboardingChatID,
+                    from: Constants.onboardingBotID,
+                    created: dateNow.toISOString(),
+                    mime: "text/plain",
+                    content: "Bzzzz! Hello there, " + profile.name + "! My name is Peerbeebot."
+                });
+                dateNow = new Date(dateNow.valueOf() + 1);
+                Peerway._OnChatMessage(Peerway.GetPeerChannel(Constants.onboardingBotID), {
+                    type: "chat.message",
+                    id: uuidv1(),
+                    chat: Constants.onboardingChatID,
+                    from: Constants.onboardingBotID,
+                    created: dateNow.toISOString(),
+                    mime: "text/plain",
+                    content: "Welcome to Peerway, the social platform where you control your data!"
+                });
+            }
+        }
 
         this.state.requests.splice(item.index, 1);
         this.setState({requests: this.state.requests});
