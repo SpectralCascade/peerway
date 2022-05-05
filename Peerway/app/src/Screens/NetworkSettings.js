@@ -60,7 +60,7 @@ export default class NetworkSettings extends React.Component {
                     ref={this.popup}
                 />
 
-                <ScrollView>
+                <ScrollView style={{padding: 10}}>
                     <Widget.Text title="Signal Server URL" name="SignalServerURL" parent={this}/>
                 </ScrollView>
             </View>

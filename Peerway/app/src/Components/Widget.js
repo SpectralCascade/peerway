@@ -75,7 +75,7 @@ export default {
         if (params.icon) {
             renderIcon = (
                 <View style={styles.buttonIcon}>
-                    <Icon name={params.icon} size={toggleHeight} color="black" />
+                    <Icon name={params.icon} size={toggleHeight} color="#fff" />
                 </View>
             );
         }
