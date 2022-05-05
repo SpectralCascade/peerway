@@ -377,6 +377,9 @@ class PeerwayAPI {
         } else {
             // Setup connection handler
             peer.onCallSuccess = () => {
+                // Sync profile data first
+                this.SyncPeers({ general: this.GetSyncConfigGeneral(id) });
+
                 if (onConnected) {
                     onConnected(peer.id);
                 }
@@ -388,8 +391,11 @@ class PeerwayAPI {
     }
 
     // Get general entity sync data
-    GetSyncConfigGeneral() {
-        let query = Database.Execute("SELECT id, updated FROM Peers");
+    GetSyncConfigGeneral(id=null) {
+        let query = Database.Execute(
+            "SELECT id, updated FROM Peers" + (id != null ? " WHERE id=?" : ""),
+            (id != null ? [id] : [])
+        );
         return query.data.length > 0 ? query.data : undefined;
     }
 
