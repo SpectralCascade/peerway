@@ -129,16 +129,13 @@ export default class CombinedFeed extends React.Component {
                     }}
                     loadPosts={(posts) => {
                         let query = Database.Execute(
-                            "SELECT * FROM (" + 
-                                "SELECT * FROM Posts INNER JOIN Subscriptions " + 
-                                    "ON Subscriptions.sub=? AND Subscriptions.pub=Posts.author" +
-                            ") WHERE parentAuthor='' " +
+                            "SELECT * FROM Posts WHERE parentPost='' " +
                             (posts.length > 0 ?
                                 ("AND created < ? ") :
                                 ""
                             ) +
                             "ORDER BY created DESC LIMIT 10",
-                            posts.length > 0 ? [this.activeId, posts[posts.length - 1].created] : [this.activeId]
+                            posts.length > 0 ? [posts[posts.length - 1].created] : []
                         );
                         let loadedPosts = query.data.map(post => {
                             post.media = JSON.parse(post.media);
