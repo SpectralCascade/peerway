@@ -226,22 +226,19 @@ export default class Profile extends React.Component {
                         }
                     }}
                     loadPosts={(posts) => {
-                        if (this.state.forceReload) {
-                            posts = [];
-                        }
+                        this.setState({forceReload: false});
                         let query = Database.Execute(
                             "SELECT * FROM Posts " + 
-                                "WHERE author=? " + (posts.length > 0 ? "AND created < ? " : "") +
+                                "WHERE parentAuthor='' AND author=? " +
+                                (posts.length > 0 ? "AND created < ? " : "") +
                             "ORDER BY created DESC LIMIT 10",
                             posts.length > 0 ? [this.peerId, posts[posts.length - 1].created] : [this.peerId]
                         );
-                        if (query.data.length > 0) {
-                            for (let i in query.data) {
-                                query.data[i].media = JSON.parse(query.data[i].media);
-                                posts.push(query.data[i]);
-                            }
-                        }                        
-                        return posts;
+                        let loadedPosts = query.data.map(post => {
+                            post.media = JSON.parse(post.media);
+                            return post;
+                        });
+                        return loadedPosts;
                     }}
                     style={styles.content}
                 />

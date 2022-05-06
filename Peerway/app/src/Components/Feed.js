@@ -24,6 +24,7 @@ export default class Feed extends React.Component {
 
         this.state = {
             posts: [],
+            replies: {},
             loading: false,
             syncing: false,
             contextOptions: [],
@@ -47,9 +48,29 @@ export default class Feed extends React.Component {
         this.peers[this.activeId] = JSON.parse(Database.active.getString("profile"));
         this.peers[this.activeId].avatar = this.peers[this.activeId].avatar.ext;
         this.onLoadComplete = this.props.onLoadComplete ? this.props.onLoadComplete : () => {};
+        // Loads a new array of posts. The returned posts are concatenated onto the current posts
         this.loadPosts = this.props.loadPosts ? this.props.loadPosts : (posts) => posts;
+        // Loads replies for the given array of posts.
+        this.loadReplies = this.props.loadReplies ? this.props.loadReplies : (replies, posts) => {
+            for (let i = 0, counti = posts.length; i < counti; i++) {
+                let query = Database.Execute(
+                    "SELECT * FROM Posts WHERE parentPost=? ORDER BY created ASC",
+                    [posts[i].id]
+                );
+                replies[posts[i].id] = query.data.map(post => {
+                    post.media = JSON.parse(post.media);
+                    return post;
+                });
+                // Recursively load reply chains
+                this.loadReplies(replies, replies[posts[i].id]);
+            }
+            return replies;
+        }
+        // Synchronise posts from other peers
         this.syncPosts = this.props.syncPosts ? this.props.syncPosts : (onComplete) => onComplete();
-        this.state.posts = this.Load(this.state.posts);
+
+        // Load posts and their replies
+        this.LoadAll();
     }
 
     OnOpen() {
@@ -63,10 +84,17 @@ export default class Feed extends React.Component {
         Log.Debug("Feed syncing complete.");
     }
 
-    Load(posts) {
-        posts = this.loadPosts(posts);
+    LoadAll(updateState = false) {
+        if (this.props.forceReload) {
+            this.state.posts = [];
+        }
+        let addedPosts = this.loadPosts(this.state.posts);
+        this.state.replies = this.loadReplies(this.state.replies, addedPosts);
+        this.state.posts = this.state.posts.concat(addedPosts);
         this.onLoadComplete();
-        return posts;
+        if (updateState) {
+            this.setState({ posts: this.state.posts, replies: this.state.replies });
+        }
     }
 
     // Get the latest posts
@@ -130,7 +158,8 @@ export default class Feed extends React.Component {
     GoProfile(id) {
         Log.Debug("Go to profile of peer." + id);
         let profileCanGo = this.props.route.name === "Profile"
-            && (!this.props.route.params || this.props.route.params.peerId !== id);
+            && ((this.props.route.params && this.props.route.params.peerId !== id) || 
+                (!this.props.route.params && this.activeId !== id));
 
         if (profileCanGo || this.props.route.name === "Feeds") {
             this.props.navigation.push("Profile", { peerId: id });
@@ -152,7 +181,9 @@ export default class Feed extends React.Component {
     }
 
     LoadNewPosts(autoScroll = true) {
-        this.setState({ posts: this.Load([]) });
+        this.state.posts = [];
+        this.state.replies = {};
+        this.LoadAll(true);
         if (autoScroll) {
             this.list.current.scrollToOffset({animated: true, offset: 0});
         }
@@ -180,6 +211,100 @@ export default class Feed extends React.Component {
                 </TouchableOpacity>
             ) : (<></>);
         }
+
+        // Render a post
+        const RenderPost = (item, replyLevel=0) => {
+            let author = this.peers[item.author];
+            if (!author) {
+                let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [item.author]);
+                if (query.data.length > 0) {
+                    Log.Debug("Loaded data for peer." + item.author);
+                    this.peers[item.author] = query.data[0];
+                    author = this.peers[item.author];
+                } else {
+                    // TODO in these cases, request peer information
+                    Log.Debug("No such known peer." + item.author);
+                    author = {
+                        name: "",
+                        avatar: ""
+                    }
+                }
+            }
+
+            return (
+            <View style={replyLevel > 0 ? styles.reply : styles.post}>
+                {/* Post header */}
+                <View style={styles.postHeader}>
+                    <TouchableOpacity
+                        style={[StyleMain.avatar, { width: avatarSize, height: avatarSize }]}
+                        onPress={() => this.GoProfile(item.author)}
+                    >
+                        <Avatar
+                            avatar={Peerway.GetAvatarPath(item.author, author.avatar, "file://")}
+                            size={avatarSize}
+                        />
+                    </TouchableOpacity>
+                    <View style={{paddingHorizontal: 5, flexDirection: "column"}}>
+                        <TouchableOpacity onPress={() => this.GoProfile(item.author)}>
+                            <Text style={styles.authorName}>{author.name}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.dateText}>
+                            {
+                                moment(new Date(item.created)).format("DD/MM/YYYY [at] HH:mm") + 
+                                (item.version > 0 ? " (edited)" : "")
+                            }
+                        </Text>
+                        {RenderReplyInfo(item)}
+                    </View>
+                    <TouchableOpacity style={{position: 'absolute', right: 10}} onPress={() => this.OpenContextMenu(item)}>
+                        <Icon
+                            name="dots-vertical"
+                            size={avatarSize / 2}
+                            color="black"
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                <TouchableHighlight
+                    underlayColor={"#fff4"}
+                    onPress={() => this.OpenPost(item)}
+                    style={styles.postContent}
+                >
+                    <Text style={styles.postContentText}>{item.content}</Text>
+                </TouchableHighlight>
+
+                <View style={styles.postFooter}>
+                    <TouchableOpacity onPress={() => this.GoReply(item)}>
+                        <Icon
+                            name="comment-outline"
+                            size={footerButtonSize}
+                            color={Colors.button}
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => this.GoToggleLike(item)}>
+                        <Icon
+                            name={item.liked ? "thumb-up" : "thumb-up-outline"}
+                            size={footerButtonSize}
+                            color={Colors.button}
+                        />
+                    </TouchableOpacity>
+                </View>
+                {RenderReplies(item, replyLevel + 1)}
+            </View>
+        );
+        };
+
+        const RenderReplies = (item, replyLevel=1) => {
+            let replies = [];
+            for (let i in this.state.replies[item.id]) {
+                replies.push((
+                    <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+                ));
+                replies.push(RenderPost(this.state.replies[item.id][i], replyLevel));
+            }
+            return replies;
+        };
 
         return (
         <>
@@ -212,86 +337,18 @@ export default class Feed extends React.Component {
             }}
             refreshing={this.state.syncing}
             onEndReached={() => {
-                this.setState({posts: this.Load(this.state.posts)});
+                this.LoadAll(true);
             }}
             data={this.state.posts}
             keyExtractor={item => item.id}
             renderItem={({ item }) => {
-                let author = this.peers[item.author];
-                if (!author) {
-                    let query = Database.Execute("SELECT * FROM Peers WHERE id=?", [item.author]);
-                    if (query.data.length > 0) {
-                        Log.Debug("Loaded data for peer." + item.author);
-                        this.peers[item.author] = query.data[0];
-                        author = this.peers[item.author];
-                    } else {
-                        // TODO in these cases, request peer information
-                        Log.Debug("No such known peer." + item.author);
-                        author = {
-                            name: "",
-                            avatar: ""
-                        }
-                    }
-                }
 
-                return (
+                return item.parentPost ? (<></>) : (
                 <View>
-                    <View style={styles.post}>
-                        {/* Post header */}
-                        <View style={styles.postHeader}>
-                            <TouchableOpacity
-                                style={[StyleMain.avatar, { width: avatarSize, height: avatarSize }]}
-                                onPress={() => this.GoProfile(item.author)}
-                            >
-                                <Avatar
-                                    avatar={Peerway.GetAvatarPath(item.author, author.avatar, "file://")}
-                                    size={avatarSize}
-                                />
-                            </TouchableOpacity>
-                            <View style={{paddingHorizontal: 5, flexDirection: "column"}}>
-                                <TouchableOpacity onPress={() => this.GoProfile(item.author)}>
-                                    <Text style={styles.authorName}>{author.name}</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.dateText}>{moment(new Date(item.created)).format("DD/MM/YYYY [at] HH:mm")}</Text>
-                                {RenderReplyInfo(item)}
-                            </View>
-                            <TouchableOpacity style={{position: 'absolute', right: 10}} onPress={() => this.OpenContextMenu(item)}>
-                                <Icon
-                                    name="dots-vertical"
-                                    size={avatarSize / 2}
-                                    color="black"
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableHighlight underlayColor={"#fff4"} onPress={() => this.OpenPost(item)} style={styles.postContent}>
-                            <Text style={styles.postContentText}>{item.content}</Text>
-                        </TouchableHighlight>
-
-                        <View style={styles.postFooter}>
-                            <TouchableOpacity onPress={() => this.GoReply(item)}>
-                                <Icon
-                                    name="comment-outline"
-                                    size={footerButtonSize}
-                                    color={Colors.button}
-                                />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={() => this.GoToggleLike(item)}>
-                                <Icon
-                                    name={item.liked ? "thumb-up" : "thumb-up-outline"}
-                                    size={footerButtonSize}
-                                    color={Colors.button}
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={{paddingBottom: 1, backgroundColor: "#999"}} />
-
-                        {/* TODO show relevant reply posts (after MVP) */}
-
-                    </View>
+                    {RenderPost(item)}
+                    <View style={{paddingBottom: 1, backgroundColor: "#999"}} />
                     <View style={[StyleMain.edge, {backgroundColor: "#ccc"}]}></View>
+                    <View style={{height: 10}}></View>
                 </View>
                 );
             }
@@ -316,10 +373,12 @@ const styles = StyleSheet.create({
         color: "#555"
     },
     post: {},
+    reply: {paddingLeft: 6},
     postContent: {
         paddingHorizontal: edgePadding,
         paddingVertical: innerPadding,
-        backgroundColor: "white"
+        backgroundColor: "white",
+        paddingBottom: 16
     },
     postContentText: {
     },

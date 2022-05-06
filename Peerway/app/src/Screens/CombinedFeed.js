@@ -128,32 +128,23 @@ export default class CombinedFeed extends React.Component {
                         }
                     }}
                     loadPosts={(posts) => {
-                        /*
-                        "SELECT * FROM (" +
-                            "SELECT Chats.id, Chats.name, Chats.read, Chats.lastMessage, Messages.created " +
-                            "FROM Chats INNER JOIN Messages " + 
-                                "ON Messages.id=Chats.lastMessage AND Messages.chat=Chats.id" +
-                        ")"
-                        */
                         let query = Database.Execute(
                             "SELECT * FROM (" + 
                                 "SELECT * FROM Posts INNER JOIN Subscriptions " + 
                                     "ON Subscriptions.sub=? AND Subscriptions.pub=Posts.author" +
-                            ") " +
+                            ") WHERE parentAuthor='' " +
                             (posts.length > 0 ?
-                                ("WHERE created < ? ") :
+                                ("AND created < ? ") :
                                 ""
                             ) +
                             "ORDER BY created DESC LIMIT 10",
                             posts.length > 0 ? [this.activeId, posts[posts.length - 1].created] : [this.activeId]
                         );
-                        if (query.data.length > 0) {
-                            for (let i in query.data) {
-                                query.data[i].media = JSON.parse(query.data[i].media);
-                                posts.push(query.data[i]);
-                            }
-                        }
-                        return posts;
+                        let loadedPosts = query.data.map(post => {
+                            post.media = JSON.parse(post.media);
+                            return post;
+                        });
+                        return loadedPosts;
                     }}
                     onLoadComplete={() => {
                         this.setState({hasNewPosts: false});
