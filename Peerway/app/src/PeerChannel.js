@@ -45,7 +45,7 @@ export default class PeerChannel {
             },
             connected: (data) => this._OnConnected(data.ts),
             data: {
-                ack: () => {},
+                ack: (data) => {},
                 begin: (data) => this._OnDataBegin(data),
                 end: (data) => this._OnDataEnd(data)
             },
@@ -62,6 +62,7 @@ export default class PeerChannel {
                 request: (data) => this._Unhandled(data),
                 response: {
                     begin: (data) => this._Unhandled(data),
+                    end: (data) => this._Unhandled(data),
                     error: (data) => Log.Error(data.error)
                 }
             },
@@ -283,8 +284,8 @@ export default class PeerChannel {
 
         let split = data.type.split(".");
         let handler = this.requests[split.shift()];
-        for (let i in split) {
-            handler = handler[split.shift()]
+        for (let i = 0, counti = split.length; i < counti; i++) {
+            handler = handler[split.shift()];
             if (!handler) {
                 break;
             }

@@ -121,7 +121,7 @@ export default class CombinedFeed extends React.Component {
                     ListHeaderComponent={() => renderHeader()}
                     syncPosts={(onComplete) => {
                         this.onSyncComplete = onComplete;
-                        Peerway.SyncPeers(Peerway.GetSyncOptions(false, false, true));
+                        Peerway.SyncPeers(Peerway.GetSyncOptions(false, false, true, true));
 
                         if (this.onSyncComplete) {
                             this.onSyncComplete();

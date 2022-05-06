@@ -307,6 +307,7 @@ class PeerwayAPI {
             peer.requests.post.publish = (data) => this._OnPostPublished(peer, data);
             peer.requests.post.request = (data) => this._OnPostRequest(peer, data);
             peer.requests.post.response.begin = (data) => this._OnPostResponse(data);
+            peer.requests.post.response.end = (data) => this.emit(data.type, data);
 
             // Synchronisation
             peer.requests.sync = (data) => this._OnPeerSync(peer, data);
@@ -414,7 +415,12 @@ class PeerwayAPI {
             // Setup connection handler
             peer.onCallSuccess = () => {
                 // Sync profile data first
-                this.SyncPeers({ general: this.GetSyncConfigGeneral(id) });
+                let query = Database.Execute(
+                    "SELECT * FROM Subscriptions WHERE pub=? AND sub=?",
+                    [id, this._activeId]
+                );
+
+                this.SyncPeers(this.GetSyncOptions(true, false, false, true, id));
 
                 if (onConnected) {
                     onConnected(peer.id);
@@ -432,52 +438,78 @@ class PeerwayAPI {
             "SELECT id, updated FROM Peers" + (id != null ? " WHERE id=?" : ""),
             (id != null ? [id] : [])
         );
-        return query.data.length > 0 ? query.data : undefined;
+        return query.data;
     }
 
     // Get cached posts sync data
     GetSyncConfigPosts(peerId, cacheLimit) {
         // Get all cached posts
         let query = Database.Execute(
-            "SELECT id,author,version FROM Posts WHERE author=? ORDER BY created DESC LIMIT ?",
+            "SELECT id,version FROM Posts WHERE author=? ORDER BY created DESC LIMIT ?",
             [peerId, cacheLimit]
         );
-        return query.data.length > 0 ? query.data : undefined;
+        return query.data;
     }
 
     // Get sync options for different data groups
-    GetSyncOptions(general, chats, posts) {
+    GetSyncOptions(general, chats, posts, subs, id=null) {
         let options = {};
         let query = {};
 
         if (general) {
-            options.general = this.GetSyncConfigGeneral();
+            options.general = this.GetSyncConfigGeneral(id);
         }
 
         if (chats) {
             // First, get the most recent chat message from each peer in each chat
             query = Database.Execute(
                 "SELECT * FROM (SELECT DISTINCT chat, MAX(created) AS created, [from] FROM Messages " +
-                    "WHERE [from] != ? ORDER BY created DESC) " + 
+                    "WHERE [from] " + (id == null ? "!" : "") + "= ? ORDER BY created DESC) " + 
                     "WHERE created IS NOT NULL",
-                [this._activeId]
+                [id == null ? this._activeId : id]
             );
             options.chats = query.data.length > 0 ? query.data : undefined;
         }
 
-        if (posts) {
-            query = Database.Execute("SELECT pub FROM Subscriptions WHERE sub=?", [this._activeId]);
+        if (posts || subs) {
+            query = Database.Execute(
+                "SELECT pub FROM Subscriptions WHERE " + (id == null ? "sub=?" : "pub=?"),
+                [id == null ? this._activeId : id]
+            );
+            let peerSubs = {};
             if (query.data.length > 0) {
                 let peers = {};
                 let cachePostLimitPerUser = parseInt(Database.userdata.getString("CachePostLimitPerUser"));
                 for (let i in query.data) {
                     let peer = query.data[i].pub;
 
-                    let config = Peerway.GetSyncConfigPosts(peer, cachePostLimitPerUser);
-                    peers[peer] = config;
+                    if (posts) {
+                        let config = Peerway.GetSyncConfigPosts(peer, cachePostLimitPerUser);
+                        peers[peer] = config;
+                    }
+                    if (subs) {
+                        peerSubs[peer] = 1;
+                    }
                 }
-                options.posts = peers;
-                options.cachePostLimitPerUser = cachePostLimitPerUser;
+                if (posts) {
+                    options.posts = peers;
+                    options.cachePostLimitPerUser = cachePostLimitPerUser;
+                }
+            }
+
+            if (subs) {
+                query = Database.Execute(
+                    "SELECT id AS pub FROM Peers " + 
+                        "WHERE pub NOT IN (SELECT pub FROM Subscriptions) " + 
+                        (id == null ? "" : "AND pub=?"),
+                    id == null ? [] : [id]
+                );
+                for (let i in query.data) {
+                    let pub = query.data[i].pub;
+                    peerSubs[pub] = 0;
+                }
+
+                options.subs = peerSubs;
             }
         }
 
@@ -521,16 +553,32 @@ class PeerwayAPI {
 
         // Handle posts
         if (options.posts) {
-            for (let i = 0, counti = options.posts.length; i < counti; i++) {
-                let post = options.posts[i];
-                if (!(post.author in requests)) {
-                    requests[post.author] = { posts: {} };
-                } else if (!("posts" in requests[post.author])) {
-                    requests[post.author].posts = {};
+            let postPeers = Object.keys(options.posts);
+            Log.Debug(JSON.stringify(options.posts));
+            for (let i = 0, counti = postPeers.length; i < counti; i++) {
+                let addedPosts = options.posts[postPeers[i]];
+                if (!(postPeers[i] in requests)) {
+                    requests[postPeers[i]] = { posts: {} };
+                } else if (!("posts" in requests[postPeers[i]])) {
+                    requests[postPeers[i]].posts = {};
                 }
-                // Map the version (timestamp doesn't matter for specific posts)
-                // CONSIDER: Rather than doing this for every post, get the latest peer posts update time?
-                requests[post.author].posts[post.id] = post.version;
+                for (let j = 0, countj = addedPosts.length; j < countj; j++) {
+                    let post = addedPosts[j];
+                    // Map the version (timestamp doesn't matter for specific posts)
+                    // CONSIDER: Rather than doing this for every post, get the latest peer posts update time?
+                    requests[postPeers[i]].posts[post.id] = post.version;
+                }
+            }
+        }
+
+        // Handle subscriptions
+        if (options.subs) {
+            let subPeers = Object.keys(options.subs);
+            for (let i = 0, counti = subPeers.length; i < counti; i++) {
+                if (!(subPeers[i] in requests)) {
+                    requests[subPeers[i]] = {};
+                }
+                requests[subPeers[i]].sub = options.subs[subPeers];
             }
         }
 
@@ -542,6 +590,9 @@ class PeerwayAPI {
             data.type = "sync";
             if (options.ts) {
                 data.ts = options.ts;
+            }
+            if (options.cachePostLimitPerUser) {
+                data.cachePostLimitPerUser = options.cachePostLimitPerUser;
             }
             
             // Not using SendRequest here as we don't want to force connection unless necessary
@@ -846,7 +897,14 @@ class PeerwayAPI {
             // Store time of this sync with the peer
             let ts = (new Date()).toISOString();
             Database.Execute("UPDATE Peers SET sync=? WHERE id=?", [ts, from.id]);
-            let options = this.GetSyncOptions("general" in data, "chats" in data, "posts" in data);
+            // Sync the specific peer back
+            let options = this.GetSyncOptions(
+                "general" in data,
+                "chats" in data,
+                "posts" in data,
+                "subs" in data,
+                from.id
+            );
             options.ts = ts;
             this.SyncPeers(options);
         } else if ("ts" in data) {

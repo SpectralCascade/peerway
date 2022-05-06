@@ -200,7 +200,7 @@ export default class MessagingOverview extends Component {
 
         if (doSync) {
             // Connect to peers to update chats
-            Peerway.SyncPeers(Peerway.GetSyncOptions(true, true, false));
+            Peerway.SyncPeers(Peerway.GetSyncOptions(true, true, false, false));
         }
 
         this.forceUpdate();
