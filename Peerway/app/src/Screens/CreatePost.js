@@ -38,6 +38,21 @@ export default class CreatePost extends React.Component {
     OnOpen() {
         Log.Debug("OPENED POST CREATION SCREEN");
         this.Init();
+        if (this.state.id) {
+            this.props.navigation.setOptions({ title: "Edit Post"});
+        } else if (this.state.parentPost && this.state.parentAuthor) {
+            let parentName = "[unknown]";
+            if (this.state.parentAuthor === this.activeId) {
+                let profile = JSON.parse(Database.active.getString("profile"));
+                parentName = profile.name;
+            } else {
+                let query = Database.Execute("SELECT name FROM Peers WHERE id=?", [this.state.parentAuthor]);
+                parentName = (query.data.length > 0 ? query.data[0].name : parentName);
+            }
+            this.props.navigation.setOptions({ title: "Reply to " + parentName});
+        } else {
+            this.props.navigation.setOptions({ title: "Publish Post" });
+        }
         // Auto-close when keyboard is hidden if no text input given
         this.sub = Keyboard.addListener("keyboardDidHide", () => {
             if (this.state.content.length == 0) {
@@ -60,9 +75,17 @@ export default class CreatePost extends React.Component {
             post.media = JSON.stringify(post.media);
             Database.CachePost(post);
             post.media = [];
+        } else if (this.state.parentPost && this.state.parentAuthor) {
+            Log.Debug("PUBLISHING REPLY POST...");
+            post = Database.CreatePost(
+                this.state.content,
+                this.state.media,
+                Constants.visibility.mutuals,
+                this.state.parentPost,
+                this.state.parentAuthor
+            );
         } else {
             Log.Debug("PUBLISHING POST...");
-            // TODO set visibility with context menu
             post = Database.CreatePost(this.state.content, this.state.media, Constants.visibility.mutuals);
         }
 

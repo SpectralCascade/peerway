@@ -349,6 +349,7 @@ export default class PeerChannel {
 
     // Creates a WebRTC connection object.
     _CreatePeerConnection() {
+        // TODO: Allow customisation of these parameters in settings (maybe reuse signal server IP)
         let peercon = new RTCPeerConnection({
             iceServers: [
                 {

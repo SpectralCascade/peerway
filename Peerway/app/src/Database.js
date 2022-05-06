@@ -147,6 +147,8 @@ export default class Database {
                 ["CREATE TABLE IF NOT EXISTS " + "Posts" + "(" +
                     "id TEXT," + // Post UUID
                     "author TEXT," + // Author UUID
+                    "parentPost TEXT," + // Reply/comment posts only
+                    "parentAuthor TEXT," + // Reply/comment posts only
                     "created TEXT," + // When the post was created; UTC ISO-8601 format
                     "edited TEXT," + // When the post was last edited by the author; UTC ISO-8601 format
                     "updated TEXT," + // When the post was last updated from the author; UTC ISO-8601 format
@@ -289,11 +291,13 @@ export default class Database {
         return chat;
     }
 
-    static CreatePost(content, media, visibility=1) {
+    static CreatePost(content, media, visibility=1, parentPost="", parentAuthor="") {
         let timeNow = (new Date()).toISOString();
         let post = {
             id: uuidv1(),
             author: this.active.getString("id"),
+            parentPost: parentPost,
+            parentAuthor: parentAuthor,
             created: timeNow,
             edited: timeNow,
             updated: timeNow,
@@ -305,11 +309,13 @@ export default class Database {
 
         // Create a post entry in the database
         this.Execute(
-            "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) " + 
-                "VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO Posts (id,author,parentPost,parentAuthor,created,edited,updated,version,content,media,visibility) " + 
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             [
                 post.id,
                 post.author,
+                post.parentPost,
+                post.parentAuthor,
                 post.created,
                 post.edited,
                 post.updated,
@@ -323,10 +329,12 @@ export default class Database {
         return post;
     }
 
+    // TODO future work
     static EditPost(id, post) {
         post.version = post.version + 1;
         this.Execute(
-            "UPDATE Posts SET "
+            "UPDATE Posts SET content=?,media=?,version=?",
+            [post.content,post.media,post.version]
         );
     }
 
@@ -337,11 +345,13 @@ export default class Database {
         if (query.data.length == 0) {
             Log.Debug("Caching post." + post.id);
             this.Execute(
-                "INSERT INTO Posts (id,author,created,edited,updated,version,content,media,visibility) " + 
-                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO Posts (id,author,parentPost,parentAuthor,created,edited,updated,version,content,media,visibility) " + 
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 [
                     post.id,
                     post.author,
+                    post.parentPost,
+                    post.parentAuthor,
                     post.created,
                     post.edited,
                     post.updated,

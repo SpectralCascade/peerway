@@ -15,6 +15,7 @@ import Avatar from '../Components/Avatar';
 import ContextMenu from '../Components/ContextMenu';
 import Popup from '../Components/Popup';
 import Notif from '../Notif';
+import moment from 'moment';
 
 const topbarHeight = 56;
 const iconSize = Constants.avatarMedium;
@@ -190,8 +191,7 @@ export default class MessagingOverview extends Component {
                 message: {
                     from: lastMessage.from === this.activeId ? "You: " : ("name" in peer ? peer.name + ": " : ""),
                     content: lastMessage.mime.startsWith("text/") ? lastMessage.content : lastMessage.mime,
-                    // TODO instead of en-GB use device locale
-                    timestamp: lastMessage.created ? (new Date(lastMessage.created)).toLocaleDateString("en-GB") : ""
+                    timestamp: lastMessage.created ? moment(new Date(lastMessage.created)).fromNow() : ""
                 },
                 read: meta.read,
                 type: meta.type

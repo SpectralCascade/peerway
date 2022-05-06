@@ -13,6 +13,7 @@ import ButtonText from '../Components/ButtonText';
 import Constants from '../Constants';
 import ContextMenu from './ContextMenu';
 import Popup from './Popup';
+import moment from 'moment';
 
 const avatarSize = Constants.avatarMedium;
 const footerButtonSize = 36;
@@ -127,10 +128,9 @@ export default class Feed extends React.Component {
 
     // Go to a specific peer profile
     GoProfile(id) {
-        // TODO
         Log.Debug("Go to profile of peer." + id);
         let profileCanGo = this.props.route.name === "Profile"
-            && this.props.route.params && this.props.route.params.peerId !== id;
+            && (!this.props.route.params || this.props.route.params.peerId !== id);
 
         if (profileCanGo || this.props.route.name === "Feeds") {
             this.props.navigation.push("Profile", { peerId: id });
@@ -138,10 +138,16 @@ export default class Feed extends React.Component {
     }
 
     GoReply(post) {
+        this.props.navigation.navigate("CreatePost", { post: {
+            content: "",
+            media: [],
+            parentPost: post.id,
+            parentAuthor: post.author
+        }});
     }
 
     GoToggleLike(post) {
-        post.liked = post.liked == 0 ? 1 : 0;
+        post.liked = post.liked ? 0 : 1;
         this.setState({posts: this.state.posts})
     }
 
@@ -153,6 +159,28 @@ export default class Feed extends React.Component {
     }
 
     render() {
+        const RenderReplyInfo = (item) => {
+            let isReply = item.parentPost && item.parentAuthor;
+            let replyName = "[unknown]";
+            if (item.parentAuthor === this.activeId) {
+                let profile = JSON.parse(Database.active.getString("profile"));
+                replyName = profile.name;
+            } else {
+                let query = Database.Execute("SELECT name FROM Peers WHERE id=?", [item.parentAuthor]);
+                replyName = (query.data.length > 0 ? query.data[0].name : replyName);
+            }
+            return isReply ? (
+                <TouchableOpacity
+                    style={{flexDirection: "row"}}
+                    onPress={() => this.GoProfile(item.parentAuthor)}
+                >
+                    <Icon name="reply-circle" size={avatarSize / 3} color="black" />
+                    <Text style={{paddingLeft: 5}}>{"replying to "}</Text>
+                    <Text style={{fontWeight: "bold"}}>{replyName}</Text>
+                </TouchableOpacity>
+            ) : (<></>);
+        }
+
         return (
         <>
         <HandleEffect navigation={this.props.navigation} effect="focus" callback={() => { this.OnOpen() }}/>
@@ -224,7 +252,8 @@ export default class Feed extends React.Component {
                                 <TouchableOpacity onPress={() => this.GoProfile(item.author)}>
                                     <Text style={styles.authorName}>{author.name}</Text>
                                 </TouchableOpacity>
-                                <Text style={styles.dateText}>{(new Date(item.created)).toLocaleDateString("en-GB")}</Text>
+                                <Text style={styles.dateText}>{moment(new Date(item.created)).format("DD/MM/YYYY [at] HH:mm")}</Text>
+                                {RenderReplyInfo(item)}
                             </View>
                             <TouchableOpacity style={{position: 'absolute', right: 10}} onPress={() => this.OpenContextMenu(item)}>
                                 <Icon
@@ -235,12 +264,10 @@ export default class Feed extends React.Component {
                             </TouchableOpacity>
                         </View>
 
-                        {/* TODO post content */}
                         <TouchableHighlight underlayColor={"#fff4"} onPress={() => this.OpenPost(item)} style={styles.postContent}>
                             <Text style={styles.postContentText}>{item.content}</Text>
                         </TouchableHighlight>
 
-                        {/* TODO add this back (after MVP)
                         <View style={styles.postFooter}>
                             <TouchableOpacity onPress={() => this.GoReply(item)}>
                                 <Icon
@@ -258,7 +285,6 @@ export default class Feed extends React.Component {
                                 />
                             </TouchableOpacity>
                         </View>
-                        */}
 
                         <View style={{paddingBottom: 1, backgroundColor: "#999"}} />
 
@@ -307,6 +333,7 @@ const styles = StyleSheet.create({
     },
     postFooter: {
         flexDirection: "row",
-        justifyContent: "space-evenly"
+        justifyContent: "space-evenly",
+        backgroundColor: "#eee"
     }
 });
