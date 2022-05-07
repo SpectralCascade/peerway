@@ -30,7 +30,8 @@ export default class ProfileEdit extends React.Component {
             website: "",
             bio: "",
             avatar: {},
-            modified: false
+            modified: false,
+            processing: false
         };
         this.initialState = {
         }
@@ -200,7 +201,7 @@ export default class ProfileEdit extends React.Component {
                     </ScrollView>
                     
                     <TouchableOpacity
-                        disabled={this.state.name.trim().length == 0 || !this.state.modified}
+                        disabled={!this.state.processing && (this.state.name.trim().length == 0 || !this.state.modified)}
                         style={[StyleMain.button, {
                             backgroundColor: (this.state.name.trim().length == 0 || !this.state.modified ?
                                 Colors.buttonDisabled : Colors.button),
@@ -208,6 +209,20 @@ export default class ProfileEdit extends React.Component {
                             marginTop: 12
                         }]}
                         onPress={() => {
+                            const saveComplete = () => {
+                                this.state.processing = false;
+                                if (goBack) {
+                                    this.props.navigation.goBack();
+                                } else {
+                                    this.props.navigation.dispatch(
+                                        CommonActions.reset({
+                                            index: 1,
+                                            routes: [{ name: "Overview" }]
+                                        })
+                                    );
+                                }
+                            }
+
                             let goBack = true;
                             if (Database.active == null) {
                                 Database.SwitchActiveEntity(Database.CreateEntity());
@@ -215,7 +230,7 @@ export default class ProfileEdit extends React.Component {
                             }
                             let id = Database.active.getString("id");
 
-                            let srcPath = this.state.avatar.path.split("file://").pop().split("?").shift();
+                            let srcPath = this.state.avatar.path ? this.state.avatar.path.split("file://").pop().split("?").shift() : null;
                             if (srcPath) {
                                 // Copy profile image to app documents path
                                 this.state.avatar.ext = srcPath.split('.').pop();
@@ -238,6 +253,22 @@ export default class ProfileEdit extends React.Component {
                                 }
                                 // Remove path as it can be obtained using the entity ID
                                 delete this.state.avatar.path;
+                            } else {
+                                // No avatar specified, use a default one
+                                let dpath = RNFS.DocumentDirectoryPath + "/" + id + ".png";
+                                this.state.avatar.ext = "png";
+                                RNFS.copyFileAssets("davatar.png", dpath).then(() => {
+                                    Log.Debug("Reading avatar...");
+                                    return RNFS.readFile(dpath, "base64");
+                                }).then((b64) => {
+                                    Database.active.set("avatar", b64);
+                                    Log.Debug("Setup default avatar successfully.");
+                                    saveComplete();
+                                }).catch((e) => {
+                                    Log.Error("Could not setup default avatar. " + e);
+                                }).finally(() => {
+                                    this.state.processing = false;
+                                });
                             }
 
                             // Extract avatar base64 string
@@ -265,15 +296,10 @@ export default class ProfileEdit extends React.Component {
                             // Save profile in database
                             Database.active.set("profile", JSON.stringify(profile));
 
-                            if (goBack) {
-                                this.props.navigation.goBack();
-                            } else {
-                                this.props.navigation.dispatch(
-                                    CommonActions.reset({
-                                        index: 1,
-                                        routes: [{ name: "Overview" }]
-                                    })
-                                );
+                            this.state.processing = true;
+
+                            if (srcPath) {
+                                saveComplete();
                             }
                         }}
                     >
