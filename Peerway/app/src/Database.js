@@ -174,6 +174,7 @@ export default class Database {
                             "ON DELETE CASCADE " +
                             "ON UPDATE NO ACTION" +
                 ")"],
+                // Table storing metadata about media files
                 ["CREATE TABLE IF NOT EXISTS " + "MediaCache" + "(" +
                     "id TEXT," + // ID given to the file
                     "hash TEXT," + // MD5 hash of the file

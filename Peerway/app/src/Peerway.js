@@ -1026,7 +1026,9 @@ class PeerwayAPI {
     // Handle updated peer data
     _OnUpdatePeer(from, data) {
         Log.Debug("Received update for peer." + from.id);
-        let avatarExt = "avatar" in data.profile && "ext" in data.profile.avatar ? data.profile.avatar.ext : "";
+        let avatarExt = "avatar" in data.profile && "ext" in data.profile.avatar ? 
+            data.profile.avatar.ext : "";
+        // Update in the database
         Database.Execute(
             "UPDATE Peers SET name=?, avatar=?, updated=? WHERE id=?",
             [data.profile.name, avatarExt, data.profile.updated, from.id]
