@@ -195,25 +195,6 @@ export default class Database {
         return id;
     }
 
-    // Deletes an existing entity storage slot.
-    static DeleteEntity(id) {
-        success = false;
-        // First, delete the entity data
-        if (id in this.entities) {
-            if (this.entities[id] != null) {
-                // This part actually clears the data from storage
-                this.entities[id].clearAll();
-                success = true;
-            }
-            delete this.entities[id];
-        }
-        // Then delete the entity entry from userdata
-        if (this.userdata.contains(id)) {
-            this.userdata.delete(id);
-        }
-        return success;
-    }
-
     // Execute some arbitrary SQL command (synchronous)
     static Execute(sql, params=[]) {
         //Log.Debug("Executing SQL command:\n" + sql);
