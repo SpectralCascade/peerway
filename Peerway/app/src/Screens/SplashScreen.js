@@ -1,7 +1,6 @@
 import { CommonActions } from '@react-navigation/native';
 import React from 'react';
 import { Image, View } from 'react-native';
-import AppState from '../AppState';
 import HandleEffect from '../Components/HandleEffect';
 import Text from '../Components/Text';
 import Database from '../Database';
