@@ -11,15 +11,17 @@ import DefaultSettings from './DefaultSettings';
 
 export default class Database {
 
-    // All entities, by entity ID.
+    // MMKV storage instances for all entities, by entity ID.
     static entities = {};
-    static active = null;
 
-    // Name of the open SQLite database.
-    static db = null;
+    // MMKV storage instance for the current "active" entity.
+    static active = null;
 
     // Local user data, tracking entities and general app settings.
     static userdata = new MMKV({ id: "userdata", encryptionKey: AppKeys.userdata });
+
+    // Name of the open SQLite database.
+    static db = null;
 
     // Changes the current active entity storage slot.
     static SwitchActiveEntity(id) {
