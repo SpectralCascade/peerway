@@ -257,17 +257,6 @@ class PeerwayAPI {
         // Setup other request handlers
         this.server.on("Call", (socket) => { this._OnConnectionRequest(socket); });
         this.server.on("EntityMetaResponse", (meta) => { this._OnEntityMetaResponse(meta); });
-        this.server.on("PushNotification", (notif) => {
-            let peer = this.GetPeerChannel(notif.from);
-            if (peer.connected) {
-                // Early out, could be an unverified peer making a security breach attempt
-                // Though it's more likely the peer was somehow disconnected without informing this entity
-                // TODO ensure that this never happens
-                Log.Error("Ignoring received push notification as peer." + peer.id + " should be using WebRTC connection!");
-            } else {
-                peer._OnRequest(notif.notif);
-            }
-        });
         this.server.on("Sync", (request) => {
             return this._OnPeerSync(
                 this.GetPeerChannel(request.from),

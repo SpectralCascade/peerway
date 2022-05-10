@@ -229,26 +229,6 @@ io.on('connection', socket => {
         socket.emit("Meta/" + request.id, meta);
     });
 
-    // Handle request to send a push notification to various target entities.
-    socket.on("PushNotification", (request) => {
-        Log.Debug("Received push notification to forward to " + JSON.stringify(request.targets));
-        // TODO send to push notifications server
-        // For now, this will send directly to the entities if available
-        for (let i in request.targets) {
-            let id = request.targets[i];
-            if (id in entities && entities[id].length > 0) {
-                // Note: For time being, the first entity is used until digital signatures are supported.
-                io.to(entities[id][0].socketId).emit(
-                    "PushNotification",
-                    { 
-                        notif: request.notif,
-                        from: request.from
-                    }
-                );
-            }
-        }
-    });
-
     // Handle sync request
     socket.on("Sync", (request) => {
         if (request.target && request.target in entities && entities[request.target].length > 0) {
